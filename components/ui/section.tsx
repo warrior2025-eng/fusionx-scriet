@@ -1,0 +1,37 @@
+import { cn } from "@/lib/utils";
+
+export function Section({
+  className,
+  children,
+  id,
+}: {
+  className?: string;
+  children: React.ReactNode;
+  id?: string;
+}) {
+  return (
+    <section id={id} className={cn("mx-auto max-w-6xl px-6 py-16 md:py-24", className)}>
+      {children}
+    </section>
+  );
+}
+
+export function SectionHeading({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow?: string;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="max-w-2xl mb-10 md:mb-14">
+      {eyebrow && (
+        <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">{eyebrow}</p>
+      )}
+      <h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-ink">{title}</h2>
+      {description && <p className="mt-3 text-ink/60 leading-relaxed">{description}</p>}
+    </div>
+  );
+}

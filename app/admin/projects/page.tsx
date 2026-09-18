@@ -1,0 +1,36 @@
+import { createClient } from "@/lib/supabase/server";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Badge } from "@/components/ui/badge";
+
+export default async function AdminProjectsPage() {
+  const supabase = await createClient();
+  const { data: projects } = await supabase
+    .from("projects")
+    .select("id, title, status, is_published, owner_id")
+    .order("updated_at", { ascending: false });
+
+  return (
+    <div>
+      <h1 className="text-2xl font-semibold text-ink mb-2">Projects</h1>
+      <p className="text-sm text-ink/50 mb-8">
+        Full create/edit tooling lives on each project&rsquo;s own page for its owner. This view is
+        for moderation — publish, unpublish, or remove listings that violate the Code of Conduct.
+      </p>
+      {projects && projects.length > 0 ? (
+        <div className="space-y-2">
+          {projects.map((p) => (
+            <div key={p.id} className="border border-ink/10 rounded-sm p-4 bg-white/60 flex items-center justify-between">
+              <p className="text-sm font-medium text-ink">{p.title}</p>
+              <div className="flex items-center gap-2">
+                <Badge>{p.status}</Badge>
+                <Badge>{p.is_published ? "published" : "draft"}</Badge>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState title="No projects yet." description="Projects created by members will appear here." />
+      )}
+    </div>
+  );
+}
