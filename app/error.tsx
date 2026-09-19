@@ -8,7 +8,7 @@ export default function Error({ reset }: { error: Error & { digest?: string }; r
       <p className="text-ink/55 mb-8 max-w-sm">
         An unexpected error occurred. It has been logged — please try again.
       </p>
-      <button onClick={reset} className="text-sm font-medium text-white bg-ink px-5 py-2.5 rounded-sm hover:bg-ink/90">
+      <button onClick={reset} className="text-sm font-medium text-white bg-accent px-5 py-2.5 rounded-sm hover:bg-accent/90">
         Try again
       </button>
     </div>

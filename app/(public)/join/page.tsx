@@ -17,7 +17,7 @@ export default async function JoinPage() {
   return (
     <Section className="pt-16 pb-24 max-w-2xl">
       <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">Join FusionX</p>
-      <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-ink mb-4">
+      <h1 className="text-3xl md:text-4xl font-serif font-normal tracking-tight text-ink mb-4">
         Don&rsquo;t just participate. Build.
       </h1>
       <p className="text-ink/55 mb-10">

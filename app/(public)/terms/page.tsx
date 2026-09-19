@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Terms & Code of Conduct" };
 export default function TermsPage() {
   return (
     <Section className="pt-16 pb-24 max-w-2xl">
-      <h1 className="text-3xl font-semibold tracking-tight text-ink mb-8">Terms &amp; Code of Conduct</h1>
+      <h1 className="text-3xl font-serif font-normal tracking-tight text-ink mb-8">Terms &amp; Code of Conduct</h1>
       <div className="prose-fx">
         <h2>Academic integrity</h2>
         <p>

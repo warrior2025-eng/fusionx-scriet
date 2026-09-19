@@ -8,7 +8,7 @@ export default async function PublicLayout({ children }: { children: React.React
   return (
     <>
       {settings.announcement_banner_active && settings.announcement_banner && (
-        <div className="bg-ink text-white text-center text-sm px-4 py-2">
+        <div className="bg-accent text-white text-center text-sm px-4 py-2">
           {settings.announcement_banner}
         </div>
       )}

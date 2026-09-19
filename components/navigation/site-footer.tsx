@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { OrganizationSettings } from "@/types/database";
 
@@ -38,9 +39,7 @@ export function SiteFooter({ settings }: { settings: OrganizationSettings }) {
       <div className="container-fx py-14 grid grid-cols-2 md:grid-cols-5 gap-10">
         <div className="col-span-2">
           <div className="flex items-center gap-2 font-semibold text-ink">
-            <span className="flex h-7 w-7 items-center justify-center rounded-sm bg-ink text-xs font-bold text-white">
-              FX
-            </span>
+            <Image src="/logo-mark.png" alt="FusionX logo" width={28} height={28} className="h-7 w-7 rounded-full" />
             {settings.chapter_name}
           </div>
           <p className="mt-3 text-sm text-ink/55 max-w-xs leading-relaxed">

@@ -12,7 +12,7 @@ export default function AboutPage() {
     <>
       <Section className="pt-16 pb-8">
         <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">About</p>
-        <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-ink">
+        <h1 className="text-3xl md:text-4xl font-serif font-normal tracking-tight text-ink">
           Why FusionX exists.
         </h1>
       </Section>

@@ -18,7 +18,7 @@ export default async function ResourcesPage() {
   return (
     <Section className="pt-16 pb-24">
       <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">Resources</p>
-      <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-ink mb-8">Curated resources.</h1>
+      <h1 className="text-3xl md:text-4xl font-serif font-normal tracking-tight text-ink mb-8">Curated resources.</h1>
       {resources && resources.length > 0 ? (
         <div className="grid md:grid-cols-2 gap-5">
           {resources.map((r) => (
@@ -27,7 +27,7 @@ export default async function ResourcesPage() {
               href={r.url ?? "#"}
               target="_blank"
               rel="noopener noreferrer"
-              className="border border-ink/10 rounded-sm p-6 bg-white/50 block hover:border-ink/25 transition-colors"
+              className="border border-ink/10 rounded-sm p-6 bg-surface block hover:border-ink/25 transition-colors"
             >
               <Badge>{r.category}</Badge>
               <p className="mt-3 font-medium text-ink">{r.title}</p>

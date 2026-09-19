@@ -14,7 +14,7 @@ export default async function ContactPage() {
   return (
     <Section className="pt-16 pb-24 max-w-2xl">
       <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">Contact</p>
-      <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-ink mb-4">Get in touch.</h1>
+      <h1 className="text-3xl md:text-4xl font-serif font-normal tracking-tight text-ink mb-4">Get in touch.</h1>
       {settings.official_email ? (
         <p className="text-ink/55 mb-10">
           Reach us directly at{" "}

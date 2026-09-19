@@ -17,7 +17,7 @@ export default async function TeamsPage() {
     return (
       <Section className="pt-16 pb-24">
         <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">Teams</p>
-        <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-ink mb-4">Find collaborators.</h1>
+        <h1 className="text-3xl md:text-4xl font-serif font-normal tracking-tight text-ink mb-4">Find collaborators.</h1>
         <EmptyState
           title="Sign in to view and join teams."
           description="Team formation is available to signed-in FusionX members so contact details stay controlled."
@@ -34,11 +34,11 @@ export default async function TeamsPage() {
   return (
     <Section className="pt-16 pb-24">
       <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">Teams</p>
-      <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-ink mb-8">Find collaborators.</h1>
+      <h1 className="text-3xl md:text-4xl font-serif font-normal tracking-tight text-ink mb-8">Find collaborators.</h1>
       {teams && teams.length > 0 ? (
         <div className="grid md:grid-cols-2 gap-5">
           {teams.map((t) => (
-            <div key={t.id} className="border border-ink/10 rounded-sm p-6 bg-white/50">
+            <div key={t.id} className="border border-ink/10 rounded-sm p-6 bg-surface">
               <div className="flex items-center justify-between mb-2">
                 <p className="font-medium text-ink">{t.name}</p>
                 <Badge>{t.status}</Badge>

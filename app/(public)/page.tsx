@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { ArrowRight, Hammer, FlaskConical, Users, Trophy, Sparkles } from "lucide-react";
 import { LinkButton } from "@/components/ui/button";
 import { Section, SectionHeading } from "@/components/ui/section";
@@ -25,7 +26,13 @@ export default async function HomePage() {
   const settings = await getOrganizationSettings();
   const supabase = await createClient();
 
-  const [{ data: projects }, { data: events }] = await Promise.all([
+  const [
+    { data: projects },
+    { data: events },
+    { count: memberCount },
+    { count: projectCount },
+    { count: eventCount },
+  ] = await Promise.all([
     supabase
       .from("projects")
       .select("id, title, description, domain, status, technologies")
@@ -39,38 +46,143 @@ export default async function HomePage() {
       .in("status", ["upcoming", "live"])
       .order("event_date", { ascending: true })
       .limit(3),
+    supabase.from("profiles").select("*", { count: "exact", head: true }),
+    supabase.from("projects").select("*", { count: "exact", head: true }).eq("is_published", true),
+    supabase.from("events").select("*", { count: "exact", head: true }).eq("is_published", true),
   ]);
+
+  // Real counts only — never fabricated. Shows 0 until there's actually
+  // something to count; see lib/site-config.ts for the no-fabrication rule.
+  const stats = [
+    { label: "Students", value: memberCount ?? 0 },
+    { label: "Projects", value: projectCount ?? 0 },
+    { label: "Events", value: eventCount ?? 0 },
+  ];
 
   return (
     <>
       {/* Hero */}
-      <Section className="pt-20 pb-16 md:pt-28 md:pb-20">
-        <div className="max-w-3xl">
-          <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-5">
-            {settings.chapter_name}
-          </p>
-          <h1 className="text-4xl md:text-6xl font-semibold tracking-tight text-ink leading-[1.05]">
-            Student Innovation
-            <br /> &amp; Research Network
-          </h1>
-          <p className="mt-6 text-xl md:text-2xl font-serif text-ink/80">&ldquo;{settings.tagline}&rdquo;</p>
-          <p className="mt-6 text-base text-ink/60 leading-relaxed max-w-xl">
-            A student-led ecosystem for building projects, exploring research, forming
-            interdisciplinary teams, participating in competitions, and turning ideas into
-            meaningful outcomes.
-          </p>
-          <div className="mt-9 flex flex-wrap gap-3">
-            <LinkButton href="/about" size="lg">
-              Explore FusionX <ArrowRight size={16} />
-            </LinkButton>
-            <LinkButton href="/join" variant="secondary" size="lg">
-              Join the Network
-            </LinkButton>
+      <section className="relative overflow-hidden border-b border-ink/10">
+        <div className="grid lg:grid-cols-2 min-h-[640px]">
+          {/* Left: copy */}
+          <div className="flex flex-col justify-center px-6 md:px-12 lg:px-16 py-16 lg:py-0">
+            <p className="text-xs font-semibold tracking-[0.16em] uppercase text-accent mb-5">
+              A Student-Led Movement
+            </p>
+            <h1 className="font-serif text-5xl md:text-6xl leading-[1.05] tracking-tight">
+              <span className="text-ink">Ideas Grow</span>
+              <br />
+              <span className="text-accent">Here.</span>
+            </h1>
+            <p className="mt-6 text-base text-ink/60 leading-relaxed max-w-md">
+              {settings.chapter_name} brings together students, ideas, and opportunities to
+              build, research, and create real-world impact — together.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <LinkButton href="/programs" size="lg">
+                Explore Programs <ArrowRight size={16} />
+              </LinkButton>
+              <LinkButton href="/join" variant="secondary" size="lg">
+                Join the Network
+              </LinkButton>
+            </div>
+
+            <div className="mt-12 flex flex-wrap gap-x-10 gap-y-4">
+              {stats.map((s) => (
+                <div key={s.label}>
+                  <p className="font-serif text-3xl text-accent">{s.value}</p>
+                  <p className="text-xs text-ink/45 mt-0.5">{s.label}</p>
+                </div>
+              ))}
+              <div>
+                <p className="font-serif text-3xl text-accent">&infin;</p>
+                <p className="text-xs text-ink/45 mt-0.5">Impact</p>
+              </div>
+            </div>
+
+            <div className="mt-10 pt-6 border-t border-ink/10 flex flex-wrap gap-x-6 gap-y-1.5 text-xs font-medium tracking-[0.1em] uppercase text-ink/40">
+              {coreAreas.map((a) => (
+                <span key={a}>{a}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* Right: visual panel — typography-driven explainer instead of a
+              stock photo or abstract illustration. Swap for a real campus
+              photo any time by dropping one into /public (e.g.
+              public/hero-campus.jpg) and replacing this div with a Next
+              <Image> pointed at it. */}
+          <div className="relative min-h-[480px] lg:min-h-0 overflow-hidden bg-[#0a0e18] flex flex-col justify-between px-8 py-10 md:px-14 md:py-14">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#05070f] via-[#0a1330] to-[#12224f]" />
+            <div
+              className="absolute top-1/4 -right-10 h-80 w-80 rounded-full bg-[#2f6bff] opacity-25 blur-[120px]"
+              aria-hidden
+            />
+            <div
+              className="absolute bottom-0 left-0 h-64 w-64 rounded-full bg-[#3f6fe0] opacity-[0.15] blur-[100px]"
+              aria-hidden
+            />
+
+            {/* Large watermark logo filling the empty right-hand space */}
+            <Image
+              src="/logo-mark.png"
+              alt=""
+              width={640}
+              height={640}
+              aria-hidden
+              className="pointer-events-none select-none absolute -right-24 top-1/2 -translate-y-1/2 w-[26rem] md:w-[34rem] h-auto opacity-[0.14] mix-blend-screen"
+            />
+
+            {/* Top: brand mark */}
+            <div className="relative flex items-center gap-2.5 text-white/90">
+              <Image
+                src="/logo-mark.png"
+                alt="FusionX logo"
+                width={36}
+                height={36}
+                className="h-9 w-9 rounded-full"
+              />
+              <span className="text-xs font-semibold tracking-[0.16em] uppercase">
+                FusionX @ SCRIET
+              </span>
+            </div>
+
+            {/* Middle: big stacked typography explaining what FusionX does */}
+            <div className="relative">
+              {["Learn.", "Build.", "Research.", "Impact."].map((word, i) => (
+                <p
+                  key={word}
+                  className={`font-serif text-5xl md:text-6xl leading-[1.05] tracking-tight ${
+                    i === 3 ? "text-accent" : "text-white"
+                  }`}
+                  style={{ opacity: 1 - i * 0.14 }}
+                >
+                  {word}
+                </p>
+              ))}
+              <p className="mt-6 max-w-xs text-sm text-white/55 leading-relaxed">
+                A network where campus conversations turn into working projects, documented
+                research, and outcomes that outlast a single event.
+              </p>
+            </div>
+
+            {/* Bottom: institution tag */}
+            <div className="relative flex items-end justify-between border-t border-white/10 pt-5">
+              <p className="text-xs text-white/45 max-w-[14rem] leading-relaxed">
+                Student Innovation &amp; Research Network
+              </p>
+              <div className="text-right text-xs font-semibold tracking-[0.14em] uppercase text-white/70">
+                <p>SCRIET</p>
+                <p>CCS University, Meerut</p>
+              </div>
+            </div>
           </div>
         </div>
+      </section>
 
-        {/* Idea -> Impact visual */}
-        <div className="mt-16 border border-ink/10 rounded-sm bg-white/60 px-6 py-8 md:px-10 md:py-10 overflow-x-auto">
+      {/* Idea -> Impact visual */}
+      <Section>
+        <div className="border border-ink/10 rounded-sm bg-surface px-6 py-8 md:px-10 md:py-10 overflow-x-auto">
           <div className="flex items-center gap-3 md:gap-5 min-w-max text-sm font-medium text-ink/70">
             {["Idea", "Team", "Build", "Research", "Impact"].map((step, i, arr) => (
               <div key={step} className="flex items-center gap-3 md:gap-5">
@@ -120,7 +232,7 @@ export default async function HomePage() {
         <SectionHeading eyebrow="Core Areas" title="Five ways to get involved." />
         <div className="grid sm:grid-cols-2 md:grid-cols-5 gap-4">
           {coreAreas.map((area) => (
-            <div key={area} className="border border-ink/10 rounded-sm p-5 bg-white/50">
+            <div key={area} className="border border-ink/10 rounded-sm p-5 bg-surface">
               <div className="text-accent mb-3">{areaIcons[area]}</div>
               <p className="font-medium text-ink text-sm">{area}</p>
             </div>
@@ -137,7 +249,7 @@ export default async function HomePage() {
         />
         <div className="grid md:grid-cols-3 gap-5">
           {programs.map((p) => (
-            <div key={p.slug} className="border border-ink/10 rounded-sm p-6 bg-white/50 hover:border-ink/25 transition-colors">
+            <div key={p.slug} className="border border-ink/10 rounded-sm p-6 bg-surface hover:border-ink/25 transition-colors">
               <p className="font-medium text-ink">{p.name}</p>
               <p className="mt-2 text-sm text-ink/55 leading-relaxed">{p.summary}</p>
             </div>
@@ -156,7 +268,7 @@ export default async function HomePage() {
         {projects && projects.length > 0 ? (
           <div className="grid md:grid-cols-3 gap-5">
             {projects.map((p) => (
-              <div key={p.id} className="border border-ink/10 rounded-sm p-6 bg-white/50">
+              <div key={p.id} className="border border-ink/10 rounded-sm p-6 bg-surface">
                 <div className="flex items-center justify-between mb-2">
                   <Badge>{p.status}</Badge>
                   {p.domain && <span className="text-xs text-ink/40">{p.domain}</span>}
@@ -185,7 +297,7 @@ export default async function HomePage() {
         {events && events.length > 0 ? (
           <div className="grid md:grid-cols-3 gap-5">
             {events.map((e) => (
-              <div key={e.id} className="border border-ink/10 rounded-sm p-6 bg-white/50">
+              <div key={e.id} className="border border-ink/10 rounded-sm p-6 bg-surface">
                 <Badge>{e.status}</Badge>
                 <p className="mt-3 font-medium text-ink">{e.title}</p>
                 <p className="mt-1.5 text-sm text-ink/55">
@@ -208,7 +320,7 @@ export default async function HomePage() {
         <SectionHeading eyebrow="Founding Team" title="Started by three students at SCRIET." />
         <div className="grid md:grid-cols-3 gap-5">
           {founders.map((f) => (
-            <div key={f.name} className="border border-ink/10 rounded-sm p-6 bg-white/50">
+            <div key={f.name} className="border border-ink/10 rounded-sm p-6 bg-surface">
               <p className="font-medium text-ink">{f.name}</p>
               <p className="mt-1 text-sm text-accent">{f.role}</p>
             </div>
@@ -223,7 +335,7 @@ export default async function HomePage() {
 
       {/* Faculty guide */}
       <Section className="pt-0">
-        <div className="border border-ink/10 rounded-sm bg-white/50 p-8 md:p-10 flex flex-col md:flex-row md:items-center gap-6 justify-between">
+        <div className="border border-ink/10 rounded-sm bg-surface p-8 md:p-10 flex flex-col md:flex-row md:items-center gap-6 justify-between">
           <div>
             <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-2">Faculty Guide</p>
             <p className="text-lg font-medium text-ink">{settings.faculty_guide_name}</p>
@@ -235,7 +347,7 @@ export default async function HomePage() {
 
       {/* Join CTA */}
       <Section className="pt-0 pb-24">
-        <div className="border border-ink/10 rounded-sm bg-ink text-white p-10 md:p-14 text-center">
+        <div className="border border-accent/30 rounded-sm bg-accent text-white p-10 md:p-14 text-center">
           <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Don&rsquo;t just participate. Build.</h2>
           <p className="mt-3 text-white/65 max-w-lg mx-auto">
             Join FusionX and become part of a network of students building, researching, and

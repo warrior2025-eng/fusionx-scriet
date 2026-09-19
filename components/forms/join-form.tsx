@@ -13,7 +13,7 @@ export function JoinForm({ isSignedIn }: { isSignedIn: boolean }) {
 
   if (!isSignedIn) {
     return (
-      <div className="border border-ink/10 rounded-sm bg-white/50 p-8 text-center">
+      <div className="border border-ink/10 rounded-sm bg-surface p-8 text-center">
         <p className="font-medium text-ink">Sign in to apply</p>
         <p className="mt-2 text-sm text-ink/55 max-w-sm mx-auto">
           We ask applicants to create a FusionX account first, so we can follow up on your
@@ -21,7 +21,7 @@ export function JoinForm({ isSignedIn }: { isSignedIn: boolean }) {
         </p>
         <a
           href="/signup?next=/join"
-          className="mt-5 inline-flex items-center justify-center rounded-sm bg-ink text-white px-5 py-2.5 text-sm font-medium hover:bg-ink/90"
+          className="mt-5 inline-flex items-center justify-center rounded-sm bg-accent text-white px-5 py-2.5 text-sm font-medium hover:bg-accent/90"
         >
           Create an account
         </a>
@@ -31,7 +31,7 @@ export function JoinForm({ isSignedIn }: { isSignedIn: boolean }) {
 
   if (state.status === "success") {
     return (
-      <div className="border border-ink/10 rounded-sm bg-white/50 p-8 text-center">
+      <div className="border border-ink/10 rounded-sm bg-surface p-8 text-center">
         <p className="font-medium text-ink">You&rsquo;re in the queue.</p>
         <p className="mt-2 text-sm text-ink/55">{state.message}</p>
       </div>

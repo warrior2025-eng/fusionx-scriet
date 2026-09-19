@@ -19,7 +19,7 @@ export default async function AdminProjectsPage() {
       {projects && projects.length > 0 ? (
         <div className="space-y-2">
           {projects.map((p) => (
-            <div key={p.id} className="border border-ink/10 rounded-sm p-4 bg-white/60 flex items-center justify-between">
+            <div key={p.id} className="border border-ink/10 rounded-sm p-4 bg-surface flex items-center justify-between">
               <p className="text-sm font-medium text-ink">{p.title}</p>
               <div className="flex items-center gap-2">
                 <Badge>{p.status}</Badge>

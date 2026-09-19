@@ -11,7 +11,7 @@ export function ApplicationRow({ application }: { application: Application }) {
   const [pending, startTransition] = useTransition();
 
   return (
-    <div className="border border-ink/10 rounded-sm p-5 bg-white/60">
+    <div className="border border-ink/10 rounded-sm p-5 bg-surface">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="font-medium text-ink">{application.full_name}</p>
@@ -32,7 +32,7 @@ export function ApplicationRow({ application }: { application: Application }) {
           onChange={(e) =>
             startTransition(() => updateApplicationStatus(application.id, e.target.value as ApplicationStatus))
           }
-          className="text-sm rounded-sm border border-ink/15 px-3 py-1.5 bg-white disabled:opacity-50"
+          className="text-sm rounded-sm border border-ink/15 px-3 py-1.5 bg-surface disabled:opacity-50"
         >
           {statuses.map((s) => (
             <option key={s} value={s}>

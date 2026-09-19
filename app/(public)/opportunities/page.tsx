@@ -21,7 +21,7 @@ export default async function OpportunitiesPage() {
     <>
       <Section className="pt-16 pb-8">
         <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">Opportunities</p>
-        <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-ink">
+        <h1 className="text-3xl md:text-4xl font-serif font-normal tracking-tight text-ink">
           Hackathons, internships, and more.
         </h1>
         <p className="mt-4 text-sm text-ink/50 max-w-xl">
@@ -35,7 +35,7 @@ export default async function OpportunitiesPage() {
         {opportunities && opportunities.length > 0 ? (
           <div className="grid md:grid-cols-2 gap-5">
             {opportunities.map((o) => (
-              <div key={o.id} className="border border-ink/10 rounded-sm p-6 bg-white/50">
+              <div key={o.id} className="border border-ink/10 rounded-sm p-6 bg-surface">
                 <div className="flex items-center justify-between mb-2">
                   <Badge>{o.category.replace(/_/g, " ")}</Badge>
                   <Badge>{o.status.replace(/_/g, " ")}</Badge>

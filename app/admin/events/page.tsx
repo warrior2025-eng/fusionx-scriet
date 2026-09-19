@@ -15,7 +15,7 @@ export default async function AdminEventsPage() {
       {events && events.length > 0 ? (
         <div className="space-y-2">
           {events.map((e) => (
-            <div key={e.id} className="border border-ink/10 rounded-sm p-4 bg-white/60 flex items-center justify-between">
+            <div key={e.id} className="border border-ink/10 rounded-sm p-4 bg-surface flex items-center justify-between">
               <p className="text-sm font-medium text-ink">{e.title}</p>
               <div className="flex items-center gap-2">
                 <Badge>{e.status}</Badge>

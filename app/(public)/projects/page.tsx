@@ -36,7 +36,7 @@ export default async function ProjectsPage({
     <>
       <Section className="pt-16 pb-8">
         <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">Projects</p>
-        <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-ink">
+        <h1 className="text-3xl md:text-4xl font-serif font-normal tracking-tight text-ink">
           What members are building.
         </h1>
       </Section>
@@ -48,12 +48,12 @@ export default async function ProjectsPage({
             name="q"
             placeholder="Search by title…"
             defaultValue={params.q}
-            className="rounded-sm border border-ink/15 bg-white px-3.5 py-2 text-sm placeholder:text-ink/35 focus:outline-none focus:ring-2 focus:ring-accent/40"
+            className="rounded-sm border border-ink/15 bg-surface px-3.5 py-2 text-sm placeholder:text-ink/35 focus:outline-none focus:ring-2 focus:ring-accent/40"
           />
           <select
             name="status"
             defaultValue={params.status ?? ""}
-            className="rounded-sm border border-ink/15 bg-white px-3.5 py-2 text-sm"
+            className="rounded-sm border border-ink/15 bg-surface px-3.5 py-2 text-sm"
           >
             <option value="">All statuses</option>
             {statuses.map((s) => (
@@ -70,7 +70,7 @@ export default async function ProjectsPage({
         {projects && projects.length > 0 ? (
           <div className="grid md:grid-cols-3 gap-5">
             {projects.map((p) => (
-              <div key={p.id} className="border border-ink/10 rounded-sm p-6 bg-white/50">
+              <div key={p.id} className="border border-ink/10 rounded-sm p-6 bg-surface">
                 <div className="flex items-center justify-between mb-2">
                   <Badge>{p.status}</Badge>
                   {p.domain && <span className="text-xs text-ink/40">{p.domain}</span>}

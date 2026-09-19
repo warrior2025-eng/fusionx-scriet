@@ -21,7 +21,7 @@ export default async function EventsPage() {
     <>
       <Section className="pt-16 pb-8">
         <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">Events</p>
-        <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-ink">
+        <h1 className="text-3xl md:text-4xl font-serif font-normal tracking-tight text-ink">
           Sessions, build days, and showcases.
         </h1>
       </Section>
@@ -32,7 +32,7 @@ export default async function EventsPage() {
             {events.map((e) => (
               <div
                 key={e.id}
-                className="border border-ink/10 rounded-sm p-6 bg-white/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                className="border border-ink/10 rounded-sm p-6 bg-surface flex flex-col sm:flex-row sm:items-center justify-between gap-4"
               >
                 <div>
                   <div className="flex items-center gap-2 mb-1.5">

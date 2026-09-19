@@ -12,7 +12,7 @@ export function ContactForm() {
 
   if (state.status === "success") {
     return (
-      <div className="border border-ink/10 rounded-sm bg-white/50 p-8 text-center">
+      <div className="border border-ink/10 rounded-sm bg-surface p-8 text-center">
         <p className="font-medium text-ink">Message sent.</p>
         <p className="mt-2 text-sm text-ink/55">{state.message}</p>
       </div>

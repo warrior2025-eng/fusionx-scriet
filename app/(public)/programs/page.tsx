@@ -21,7 +21,7 @@ export default function ProgramsPage() {
     <>
       <Section className="pt-16 pb-8">
         <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">Programs</p>
-        <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-ink max-w-2xl">
+        <h1 className="text-3xl md:text-4xl font-serif font-normal tracking-tight text-ink max-w-2xl">
           Six tracks, one pipeline from idea to impact.
         </h1>
       </Section>
@@ -29,7 +29,7 @@ export default function ProgramsPage() {
       <Section className="pt-0">
         <div className="grid md:grid-cols-2 gap-6">
           {programs.map((p) => (
-            <div key={p.slug} id={p.slug} className="border border-ink/10 rounded-sm p-7 bg-white/50">
+            <div key={p.slug} id={p.slug} className="border border-ink/10 rounded-sm p-7 bg-surface">
               <p className="font-medium text-lg text-ink">{p.name}</p>
               <p className="mt-2 text-sm text-ink/60 leading-relaxed">{p.summary}</p>
               <ul className="mt-5 flex flex-wrap gap-2">

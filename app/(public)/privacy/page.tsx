@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Privacy Policy" };
 export default function PrivacyPage() {
   return (
     <Section className="pt-16 pb-24 max-w-2xl">
-      <h1 className="text-3xl font-semibold tracking-tight text-ink mb-8">Privacy Policy</h1>
+      <h1 className="text-3xl font-serif font-normal tracking-tight text-ink mb-8">Privacy Policy</h1>
       <div className="prose-fx">
         <p>
           FusionX @ SCRIET collects only the personal information necessary to operate the

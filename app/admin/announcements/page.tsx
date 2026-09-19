@@ -15,7 +15,7 @@ export default async function AdminAnnouncementsPage() {
       {announcements && announcements.length > 0 ? (
         <div className="space-y-2">
           {announcements.map((a) => (
-            <div key={a.id} className="border border-ink/10 rounded-sm p-4 bg-white/60 flex items-center justify-between">
+            <div key={a.id} className="border border-ink/10 rounded-sm p-4 bg-surface flex items-center justify-between">
               <p className="text-sm font-medium text-ink">{a.title}</p>
               <Badge>{a.status}</Badge>
             </div>

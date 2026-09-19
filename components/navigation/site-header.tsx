@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
@@ -25,9 +26,7 @@ export function SiteHeader({ chapterName }: { chapterName: string }) {
     <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper/90 backdrop-blur">
       <div className="container-fx flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight text-ink" onClick={() => setOpen(false)}>
-          <span className="flex h-7 w-7 items-center justify-center rounded-sm bg-ink text-xs font-bold text-white">
-            FX
-          </span>
+          <Image src="/logo-mark.png" alt="FusionX logo" width={28} height={28} className="h-7 w-7 rounded-full" />
           <span className="hidden sm:inline">{chapterName}</span>
           <span className="sm:hidden">FusionX</span>
         </Link>

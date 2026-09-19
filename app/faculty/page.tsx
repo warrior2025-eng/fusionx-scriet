@@ -49,7 +49,7 @@ export default async function FacultyDashboardPage() {
 
       <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
         {metrics.map((m) => (
-          <div key={m.label} className="border border-ink/10 rounded-sm p-5 bg-white/60">
+          <div key={m.label} className="border border-ink/10 rounded-sm p-5 bg-surface">
             <p className="text-2xl font-semibold text-ink">{m.value}</p>
             <p className="text-sm text-ink/50 mt-1">{m.label}</p>
           </div>
