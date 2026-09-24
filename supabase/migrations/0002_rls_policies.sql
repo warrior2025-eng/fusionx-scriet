@@ -1,4 +1,4 @@
--- FusionX @ SCRIET — Row Level Security
+-- FusionX@SCRIET — Row Level Security
 --
 -- Rule of thumb applied throughout: never write "allow everything for
 -- authenticated users." Every policy names the exact rows a role can touch.

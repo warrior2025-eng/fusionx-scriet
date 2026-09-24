@@ -1,8 +1,10 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Section } from "@/components/ui/section";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { EventRegisterButton } from "@/components/forms/event-register-button";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/permissions";
 
 export const metadata: Metadata = {
   title: "Events",
@@ -11,11 +13,20 @@ export const metadata: Metadata = {
 
 export default async function EventsPage() {
   const supabase = await createClient();
-  const { data: events } = await supabase
-    .from("events")
-    .select("id, title, description, event_date, event_time, venue, status, registration_url")
-    .eq("is_published", true)
-    .order("event_date", { ascending: true });
+  const user = await getCurrentUser();
+
+  const [{ data: events }, { data: myRegistrations }] = await Promise.all([
+    supabase
+      .from("events")
+      .select("id, title, description, event_date, event_time, venue, status, registration_url")
+      .eq("is_published", true)
+      .order("event_date", { ascending: true }),
+    user
+      ? supabase.from("event_registrations").select("event_id").eq("user_id", user.id)
+      : Promise.resolve({ data: [] as { event_id: string }[] }),
+  ]);
+
+  const myEventIds = new Set((myRegistrations ?? []).map((r) => r.event_id));
 
   return (
     <>
@@ -46,16 +57,23 @@ export default async function EventsPage() {
                   {e.venue && <p className="text-xs text-ink/45 mt-0.5">{e.venue}</p>}
                   <p className="mt-2 text-sm text-ink/55 max-w-xl">{e.description}</p>
                 </div>
-                {e.registration_url && e.status !== "completed" && (
-                  <a
-                    href={e.registration_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="shrink-0 text-sm font-medium text-accent hover:underline"
-                  >
-                    Register →
-                  </a>
-                )}
+                {e.status !== "completed" &&
+                  (e.registration_url ? (
+                    <a
+                      href={e.registration_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 text-sm font-medium text-accent hover:underline"
+                    >
+                      Register →
+                    </a>
+                  ) : (
+                    <EventRegisterButton
+                      eventId={e.id}
+                      isRegistered={myEventIds.has(e.id)}
+                      isSignedIn={!!user}
+                    />
+                  ))}
               </div>
             ))}
           </div>

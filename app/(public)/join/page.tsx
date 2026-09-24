@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Join FusionX",
-  description: "Apply to join FusionX @ SCRIET.",
+  description: "Apply to join FusionX@SCRIET.",
 };
 
 export default async function JoinPage() {

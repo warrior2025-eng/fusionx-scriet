@@ -11,7 +11,7 @@ import {
   buildPipeline,
   coreAreas,
 } from "@/lib/site-config";
-import { getOrganizationSettings, approvalStatusLabel } from "@/lib/data/organization";
+import { getOrganizationSettings } from "@/lib/data/organization";
 import { createClient } from "@/lib/supabase/server";
 
 const areaIcons: Record<string, React.ReactNode> = {
@@ -143,7 +143,7 @@ export default async function HomePage() {
                 className="h-9 w-9 rounded-full"
               />
               <span className="text-xs font-semibold tracking-[0.16em] uppercase">
-                FusionX @ SCRIET
+                FusionX@SCRIET
               </span>
             </div>
 
@@ -201,7 +201,7 @@ export default async function HomePage() {
         <SectionHeading
           eyebrow="What is FusionX?"
           title="An ecosystem, not just a club."
-          description="FusionX @ SCRIET exists to help students move beyond attending events — into
+          description="FusionX@SCRIET exists to help students move beyond attending events — into
           actually building projects, conducting research, protecting their ideas, and carrying
           work forward past a single competition."
         />
@@ -335,13 +335,10 @@ export default async function HomePage() {
 
       {/* Faculty guide */}
       <Section className="pt-0">
-        <div className="border border-ink/10 rounded-sm bg-surface p-8 md:p-10 flex flex-col md:flex-row md:items-center gap-6 justify-between">
-          <div>
-            <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-2">Faculty Guide</p>
-            <p className="text-lg font-medium text-ink">{settings.faculty_guide_name}</p>
-            <p className="text-sm text-ink/55 mt-1">{settings.faculty_guide_title}</p>
-          </div>
-          <Badge className="self-start md:self-center">{approvalStatusLabel(settings.institutional_approval)}</Badge>
+        <div className="border border-ink/10 rounded-sm bg-surface p-8 md:p-10">
+          <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-2">Faculty Guide</p>
+          <p className="text-lg font-medium text-ink">{settings.faculty_guide_name}</p>
+          <p className="text-sm text-ink/55 mt-1">{settings.faculty_guide_title}</p>
         </div>
       </Section>
 

@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { Section, SectionHeading } from "@/components/ui/section";
-import { Badge } from "@/components/ui/badge";
+
 import { founders, seniorMentor } from "@/lib/site-config";
-import { getOrganizationSettings, approvalStatusLabel } from "@/lib/data/organization";
+import { getOrganizationSettings } from "@/lib/data/organization";
 
 export const metadata: Metadata = {
   title: "Founding Team",
-  description: "The founding members, faculty guide, and senior mentor of FusionX @ SCRIET.",
+  description: "The founding members, faculty guide, and senior mentor of FusionX@SCRIET.",
 };
 
 export default async function FoundersPage() {
@@ -38,12 +38,9 @@ export default async function FoundersPage() {
 
       <Section className="pt-0">
         <SectionHeading eyebrow="Faculty Guide" title="Institutional guidance and mentorship." />
-        <div className="border border-ink/10 rounded-sm p-7 bg-surface flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <p className="font-medium text-ink">{settings.faculty_guide_name}</p>
-            <p className="text-sm text-ink/55 mt-1">{settings.faculty_guide_title}</p>
-          </div>
-          <Badge>{approvalStatusLabel(settings.institutional_approval)}</Badge>
+        <div className="border border-ink/10 rounded-sm p-7 bg-surface">
+          <p className="font-medium text-ink">{settings.faculty_guide_name}</p>
+          <p className="text-sm text-ink/55 mt-1">{settings.faculty_guide_title}</p>
         </div>
       </Section>
 

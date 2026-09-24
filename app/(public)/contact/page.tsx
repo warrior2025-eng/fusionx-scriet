@@ -5,7 +5,7 @@ import { getOrganizationSettings } from "@/lib/data/organization";
 
 export const metadata: Metadata = {
   title: "Contact",
-  description: "Get in touch with FusionX @ SCRIET.",
+  description: "Get in touch with FusionX@SCRIET.",
 };
 
 export default async function ContactPage() {

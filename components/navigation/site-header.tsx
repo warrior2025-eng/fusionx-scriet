@@ -1,12 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Search, Bell, LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LinkButton } from "@/components/ui/button";
+import { logoutAction } from "@/actions/auth";
 
 const nav = [
   { href: "/about", label: "About" },
@@ -18,7 +19,7 @@ const nav = [
   { href: "/founders", label: "Team" },
 ];
 
-export function SiteHeader({ chapterName }: { chapterName: string }) {
+export function SiteHeader({ chapterName, isSignedIn }: { chapterName: string; isSignedIn: boolean }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -47,9 +48,36 @@ export function SiteHeader({ chapterName }: { chapterName: string }) {
         </nav>
 
         <div className="hidden md:flex items-center gap-3">
-          <Link href="/login" className="text-sm text-ink/65 hover:text-ink transition-colors">
-            Sign in
+          <Link href="/search" aria-label="Search" className="p-2 text-ink/65 hover:text-ink transition-colors">
+            <Search size={18} />
           </Link>
+          {isSignedIn ? (
+            <>
+              <Link
+                href="/notifications"
+                aria-label="Notifications"
+                className="p-2 text-ink/65 hover:text-ink transition-colors"
+              >
+                <Bell size={18} />
+              </Link>
+              <Link
+                href="/projects/mine"
+                aria-label="My projects"
+                className="p-2 text-ink/65 hover:text-ink transition-colors"
+              >
+                <LayoutGrid size={18} />
+              </Link>
+              <form action={logoutAction}>
+                <button type="submit" className="text-sm text-ink/65 hover:text-ink transition-colors">
+                  Sign out
+                </button>
+              </form>
+            </>
+          ) : (
+            <Link href="/login" className="text-sm text-ink/65 hover:text-ink transition-colors">
+              Sign in
+            </Link>
+          )}
           <LinkButton href="/join" size="sm">
             Join FusionX
           </LinkButton>
@@ -77,10 +105,39 @@ export function SiteHeader({ chapterName }: { chapterName: string }) {
               {item.label}
             </Link>
           ))}
+          {isSignedIn && (
+            <>
+              <Link
+                href="/notifications"
+                onClick={() => setOpen(false)}
+                className="py-2.5 text-sm text-ink/75 hover:text-ink border-b border-ink/5"
+              >
+                Notifications
+              </Link>
+              <Link
+                href="/projects/mine"
+                onClick={() => setOpen(false)}
+                className="py-2.5 text-sm text-ink/75 hover:text-ink border-b border-ink/5"
+              >
+                My Projects
+              </Link>
+            </>
+          )}
           <div className="flex gap-3 pt-4">
-            <LinkButton href="/login" variant="secondary" size="sm" className="flex-1">
-              Sign in
-            </LinkButton>
+            {isSignedIn ? (
+              <form action={logoutAction} className="flex-1">
+                <button
+                  type="submit"
+                  className="w-full text-center rounded-sm border border-ink/20 py-2.5 text-sm font-medium text-ink hover:border-ink/50"
+                >
+                  Sign out
+                </button>
+              </form>
+            ) : (
+              <LinkButton href="/login" variant="secondary" size="sm" className="flex-1">
+                Sign in
+              </LinkButton>
+            )}
             <LinkButton href="/join" size="sm" className="flex-1">
               Join FusionX
             </LinkButton>

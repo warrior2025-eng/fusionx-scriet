@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Section, SectionHeading } from "@/components/ui/section";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { LinkButton } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -20,11 +21,19 @@ export default async function ResearchPage() {
   return (
     <>
       <Section className="pt-16 pb-8">
-        <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">Research &amp; IP</p>
-        <h1 className="text-3xl md:text-4xl font-serif font-normal tracking-tight text-ink max-w-2xl">
-          Turning projects into documented research.
-        </h1>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">Research &amp; IP</p>
+            <h1 className="text-3xl md:text-4xl font-serif font-normal tracking-tight text-ink max-w-2xl">
+              Turning projects into documented research.
+            </h1>
+          </div>
+          <LinkButton href="/research/new" size="sm">
+            Add entry
+          </LinkButton>
+        </div>
       </Section>
+
 
       <Section className="pt-0">
         {research && research.length > 0 ? (

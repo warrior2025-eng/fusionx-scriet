@@ -8,11 +8,11 @@ import type { OrganizationSettings } from "@/types/database";
 const FALLBACK_SETTINGS: OrganizationSettings = {
   id: true,
   org_name: "FusionX",
-  chapter_name: "FusionX @ SCRIET",
+  chapter_name: "FusionX@SCRIET",
   tagline: "From Ideas to Impact.",
   secondary_tagline: "Don't just participate. Build.",
   faculty_guide_name: "Manav Bansal",
-  faculty_guide_title: "Faculty Guide, FusionX @ SCRIET · HOD, IT, SCRIET",
+  faculty_guide_title: "Faculty Guide, FusionX@SCRIET · HOD, IT, SCRIET",
   institutional_approval: "faculty_guide_confirmed",
   official_email: null,
   instagram_url: null,

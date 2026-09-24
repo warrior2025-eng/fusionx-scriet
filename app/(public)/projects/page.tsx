@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Section } from "@/components/ui/section";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { LinkButton } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -35,10 +36,22 @@ export default async function ProjectsPage({
   return (
     <>
       <Section className="pt-16 pb-8">
-        <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">Projects</p>
-        <h1 className="text-3xl md:text-4xl font-serif font-normal tracking-tight text-ink">
-          What members are building.
-        </h1>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">Projects</p>
+            <h1 className="text-3xl md:text-4xl font-serif font-normal tracking-tight text-ink">
+              What members are building.
+            </h1>
+          </div>
+          <div className="flex gap-2">
+            <LinkButton href="/projects/mine" variant="secondary" size="sm">
+              My projects
+            </LinkButton>
+            <LinkButton href="/projects/new" size="sm">
+              New project
+            </LinkButton>
+          </div>
+        </div>
       </Section>
 
       <Section className="pt-0">

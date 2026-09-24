@@ -1,6 +1,7 @@
-import { createClient } from "@/lib/supabase/server";
+﻿import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { AnnouncementControls } from "@/components/admin/announcement-controls";
 
 export default async function AdminAnnouncementsPage() {
   const supabase = await createClient();
@@ -15,9 +16,12 @@ export default async function AdminAnnouncementsPage() {
       {announcements && announcements.length > 0 ? (
         <div className="space-y-2">
           {announcements.map((a) => (
-            <div key={a.id} className="border border-ink/10 rounded-sm p-4 bg-surface flex items-center justify-between">
-              <p className="text-sm font-medium text-ink">{a.title}</p>
-              <Badge>{a.status}</Badge>
+            <div key={a.id} className="border border-ink/10 rounded-sm p-4 bg-surface flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <p className="text-sm font-medium text-ink">{a.title}</p>
+                <Badge>{a.status}</Badge>
+              </div>
+              <AnnouncementControls id={a.id} status={a.status} />
             </div>
           ))}
         </div>

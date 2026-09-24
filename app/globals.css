@@ -13,8 +13,8 @@
   --color-ink: var(--color-ink);
   --color-accent: var(--color-accent);
   --color-surface: var(--color-surface);
-  --font-sans: var(--font-inter);
-  --font-serif: var(--font-source-serif);
+  --font-sans: var(--font-manrope);
+  --font-serif: var(--font-fraunces);
 }
 
 @media (prefers-reduced-motion: reduce) {

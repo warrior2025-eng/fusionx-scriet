@@ -65,11 +65,10 @@ export function SiteFooter({ settings }: { settings: OrganizationSettings }) {
       </div>
 
       <div className="border-t border-ink/10">
-        <div className="container-fx py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-ink/45">
+        <div className="container-fx py-5 text-center text-xs text-ink/45">
           <p>
             © {new Date().getFullYear()} {settings.chapter_name}. Built by students, for students.
           </p>
-          <p>{settings.faculty_guide_title}</p>
         </div>
       </div>
     </footer>

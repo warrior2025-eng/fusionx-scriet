@@ -1,6 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
+﻿import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { PublishToggle } from "@/components/admin/publish-toggle";
+import { toggleEventPublished, deleteEventAsAdmin } from "@/actions/admin-moderation";
 
 export default async function AdminEventsPage() {
   const supabase = await createClient();
@@ -15,12 +17,27 @@ export default async function AdminEventsPage() {
       {events && events.length > 0 ? (
         <div className="space-y-2">
           {events.map((e) => (
-            <div key={e.id} className="border border-ink/10 rounded-sm p-4 bg-surface flex items-center justify-between">
-              <p className="text-sm font-medium text-ink">{e.title}</p>
-              <div className="flex items-center gap-2">
+            <div key={e.id} className="border border-ink/10 rounded-sm p-4 bg-surface flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <p className="text-sm font-medium text-ink">{e.title}</p>
                 <Badge>{e.status}</Badge>
                 <Badge>{e.is_published ? "published" : "draft"}</Badge>
               </div>
+              <PublishToggle
+                isPublished={e.is_published}
+                onPublish={async () => {
+                  "use server";
+                  await toggleEventPublished(e.id, true);
+                }}
+                onUnpublish={async () => {
+                  "use server";
+                  await toggleEventPublished(e.id, false);
+                }}
+                onDelete={async () => {
+                  "use server";
+                  await deleteEventAsAdmin(e.id);
+                }}
+              />
             </div>
           ))}
         </div>

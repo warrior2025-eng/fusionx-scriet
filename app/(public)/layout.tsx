@@ -1,9 +1,11 @@
 import { SiteHeader } from "@/components/navigation/site-header";
 import { SiteFooter } from "@/components/navigation/site-footer";
 import { getOrganizationSettings } from "@/lib/data/organization";
+import { getCurrentUser } from "@/lib/permissions";
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
   const settings = await getOrganizationSettings();
+  const user = await getCurrentUser();
 
   return (
     <>
@@ -12,7 +14,7 @@ export default async function PublicLayout({ children }: { children: React.React
           {settings.announcement_banner}
         </div>
       )}
-      <SiteHeader chapterName={settings.chapter_name} />
+      <SiteHeader chapterName={settings.chapter_name} isSignedIn={!!user} />
       <main className="flex-1">{children}</main>
       <SiteFooter settings={settings} />
     </>

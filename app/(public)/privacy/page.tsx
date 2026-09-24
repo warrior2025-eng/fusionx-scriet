@@ -9,7 +9,7 @@ export default function PrivacyPage() {
       <h1 className="text-3xl font-serif font-normal tracking-tight text-ink mb-8">Privacy Policy</h1>
       <div className="prose-fx">
         <p>
-          FusionX @ SCRIET collects only the personal information necessary to operate the
+          FusionX@SCRIET collects only the personal information necessary to operate the
           network — for example, your name, college email, department, and the details you
           choose to share on your profile or in an application.
         </p>

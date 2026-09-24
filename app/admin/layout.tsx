@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isStaff, getCurrentUser } from "@/lib/permissions";
 import { logoutAction } from "@/actions/auth";
@@ -10,6 +10,7 @@ const navItems = [
   { href: "/admin/events", label: "Events" },
   { href: "/admin/opportunities", label: "Opportunities" },
   { href: "/admin/announcements", label: "Announcements" },
+  { href: "/admin/audit-logs", label: "Audit Logs" },
   { href: "/admin/settings", label: "Settings" },
 ];
 

@@ -1,6 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
+﻿import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { PublishToggle } from "@/components/admin/publish-toggle";
+import { toggleProjectPublished, deleteProjectAsAdmin } from "@/actions/admin-moderation";
 
 export default async function AdminProjectsPage() {
   const supabase = await createClient();
@@ -19,12 +21,27 @@ export default async function AdminProjectsPage() {
       {projects && projects.length > 0 ? (
         <div className="space-y-2">
           {projects.map((p) => (
-            <div key={p.id} className="border border-ink/10 rounded-sm p-4 bg-surface flex items-center justify-between">
-              <p className="text-sm font-medium text-ink">{p.title}</p>
-              <div className="flex items-center gap-2">
+            <div key={p.id} className="border border-ink/10 rounded-sm p-4 bg-surface flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <p className="text-sm font-medium text-ink">{p.title}</p>
                 <Badge>{p.status}</Badge>
                 <Badge>{p.is_published ? "published" : "draft"}</Badge>
               </div>
+              <PublishToggle
+                isPublished={p.is_published}
+                onPublish={async () => {
+                  "use server";
+                  await toggleProjectPublished(p.id, true);
+                }}
+                onUnpublish={async () => {
+                  "use server";
+                  await toggleProjectPublished(p.id, false);
+                }}
+                onDelete={async () => {
+                  "use server";
+                  await deleteProjectAsAdmin(p.id);
+                }}
+              />
             </div>
           ))}
         </div>

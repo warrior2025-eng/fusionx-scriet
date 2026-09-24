@@ -4,7 +4,7 @@ import { journeyStages } from "@/lib/site-config";
 
 export const metadata: Metadata = {
   title: "About",
-  description: "Mission, vision, and philosophy behind FusionX @ SCRIET.",
+  description: "Mission, vision, and philosophy behind FusionX@SCRIET.",
 };
 
 export default function AboutPage() {

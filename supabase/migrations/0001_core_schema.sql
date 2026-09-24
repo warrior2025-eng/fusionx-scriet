@@ -1,4 +1,4 @@
--- FusionX @ SCRIET — Core schema
+-- FusionX@SCRIET — Core schema
 -- Run in order: 0001_core_schema.sql -> 0002_rls_policies.sql -> 0003_signup_trigger.sql
 --
 -- Design notes:
@@ -65,11 +65,11 @@ create type institutional_approval_status as enum (
 create table organization_settings (
   id boolean primary key default true constraint single_row check (id),
   org_name text not null default 'FusionX',
-  chapter_name text not null default 'FusionX @ SCRIET',
+  chapter_name text not null default 'FusionX@SCRIET',
   tagline text not null default 'From Ideas to Impact.',
   secondary_tagline text not null default 'Don''t just participate. Build.',
   faculty_guide_name text not null default 'Manav Bansal',
-  faculty_guide_title text not null default 'Faculty Guide, FusionX @ SCRIET · HOD, IT, SCRIET',
+  faculty_guide_title text not null default 'Faculty Guide, FusionX@SCRIET · HOD, IT, SCRIET',
   institutional_approval institutional_approval_status not null default 'faculty_guide_confirmed',
   official_email text,
   instagram_url text,
