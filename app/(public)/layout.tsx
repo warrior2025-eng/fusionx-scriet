@@ -1,4 +1,4 @@
-﻿import { SiteHeader } from "@/components/navigation/site-header";
+import { SiteHeader } from "@/components/navigation/site-header";
 import { SiteFooter } from "@/components/navigation/site-footer";
 import { getOrganizationSettings } from "@/lib/data/organization";
 import { getCurrentUser } from "@/lib/permissions";

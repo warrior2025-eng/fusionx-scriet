@@ -62,6 +62,28 @@ export function ProjectForm({
         />
       </div>
 
+      <div>
+        <Label htmlFor="image">Cover image (optional — JPEG/PNG/WEBP, under 4MB)</Label>
+        {project?.image_path && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={project.image_path}
+            alt=""
+            className="mb-2 h-32 w-full max-w-xs rounded-sm border border-ink/10 object-cover"
+          />
+        )}
+        <input
+          id="image"
+          name="image"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="block w-full text-sm text-ink/70 file:mr-3 file:rounded-sm file:border file:border-ink/15 file:bg-surface file:px-3 file:py-1.5 file:text-sm file:text-ink hover:file:border-ink/40"
+        />
+        {project?.image_path && (
+          <p className="mt-1 text-xs text-ink/40">Uploading a new image replaces the current one.</p>
+        )}
+      </div>
+
       <div className="grid sm:grid-cols-2 gap-5">
         <div>
           <Label htmlFor="github_url">GitHub URL (optional)</Label>

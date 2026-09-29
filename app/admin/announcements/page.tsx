@@ -1,7 +1,8 @@
-﻿import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { AnnouncementControls } from "@/components/admin/announcement-controls";
+import { LinkButton } from "@/components/ui/button";
 
 export default async function AdminAnnouncementsPage() {
   const supabase = await createClient();
@@ -12,7 +13,10 @@ export default async function AdminAnnouncementsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-ink mb-8">Announcements</h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-2xl font-semibold text-ink">Announcements</h1>
+        <LinkButton href="/admin/announcements/new" size="sm">New announcement</LinkButton>
+      </div>
       {announcements && announcements.length > 0 ? (
         <div className="space-y-2">
           {announcements.map((a) => (

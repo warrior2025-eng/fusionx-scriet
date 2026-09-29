@@ -14,6 +14,8 @@ export async function registerForEvent(eventId: string) {
     .from("event_registrations")
     .insert({ event_id: eventId, user_id: user.id });
 
+  // Unique constraint on (event_id, user_id) — a duplicate click is a
+  // harmless no-op.
   if (error && error.code !== "23505") {
     throw new Error(error.message);
   }

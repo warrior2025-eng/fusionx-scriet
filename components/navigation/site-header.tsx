@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -65,6 +65,9 @@ function ProfileMenu({ user }: { user: SiteUser }) {
             <p className="text-sm font-medium text-ink truncate">{user.fullName}</p>
             <p className="text-xs text-ink/45 truncate">{user.email}</p>
           </div>
+          <Link href="/profile" onClick={() => setOpen(false)} className="block px-3.5 py-2 text-sm text-ink/70 hover:bg-ink/5 hover:text-ink">
+            My Profile
+          </Link>
           <Link href="/projects/mine" onClick={() => setOpen(false)} className="block px-3.5 py-2 text-sm text-ink/70 hover:bg-ink/5 hover:text-ink">
             My Projects
           </Link>
@@ -174,6 +177,9 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
           ))}
           {user && (
             <>
+              <Link href="/profile" onClick={() => setOpen(false)} className="py-2.5 text-sm text-ink/75 hover:text-ink border-b border-ink/5">
+                My Profile
+              </Link>
               <Link href="/notifications" onClick={() => setOpen(false)} className="py-2.5 text-sm text-ink/75 hover:text-ink border-b border-ink/5">
                 Notifications
               </Link>

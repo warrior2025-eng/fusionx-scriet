@@ -24,6 +24,9 @@ const projectSchema = z.object({
   is_published: z.union([z.literal("on"), z.undefined()]).optional(),
 });
 
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
 function slugify(title: string) {
   return (
     title
@@ -52,6 +55,40 @@ function parseFields(formData: FormData) {
   return projectSchema.safeParse(raw);
 }
 
+/**
+ * Uploads the project image to Storage under the owner's own folder (the
+ * bucket's RLS policy only allows writes under `${user.id}/...`) and
+ * returns its public URL. Returns null if no file was submitted, and
+ * throws a plain Error with a user-facing message on validation failure
+ * so callers can surface it directly.
+ */
+async function uploadProjectImage(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  file: File | null
+): Promise<string | null> {
+  if (!file || file.size === 0) return null;
+
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    throw new Error("Image must be a JPEG, PNG, or WEBP file.");
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    throw new Error("Image must be under 4MB.");
+  }
+
+  const ext = file.name.split(".").pop() || "jpg";
+  const path = `${userId}/${crypto.randomUUID()}.${ext}`;
+
+  const { error } = await supabase.storage.from("project-images").upload(path, file, {
+    contentType: file.type,
+    upsert: false,
+  });
+  if (error) throw new Error("Could not upload the image. Please try again.");
+
+  const { data } = supabase.storage.from("project-images").getPublicUrl(path);
+  return data.publicUrl;
+}
+
 export async function createProject(
   _prev: ProjectActionState,
   formData: FormData
@@ -75,6 +112,13 @@ export async function createProject(
   const { title, description, domain, status, technologies, github_url, demo_url, is_published } =
     parsed.data;
 
+  let imagePath: string | null = null;
+  try {
+    imagePath = await uploadProjectImage(supabase, user.id, formData.get("image") as File | null);
+  } catch (err) {
+    return { status: "error", message: err instanceof Error ? err.message : "Image upload failed." };
+  }
+
   const { data, error } = await supabase
     .from("projects")
     .insert({
@@ -88,6 +132,7 @@ export async function createProject(
         : [],
       github_url: github_url || null,
       demo_url: demo_url || null,
+      image_path: imagePath,
       owner_id: user.id,
       is_published: is_published === "on",
     })
@@ -127,14 +172,24 @@ export async function updateProject(
   const { title, description, domain, status, technologies, github_url, demo_url, is_published } =
     parsed.data;
 
+  // RLS also enforces owner-or-staff on the database side — this check just
+  // gives a clean error message instead of a generic RLS failure.
   const { data: existing } = await supabase
     .from("projects")
-    .select("owner_id")
+    .select("owner_id, image_path")
     .eq("id", projectId)
     .single();
 
   if (!existing || (existing.owner_id !== user.id && !staff)) {
     return { status: "error", message: "You don't have permission to edit this project." };
+  }
+
+  let imagePath = existing.image_path as string | null;
+  try {
+    const uploaded = await uploadProjectImage(supabase, user.id, formData.get("image") as File | null);
+    if (uploaded) imagePath = uploaded;
+  } catch (err) {
+    return { status: "error", message: err instanceof Error ? err.message : "Image upload failed." };
   }
 
   const { error } = await supabase
@@ -149,6 +204,7 @@ export async function updateProject(
         : [],
       github_url: github_url || null,
       demo_url: demo_url || null,
+      image_path: imagePath,
       is_published: is_published === "on",
     })
     .eq("id", projectId);

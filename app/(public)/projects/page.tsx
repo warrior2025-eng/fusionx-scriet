@@ -22,7 +22,7 @@ export default async function ProjectsPage({
 
   let query = supabase
     .from("projects")
-    .select("id, title, slug, description, domain, status, technologies")
+    .select("id, title, slug, description, domain, status, technologies, image_path")
     .eq("is_published", true)
     .order("updated_at", { ascending: false });
 
@@ -83,7 +83,12 @@ export default async function ProjectsPage({
         {projects && projects.length > 0 ? (
           <div className="grid md:grid-cols-3 gap-5">
             {projects.map((p) => (
-              <div key={p.id} className="border border-ink/10 rounded-sm p-6 bg-surface">
+              <div key={p.id} className="border border-ink/10 rounded-sm bg-surface overflow-hidden">
+                {p.image_path && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.image_path} alt="" className="h-40 w-full object-cover" />
+                )}
+                <div className="p-6">
                 <div className="flex items-center justify-between mb-2">
                   <Badge>{p.status}</Badge>
                   {p.domain && <span className="text-xs text-ink/40">{p.domain}</span>}
@@ -99,6 +104,7 @@ export default async function ProjectsPage({
                     ))}
                   </div>
                 )}
+                </div>
               </div>
             ))}
           </div>

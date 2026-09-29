@@ -5,6 +5,8 @@ import { isAdmin } from "@/lib/permissions";
 import { redirect } from "next/navigation";
 
 export default async function AdminAuditLogsPage() {
+  // Audit logs are admin-only, one level stricter than the rest of /admin
+  // (which allows editors too) — checked here in addition to RLS.
   const authorized = await isAdmin();
   if (!authorized) redirect("/admin");
 

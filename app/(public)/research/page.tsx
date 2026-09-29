@@ -28,9 +28,14 @@ export default async function ResearchPage() {
               Turning projects into documented research.
             </h1>
           </div>
-          <LinkButton href="/research/new" size="sm">
-            Add entry
-          </LinkButton>
+          <div className="flex gap-2">
+            <LinkButton href="/research/mine" variant="secondary" size="sm">
+              My research
+            </LinkButton>
+            <LinkButton href="/research/new" size="sm">
+              Add entry
+            </LinkButton>
+          </div>
         </div>
       </Section>
 

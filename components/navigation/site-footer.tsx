@@ -18,6 +18,7 @@ const columns = [
       { href: "/opportunities", label: "Opportunities" },
       { href: "/events", label: "Events" },
       { href: "/teams", label: "Teams" },
+      { href: "/mentors", label: "Mentors" },
       { href: "/join", label: "Join FusionX" },
     ],
   },

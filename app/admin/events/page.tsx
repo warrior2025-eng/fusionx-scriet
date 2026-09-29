@@ -1,7 +1,8 @@
-﻿import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { PublishToggle } from "@/components/admin/publish-toggle";
+import { LinkButton } from "@/components/ui/button";
 import { toggleEventPublished, deleteEventAsAdmin } from "@/actions/admin-moderation";
 
 export default async function AdminEventsPage() {
@@ -13,7 +14,10 @@ export default async function AdminEventsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-ink mb-8">Events</h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-2xl font-semibold text-ink">Events</h1>
+        <LinkButton href="/admin/events/new" size="sm">New event</LinkButton>
+      </div>
       {events && events.length > 0 ? (
         <div className="space-y-2">
           {events.map((e) => (

@@ -13,6 +13,8 @@ export default async function TeamsPage() {
   const user = await getCurrentUser();
   const supabase = await createClient();
 
+  // Team formation is a members-only feature (RLS requires auth.uid()), so
+  // signed-out visitors get an explanation instead of an empty query.
   if (!user) {
     return (
       <Section className="pt-16 pb-24">

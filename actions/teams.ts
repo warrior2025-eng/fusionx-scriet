@@ -78,8 +78,22 @@ export async function joinTeam(teamId: string) {
     .from("team_members")
     .insert({ team_id: teamId, user_id: user.id, role: "member" });
 
-  if (error && error.code !== "23505") {
-    throw new Error(error.message);
+  // Unique constraint on (team_id, user_id) means a duplicate join is a
+  // harmless no-op from the user's point of view — skip the notification
+  // in that case too, since nothing actually changed.
+  if (error) {
+    if (error.code !== "23505") throw new Error(error.message);
+  } else {
+    const { data: team } = await supabase.from("teams").select("name, created_by").eq("id", teamId).single();
+    if (team && team.created_by !== user.id) {
+      const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
+      await supabase.from("notifications").insert({
+        user_id: team.created_by,
+        title: "New team member",
+        body: `${profile?.full_name ?? "Someone"} joined your team "${team.name}".`,
+        link: "/teams",
+      });
+    }
   }
 
   revalidatePath("/teams");
