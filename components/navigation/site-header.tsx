@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -92,11 +92,21 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
   return (
     <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper/90 backdrop-blur">
       <div className="container-fx flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight text-ink" onClick={() => setOpen(false)}>
-          <Image src="/logo-mark.png" alt="FusionX logo" width={28} height={28} className="h-7 w-7 rounded-full" />
-          <span className="hidden sm:inline">{chapterName}</span>
-          <span className="sm:hidden">FusionX</span>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Image
+            src="/ccsu-logo.webp"
+            alt="Chaudhary Charan Singh University, Meerut"
+            width={32}
+            height={32}
+            className="h-8 w-8 object-contain shrink-0"
+          />
+          <span className="hidden sm:block h-6 w-px bg-ink/15" aria-hidden />
+          <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight text-ink" onClick={() => setOpen(false)}>
+            <Image src="/logo-mark.png" alt="FusionX logo" width={28} height={28} className="h-7 w-7 rounded-full" />
+            <span className="hidden sm:inline">{chapterName}</span>
+            <span className="sm:hidden">FusionX</span>
+          </Link>
+        </div>
 
         <nav className="hidden md:flex items-center gap-7 text-sm">
           {nav.map((item) => (
