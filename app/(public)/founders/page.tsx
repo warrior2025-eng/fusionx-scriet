@@ -17,7 +17,7 @@ export default async function FoundersPage() {
       <Section className="pt-16 pb-8">
         <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">Founding Team</p>
         <h1 className="text-3xl md:text-4xl font-serif font-normal tracking-tight text-ink">
-          Started by three students at SCRIET.
+          Built by students, for students.
         </h1>
       </Section>
 

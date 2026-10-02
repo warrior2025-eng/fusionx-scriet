@@ -317,7 +317,7 @@ export default async function HomePage() {
 
       {/* Founding team preview */}
       <Section className="pt-0">
-        <SectionHeading eyebrow="Founding Team" title="Started by three students at SCRIET." />
+        <SectionHeading eyebrow="Founding Team" title="Built by students, for students." />
         <div className="grid md:grid-cols-3 gap-5">
           {founders.map((f) => (
             <div key={f.name} className="border border-ink/10 rounded-sm p-6 bg-surface">

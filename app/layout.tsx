@@ -35,9 +35,22 @@ export const metadata: Metadata = {
   },
 };
 
+// Runs before paint so a returning visitor's saved light/dark choice
+// applies immediately — no flash of the default (dark) theme. Dark stays
+// the default for anyone who hasn't chosen a theme yet.
+const themeInitScript = `
+  try {
+    var t = localStorage.getItem('theme');
+    if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  } catch (e) {}
+`;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${manrope.variable} ${fraunces.variable} h-full antialiased`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="min-h-full flex flex-col bg-paper text-ink">{children}</body>
     </html>
   );

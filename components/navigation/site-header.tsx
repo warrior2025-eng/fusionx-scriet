@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { Menu, X, Search, Bell, LayoutGrid, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LinkButton } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { logoutAction } from "@/actions/auth";
 
 const nav = [
@@ -127,6 +128,7 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
           <Link href="/search" aria-label="Search" className="p-2 text-ink/65 hover:text-ink transition-colors">
             <Search size={18} />
           </Link>
+          <ThemeToggle />
           {user ? (
             <>
               <Link href="/notifications" aria-label="Notifications" className="p-2 text-ink/65 hover:text-ink transition-colors">
@@ -159,6 +161,10 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
 
       {open && (
         <nav className="md:hidden border-t border-ink/10 bg-paper px-6 py-4 flex flex-col gap-1">
+          <div className="flex items-center justify-between pb-3 mb-2 border-b border-ink/10">
+            <span className="text-sm text-ink/65">Theme</span>
+            <ThemeToggle className="p-1.5 rounded-full border border-ink/15 text-ink/70 hover:text-ink" />
+          </div>
           {user && (
             <div className="flex items-center gap-2.5 pb-3 mb-2 border-b border-ink/10">
               {user.avatarUrl ? (

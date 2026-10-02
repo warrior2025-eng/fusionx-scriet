@@ -8,6 +8,17 @@
   --color-line: rgba(255, 255, 255, 0.12);
 }
 
+/* Light theme — applied when <html data-theme="light">. Dark (above) stays
+   the default so the site's existing navy identity doesn't shift for
+   anyone who hasn't explicitly chosen light mode. */
+:root[data-theme="light"] {
+  --color-paper: #f7f9fc;
+  --color-ink: #0f172a;
+  --color-accent: #1d4fd6;
+  --color-surface: #ffffff;
+  --color-line: rgba(15, 23, 42, 0.1);
+}
+
 @theme inline {
   --color-paper: var(--color-paper);
   --color-ink: var(--color-ink);
@@ -47,7 +58,7 @@ body {
 }
 
 .prose-fx :where(p, ul, ol) {
-  color: rgb(238 241 246 / 0.72);
+  color: color-mix(in srgb, var(--color-ink) 72%, transparent);
   line-height: 1.7;
 }
 .prose-fx :where(h2) {
