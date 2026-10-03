@@ -118,3 +118,11 @@ export const institution = {
   name: "SCRIET",
   fullName: "SCRIET, CCS University, Meerut",
 } as const;
+
+
+export const additionalFacultyGuides = [
+  {
+    name: "Amit Sharma",
+    title: "Faculty Guide, FusionX@SCRIET · HOD, CS, SCRIET",
+  },
+] as const;

@@ -4,13 +4,7 @@ import { LinkButton } from "@/components/ui/button";
 import { Section, SectionHeading } from "@/components/ui/section";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
-import {
-  founders,
-  programs,
-  journeyStages,
-  buildPipeline,
-  coreAreas,
-} from "@/lib/site-config";
+import { founders, programs, journeyStages, buildPipeline, coreAreas, additionalFacultyGuides } from "@/lib/site-config";
 import { getOrganizationSettings } from "@/lib/data/organization";
 import { createClient } from "@/lib/supabase/server";
 
@@ -335,10 +329,18 @@ export default async function HomePage() {
 
       {/* Faculty guide */}
       <Section className="pt-0">
-        <div className="border border-ink/10 rounded-sm bg-surface p-8 md:p-10">
-          <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-2">Faculty Guide</p>
-          <p className="text-lg font-medium text-ink">{settings.faculty_guide_name}</p>
-          <p className="text-sm text-ink/55 mt-1">{settings.faculty_guide_title}</p>
+        <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-4">Faculty Guide</p>
+        <div className="space-y-4">
+          <div className="border border-ink/10 rounded-sm bg-surface p-8 md:p-10">
+            <p className="text-lg font-medium text-ink">{settings.faculty_guide_name}</p>
+            <p className="text-sm text-ink/55 mt-1">{settings.faculty_guide_title}</p>
+          </div>
+          {additionalFacultyGuides.map((f) => (
+            <div key={f.name} className="border border-ink/10 rounded-sm bg-surface p-8 md:p-10">
+              <p className="text-lg font-medium text-ink">{f.name}</p>
+              <p className="text-sm text-ink/55 mt-1">{f.title}</p>
+            </div>
+          ))}
         </div>
       </Section>
 

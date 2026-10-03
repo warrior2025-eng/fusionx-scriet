@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Section, SectionHeading } from "@/components/ui/section";
-
-import { founders, seniorMentor } from "@/lib/site-config";
+import { founders, seniorMentor, additionalFacultyGuides } from "@/lib/site-config";
 import { getOrganizationSettings } from "@/lib/data/organization";
 
 export const metadata: Metadata = {
@@ -38,9 +37,17 @@ export default async function FoundersPage() {
 
       <Section className="pt-0">
         <SectionHeading eyebrow="Faculty Guide" title="Institutional guidance and mentorship." />
-        <div className="border border-ink/10 rounded-sm p-7 bg-surface">
-          <p className="font-medium text-ink">{settings.faculty_guide_name}</p>
-          <p className="text-sm text-ink/55 mt-1">{settings.faculty_guide_title}</p>
+        <div className="space-y-4">
+          <div className="border border-ink/10 rounded-sm p-7 bg-surface">
+            <p className="font-medium text-ink">{settings.faculty_guide_name}</p>
+            <p className="text-sm text-ink/55 mt-1">{settings.faculty_guide_title}</p>
+          </div>
+          {additionalFacultyGuides.map((f) => (
+            <div key={f.name} className="border border-ink/10 rounded-sm p-7 bg-surface">
+              <p className="font-medium text-ink">{f.name}</p>
+              <p className="text-sm text-ink/55 mt-1">{f.title}</p>
+            </div>
+          ))}
         </div>
       </Section>
 
