@@ -1,19 +1,28 @@
 import Image from "next/image";
-import { ArrowRight, Hammer, FlaskConical, Users, Trophy, Sparkles } from "lucide-react";
+import { ArrowRight, Hammer, FlaskConical, Users, Trophy, Sparkles, Terminal, Cpu, Flame, ShieldCheck, Compass } from "lucide-react";
 import { LinkButton } from "@/components/ui/button";
 import { Section, SectionHeading } from "@/components/ui/section";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { TechMarquee } from "@/components/ui/tech-marquee";
 import { founders, programs, journeyStages, buildPipeline, coreAreas, additionalFacultyGuides } from "@/lib/site-config";
 import { getOrganizationSettings } from "@/lib/data/organization";
 import { createClient } from "@/lib/supabase/server";
 
 const areaIcons: Record<string, React.ReactNode> = {
-  Build: <Hammer size={18} />,
-  Research: <FlaskConical size={18} />,
-  Connect: <Users size={18} />,
-  Compete: <Trophy size={18} />,
-  Create: <Sparkles size={18} />,
+  Build: <Hammer size={20} />,
+  Research: <FlaskConical size={20} />,
+  Connect: <Users size={20} />,
+  Compete: <Trophy size={20} />,
+  Create: <Sparkles size={20} />,
+};
+
+const areaDescriptions: Record<string, string> = {
+  Build: "Rapid hardware & software prototyping, dev labs, and production-ready applications.",
+  Research: "Literature discovery, empirical experimentation, IEEE paper drafting, and peer review.",
+  Connect: "Cross-departmental collaboration, multi-skill team formation, and peer-to-peer mentoring.",
+  Compete: "National tech fests, Smart India Hackathon, ICPC, and tier-1 innovation challenges.",
+  Create: "Creative technology, generative UI, design engineering, and media technology.",
 };
 
 export default async function HomePage() {
@@ -45,317 +54,415 @@ export default async function HomePage() {
     supabase.from("events").select("*", { count: "exact", head: true }).eq("is_published", true),
   ]);
 
-  // Real counts only — never fabricated. Shows 0 until there's actually
-  // something to count; see lib/site-config.ts for the no-fabrication rule.
   const stats = [
-    { label: "Students", value: memberCount ?? 0 },
-    { label: "Projects", value: projectCount ?? 0 },
-    { label: "Events", value: eventCount ?? 0 },
+    { label: "Students", value: memberCount ?? 0, sub: "Registered Members" },
+    { label: "Projects", value: projectCount ?? 0, sub: "Active Repos" },
+    { label: "Events", value: eventCount ?? 0, sub: "Conducted & Live" },
   ];
 
   return (
     <>
-      {/* Hero */}
-      <section className="relative overflow-hidden border-b border-ink/10">
-        <div className="grid lg:grid-cols-2 min-h-[640px]">
-          {/* Left: copy */}
-          <div className="flex flex-col justify-center px-6 md:px-12 lg:px-16 py-16 lg:py-0">
-            <p className="text-xs font-semibold tracking-[0.16em] uppercase text-accent mb-5">
-              A Student-Led Movement
-            </p>
-            <h1 className="font-serif text-5xl md:text-6xl leading-[1.05] tracking-tight">
-              <span className="text-ink">Ideas Grow</span>
+      {/* Hero Section — Techfest & Cognizance Futuristic Aesthetic */}
+      <section className="relative overflow-hidden border-b border-ink/10 bg-cyber-grid">
+        {/* Ambient Neon Glow Spotlights */}
+        <div className="pointer-events-none absolute -top-40 left-1/4 h-96 w-96 rounded-full bg-blue-600/20 blur-[130px]" aria-hidden />
+        <div className="pointer-events-none absolute top-1/2 -right-20 h-96 w-96 rounded-full bg-cyan-500/15 blur-[140px]" aria-hidden />
+        <div className="pointer-events-none absolute -bottom-20 left-10 h-72 w-72 rounded-full bg-indigo-600/15 blur-[110px]" aria-hidden />
+
+        <div className="grid lg:grid-cols-12 min-h-[640px] relative z-10">
+          {/* Left: Futuristic Hero Copy (7 cols) */}
+          <div className="lg:col-span-7 flex flex-col justify-center px-6 md:px-12 lg:px-16 py-16 lg:py-20">
+            {/* Live Telemetry Pill */}
+            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full border border-cyan-500/30 bg-cyan-950/30 backdrop-blur-md mb-6 w-fit">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400"></span>
+              </span>
+              <span className="text-[11px] font-mono tracking-widest uppercase text-cyan-300 font-semibold">
+                SCRIET MEERUT &bull; INNOVATION &amp; TECH ECOSYSTEM
+              </span>
+            </div>
+
+            <h1 className="font-serif text-5xl md:text-6xl lg:text-7xl leading-[1.05] tracking-tight">
+              <span className="text-white">Ideas That Defy</span>
               <br />
-              <span className="text-accent">Here.</span>
+              <span className="bg-gradient-to-r from-blue-400 via-indigo-300 to-cyan-300 bg-clip-text text-transparent">
+                Limits &amp; Boundaries.
+              </span>
             </h1>
-            <p className="mt-6 text-base text-ink/60 leading-relaxed max-w-md">
-              {settings.chapter_name} brings together students, ideas, and opportunities to
-              build, research, and create real-world impact — together.
+
+            <p className="mt-6 text-base md:text-lg text-ink/70 leading-relaxed max-w-xl">
+              {settings.chapter_name} brings together students, engineers, and researchers to
+              engineer scalable prototypes, write high-impact research, and compete on the grandest
+              national stages.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <LinkButton href="/programs" size="lg">
+
+            {/* Glowing CTAs */}
+            <div className="mt-8 flex flex-wrap gap-4">
+              <LinkButton href="/programs" size="lg" className="shadow-[0_0_25px_rgba(47,107,255,0.45)] hover:shadow-[0_0_35px_rgba(47,107,255,0.65)] transition-all">
                 Explore Programs <ArrowRight size={16} />
               </LinkButton>
-              <LinkButton href="/join" variant="secondary" size="lg">
+              <LinkButton href="/join" variant="secondary" size="lg" className="border-cyan-500/30 text-ink hover:border-cyan-400/70 hover:bg-cyan-950/20 backdrop-blur-sm transition-all">
                 Join the Network
               </LinkButton>
             </div>
 
-            <div className="mt-12 flex flex-wrap gap-x-10 gap-y-4">
+            {/* Telemetry Stats Grid */}
+            <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-xl">
               {stats.map((s) => (
-                <div key={s.label}>
-                  <p className="font-serif text-3xl text-accent">{s.value}</p>
-                  <p className="text-xs text-ink/45 mt-0.5">{s.label}</p>
+                <div key={s.label} className="hud-corner tech-card p-3.5 rounded-sm">
+                  <p className="text-[10px] font-mono tracking-wider uppercase text-cyan-400/80">{s.label}</p>
+                  <p className="font-serif text-3xl font-bold text-white mt-0.5">{s.value}</p>
+                  <p className="text-[10px] text-ink/40 mt-1">{s.sub}</p>
                 </div>
               ))}
-              <div>
-                <p className="font-serif text-3xl text-accent">&infin;</p>
-                <p className="text-xs text-ink/45 mt-0.5">Impact</p>
+              <div className="hud-corner tech-card p-3.5 rounded-sm">
+                <p className="text-[10px] font-mono tracking-wider uppercase text-cyan-400/80">Impact</p>
+                <p className="font-serif text-3xl font-bold text-cyan-300 mt-0.5">&infin;</p>
+                <p className="text-[10px] text-ink/40 mt-1">Campus Legacy</p>
               </div>
             </div>
 
-            <div className="mt-10 pt-6 border-t border-ink/10 flex flex-wrap gap-x-6 gap-y-1.5 text-xs font-medium tracking-[0.1em] uppercase text-ink/40">
+            {/* Core Area Badges */}
+            <div className="mt-10 pt-6 border-t border-ink/10 flex flex-wrap gap-2 text-xs font-mono tracking-wider uppercase text-ink/50">
+              <span className="text-cyan-400/70 mr-1">// CORE DOMAINS:</span>
               {coreAreas.map((a) => (
-                <span key={a}>{a}</span>
+                <span key={a} className="px-2 py-0.5 rounded border border-ink/10 bg-surface/40 text-ink/75 hover:border-accent/40 transition-colors">
+                  {a}
+                </span>
               ))}
             </div>
           </div>
 
-          {/* Right: visual panel — typography-driven explainer instead of a
-              stock photo or abstract illustration. Swap for a real campus
-              photo any time by dropping one into /public (e.g.
-              public/hero-campus.jpg) and replacing this div with a Next
-              <Image> pointed at it. */}
-          <div className="relative min-h-[480px] lg:min-h-0 overflow-hidden bg-[#0a0e18] flex flex-col justify-between px-8 py-10 md:px-14 md:py-14">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#05070f] via-[#0a1330] to-[#12224f]" />
-            <div
-              className="absolute top-1/4 -right-10 h-80 w-80 rounded-full bg-[#2f6bff] opacity-25 blur-[120px]"
-              aria-hidden
-            />
-            <div
-              className="absolute bottom-0 left-0 h-64 w-64 rounded-full bg-[#3f6fe0] opacity-[0.15] blur-[100px]"
-              aria-hidden
-            />
+          {/* Right: Futuristic HUD Terminal Display (5 cols) */}
+          <div className="lg:col-span-5 relative min-h-[480px] lg:min-h-0 overflow-hidden bg-[#070b14]/90 flex flex-col justify-between px-8 py-10 md:px-12 md:py-12 border-l border-ink/10">
+            {/* Background elements & Watermark */}
+            <div className="absolute inset-0 bg-gradient-to-br from-[#05070f] via-[#091430] to-[#0f1f45]" />
+            <div className="pointer-events-none absolute top-1/4 -right-10 h-80 w-80 rounded-full bg-cyan-500/10 blur-[100px]" aria-hidden />
 
-            {/* Large watermark logo filling the empty right-hand space */}
             <Image
               src="/logo-mark.png"
               alt=""
               width={640}
               height={640}
               aria-hidden
-              className="pointer-events-none select-none absolute -right-24 top-1/2 -translate-y-1/2 w-[26rem] md:w-[34rem] h-auto opacity-[0.14] mix-blend-screen"
+              className="pointer-events-none select-none absolute -right-20 top-1/2 -translate-y-1/2 w-[28rem] h-auto opacity-[0.12] mix-blend-screen"
             />
 
-            {/* Top: brand mark */}
-            <div className="relative flex items-center gap-2.5 text-white/90">
-              <Image
-                src="/logo-mark.png"
-                alt="FusionX logo"
-                width={36}
-                height={36}
-                className="h-9 w-9 rounded-full"
-              />
-              <span className="text-xs font-semibold tracking-[0.16em] uppercase">
-                FusionX@SCRIET
+            {/* Terminal Header */}
+            <div className="relative flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center gap-2.5">
+                <Image
+                  src="/logo-mark.png"
+                  alt="FusionX logo"
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 rounded-full border border-cyan-400/30 shadow-[0_0_10px_rgba(6,182,212,0.3)]"
+                />
+                <div>
+                  <span className="text-xs font-mono font-bold tracking-[0.16em] uppercase text-white">
+                    FusionX // OS
+                  </span>
+                  <p className="text-[10px] font-mono text-cyan-400">STATUS: ONLINE • v2.4</p>
+                </div>
+              </div>
+              <span className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/20">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                ACTIVE
               </span>
             </div>
 
-            {/* Middle: big stacked typography explaining what FusionX does */}
-            <div className="relative">
-              {["Learn.", "Build.", "Research.", "Impact."].map((word, i) => (
-                <p
-                  key={word}
-                  className={`font-serif text-5xl md:text-6xl leading-[1.05] tracking-tight ${
-                    i === 3 ? "text-accent" : "text-white"
-                  }`}
-                  style={{ opacity: 1 - i * 0.14 }}
-                >
-                  {word}
-                </p>
+            {/* Futuristic Stacked Pillars */}
+            <div className="relative my-8 space-y-3">
+              {[
+                { word: "01. LEARN", desc: "Foundational masterclasses & skill acceleration", color: "text-white" },
+                { word: "02. BUILD", desc: "Prototypes, codebases & engineering labs", color: "text-blue-300" },
+                { word: "03. RESEARCH", desc: "Scientific validation & patent discovery", color: "text-cyan-300" },
+                { word: "04. IMPACT", desc: "National competitions & startup launches", color: "text-indigo-300 font-bold" },
+              ].map((item, i) => (
+                <div key={item.word} className="tech-card p-3 rounded border border-white/10 bg-white/[0.02] hover:border-cyan-400/40 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <p className={`font-mono text-lg tracking-wide ${item.color}`}>{item.word}</p>
+                    <span className="text-[10px] font-mono text-ink/30">STAGE 0{i + 1}</span>
+                  </div>
+                  <p className="text-xs text-ink/60 mt-0.5">{item.desc}</p>
+                </div>
               ))}
-              <p className="mt-6 max-w-xs text-sm text-white/55 leading-relaxed">
-                A network where campus conversations turn into working projects, documented
-                research, and outcomes that outlast a single event.
-              </p>
             </div>
 
-            {/* Bottom: institution tag */}
-            <div className="relative flex items-end justify-between border-t border-white/10 pt-5">
-              <p className="text-xs text-white/45 max-w-[14rem] leading-relaxed">
-                Student Innovation &amp; Research Network
-              </p>
-              <div className="text-right text-xs font-semibold tracking-[0.14em] uppercase text-white/70">
-                <p>SCRIET</p>
-                <p>CCS University, Meerut</p>
+            {/* Bottom Institutional Seal */}
+            <div className="relative flex items-center justify-between border-t border-white/10 pt-4 text-[11px] font-mono text-white/50">
+              <div>
+                <p className="text-white/80 font-medium">SCRIET MEERUT</p>
+                <p className="text-[10px] text-white/40">Chaudhary Charan Singh University</p>
+              </div>
+              <div className="text-right">
+                <span className="px-2 py-0.5 rounded bg-accent/20 border border-accent/30 text-accent font-semibold text-[10px]">
+                  STUDENT RUN
+                </span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Idea -> Impact visual */}
-      <Section>
-        <div className="border border-ink/10 rounded-sm bg-surface px-6 py-8 md:px-10 md:py-10 overflow-x-auto">
-          <div className="flex items-center gap-3 md:gap-5 min-w-max text-sm font-medium text-ink/70">
-            {["Idea", "Team", "Build", "Research", "Impact"].map((step, i, arr) => (
-              <div key={step} className="flex items-center gap-3 md:gap-5">
-                <span className="px-4 py-2 rounded-full border border-ink/15 bg-paper whitespace-nowrap">
-                  {step}
+      {/* Infinite Tech Marquee — Cognizance & Techfest style */}
+      <TechMarquee />
+
+      {/* Idea -> Impact Interactive Circuit */}
+      <Section className="relative">
+        <div className="pointer-events-none absolute inset-0 bg-cyber-dots opacity-30" />
+        <SectionHeading
+          eyebrow="The Innovation Circuit"
+          title="From Raw Curiosity to Scaled Reality"
+          description="How ideas progress through FusionX's engineered pipeline from campus brainstorming to national recognition."
+        />
+
+        <div className="relative mt-8">
+          {/* Circuit steps grid */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+            {[
+              { step: "01", name: "Problem Discovery", desc: "Identify real campus and societal friction points.", icon: <Compass size={18} className="text-blue-400" /> },
+              { step: "02", name: "Team Fusion", desc: "Unite cross-departmental developers & designers.", icon: <Users size={18} className="text-cyan-400" /> },
+              { step: "03", name: "Sprint & Build", desc: "Rapid prototyping in the FusionX Build Lab.", icon: <Hammer size={18} className="text-indigo-400" /> },
+              { step: "04", name: "Research & IP", desc: "Prior art search, novelty documentation & papers.", icon: <ShieldCheck size={18} className="text-emerald-400" /> },
+              { step: "05", name: "National Launch", desc: "Hackathons, angel pitching, and deployment.", icon: <Trophy size={18} className="text-amber-400" /> },
+            ].map((s) => (
+              <div key={s.step} className="hud-corner tech-card p-5 rounded-sm flex flex-col justify-between group hover:border-cyan-500/40">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-mono text-xs font-bold text-cyan-400 bg-cyan-950/50 px-2 py-0.5 rounded border border-cyan-500/30">
+                      STEP {s.step}
+                    </span>
+                    {s.icon}
+                  </div>
+                  <p className="font-medium text-ink group-hover:text-white transition-colors">{s.name}</p>
+                  <p className="mt-2 text-xs text-ink/55 leading-relaxed">{s.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Full Pipeline Tags */}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 pt-4 border-t border-ink/10">
+            <span className="text-xs font-mono text-ink/40 mr-2">COMPLETE PIPELINE:</span>
+            {buildPipeline.map((stage, i) => (
+              <div key={stage} className="flex items-center gap-2">
+                <span className="text-xs font-mono px-2.5 py-1 rounded bg-surface border border-ink/10 text-ink/70">
+                  {stage}
                 </span>
-                {i < arr.length - 1 && <ArrowRight size={16} className="text-ink/25 shrink-0" />}
+                {i < buildPipeline.length - 1 && <span className="text-cyan-400/50 text-xs">→</span>}
               </div>
             ))}
           </div>
         </div>
       </Section>
 
-      {/* What is FusionX */}
+      {/* Core Domains Showcase */}
       <Section className="pt-0">
         <SectionHeading
-          eyebrow="What is FusionX?"
-          title="An ecosystem, not just a club."
-          description="FusionX@SCRIET exists to help students move beyond attending events — into
-          actually building projects, conducting research, protecting their ideas, and carrying
-          work forward past a single competition."
+          eyebrow="Core Domains"
+          title="Five Pillars of Excellence"
+          description="Whether you write code, design hardware, conduct academic research, or build businesses — there is a dedicated track for you."
         />
-      </Section>
-
-      {/* Built Beyond Events */}
-      <Section className="pt-0">
-        <SectionHeading eyebrow="Built Beyond Events" title="The full pipeline, not a single weekend." />
-        <div className="flex flex-wrap gap-2.5">
-          {buildPipeline.map((stage, i) => (
-            <div key={stage} className="flex items-center gap-2.5">
-              <Badge>{stage}</Badge>
-              {i < buildPipeline.length - 1 && <ArrowRight size={14} className="text-ink/20" />}
-            </div>
-          ))}
-        </div>
-        <div className="mt-10 flex flex-wrap gap-2">
-          {journeyStages.map((stage) => (
-            <span key={stage} className="text-xs text-ink/40 px-2.5 py-1 border-l border-ink/10 first:border-l-0">
-              {stage}
-            </span>
-          ))}
-        </div>
-      </Section>
-
-      {/* Core areas */}
-      <Section className="pt-0">
-        <SectionHeading eyebrow="Core Areas" title="Five ways to get involved." />
         <div className="grid sm:grid-cols-2 md:grid-cols-5 gap-4">
           {coreAreas.map((area) => (
-            <div key={area} className="border border-ink/10 rounded-sm p-5 bg-surface">
-              <div className="text-accent mb-3">{areaIcons[area]}</div>
-              <p className="font-medium text-ink text-sm">{area}</p>
+            <div key={area} className="tech-card hud-corner p-6 rounded-sm group hover:border-accent/50">
+              <div className="text-accent mb-4 p-3 rounded-full bg-accent/10 w-fit group-hover:scale-110 group-hover:bg-accent/20 transition-all">
+                {areaIcons[area]}
+              </div>
+              <p className="font-serif text-lg font-bold text-ink group-hover:text-white transition-colors">{area}</p>
+              <p className="mt-2 text-xs text-ink/60 leading-relaxed">
+                {areaDescriptions[area] || "Collaborate and push technological boundaries."}
+              </p>
             </div>
           ))}
         </div>
       </Section>
 
-      {/* Programs preview */}
+      {/* Programs Preview — High Tech Cards */}
       <Section className="pt-0">
         <SectionHeading
-          eyebrow="Programs"
-          title="Structured tracks for every stage of the journey."
-          description="Six focused programs, each built around a different part of the idea-to-impact pipeline."
+          eyebrow="Programs & Tracks"
+          title="Structured Frameworks for High Performers"
+          description="Six specialized cells operating year-round to turn raw talent into industry-grade outcomes."
         />
         <div className="grid md:grid-cols-3 gap-5">
-          {programs.map((p) => (
-            <div key={p.slug} className="border border-ink/10 rounded-sm p-6 bg-surface hover:border-ink/25 transition-colors">
-              <p className="font-medium text-ink">{p.name}</p>
-              <p className="mt-2 text-sm text-ink/55 leading-relaxed">{p.summary}</p>
+          {programs.map((p, idx) => (
+            <div key={p.slug} className="tech-card hud-corner p-6 rounded-sm group hover:border-cyan-500/40">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-mono tracking-widest text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/20">
+                  CELL 0{idx + 1}
+                </span>
+                <span className="text-ink/20 group-hover:text-cyan-400 transition-colors">✦</span>
+              </div>
+              <p className="font-serif text-lg font-bold text-ink group-hover:text-white transition-colors">{p.name}</p>
+              <p className="mt-2 text-sm text-ink/60 leading-relaxed">{p.summary}</p>
             </div>
           ))}
         </div>
-        <div className="mt-8">
-          <LinkButton href="/programs" variant="secondary" size="sm">
-            View all programs <ArrowRight size={14} />
+        <div className="mt-8 flex justify-center">
+          <LinkButton href="/programs" variant="secondary" size="md" className="border-cyan-500/30 hover:border-cyan-400">
+            View All Program Frameworks <ArrowRight size={14} />
           </LinkButton>
         </div>
       </Section>
 
-      {/* Projects preview */}
+      {/* Projects Preview */}
       <Section className="pt-0">
-        <SectionHeading eyebrow="Projects" title="What students are building right now." />
+        <SectionHeading
+          eyebrow="Active Repositories"
+          title="Engineered by Students. Verified by Results."
+          description="A glimpse of what our developers, researchers, and engineers are actively shipping."
+        />
         {projects && projects.length > 0 ? (
           <div className="grid md:grid-cols-3 gap-5">
             {projects.map((p) => (
-              <div key={p.id} className="border border-ink/10 rounded-sm p-6 bg-surface">
-                <div className="flex items-center justify-between mb-2">
+              <div key={p.id} className="tech-card hud-corner p-6 rounded-sm">
+                <div className="flex items-center justify-between mb-3">
                   <Badge>{p.status}</Badge>
-                  {p.domain && <span className="text-xs text-ink/40">{p.domain}</span>}
+                  {p.domain && <span className="text-xs font-mono text-cyan-400/80">{p.domain}</span>}
                 </div>
-                <p className="font-medium text-ink">{p.title}</p>
-                <p className="mt-1.5 text-sm text-ink/55 line-clamp-2">{p.description}</p>
+                <p className="font-serif text-lg font-bold text-ink">{p.title}</p>
+                <p className="mt-2 text-sm text-ink/60 line-clamp-3">{p.description}</p>
+                {p.technologies && p.technologies.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-ink/10 flex flex-wrap gap-1.5">
+                    {p.technologies.slice(0, 3).map((t: string) => (
+                      <span key={t} className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface text-ink/50">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
         ) : (
           <EmptyState
-            title="No projects published yet."
-            description="FusionX projects will appear here as ideas move into development."
+            title="Projects Initializing"
+            description="FusionX repositories and prototypes will be showcased here as they are deployed."
           />
         )}
         <div className="mt-8">
           <LinkButton href="/projects" variant="secondary" size="sm">
-            Browse all projects <ArrowRight size={14} />
+            Browse Project Directory <ArrowRight size={14} />
           </LinkButton>
         </div>
       </Section>
 
-      {/* Events preview */}
+      {/* Events Preview */}
       <Section className="pt-0">
-        <SectionHeading eyebrow="Events" title="Upcoming on the calendar." />
+        <SectionHeading
+          eyebrow="Calendar & Fests"
+          title="Upcoming Hackathons, Symposia & Build Sessions"
+          description="Stay updated with upcoming workshops, offline hack days, and guest speaker sessions."
+        />
         {events && events.length > 0 ? (
           <div className="grid md:grid-cols-3 gap-5">
             {events.map((e) => (
-              <div key={e.id} className="border border-ink/10 rounded-sm p-6 bg-surface">
+              <div key={e.id} className="tech-card hud-corner p-6 rounded-sm">
                 <Badge>{e.status}</Badge>
-                <p className="mt-3 font-medium text-ink">{e.title}</p>
-                <p className="mt-1.5 text-sm text-ink/55">
+                <p className="mt-3 font-serif text-lg font-bold text-ink">{e.title}</p>
+                <p className="mt-2 text-xs font-mono text-cyan-400">
                   {new Date(e.event_date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
-                  {e.venue ? ` · ${e.venue}` : ""}
+                  {e.venue ? ` • ${e.venue}` : ""}
                 </p>
               </div>
             ))}
           </div>
         ) : (
           <EmptyState
-            title="No upcoming events scheduled yet."
-            description="FusionX events will be listed here as they're announced."
+            title="No events scheduled currently"
+            description="Upcoming hackathons and technical bootcamps will be announced shortly."
           />
         )}
       </Section>
 
-      {/* Founding team preview */}
+      {/* Founding Leadership */}
       <Section className="pt-0">
-        <SectionHeading eyebrow="Founding Team" title="Built by students, for students." />
+        <SectionHeading
+          eyebrow="Core Leadership"
+          title="Founding Members"
+          description="Dedicated student architects steering FusionX's vision and operations."
+        />
         <div className="grid md:grid-cols-3 gap-5">
           {founders.map((f) => (
-            <div key={f.name} className="border border-ink/10 rounded-sm p-6 bg-surface">
-              <p className="font-medium text-ink">{f.name}</p>
-              <p className="mt-1 text-sm text-accent">{f.role}</p>
+            <div key={f.name} className="tech-card hud-corner p-6 rounded-sm">
+              <p className="font-serif text-lg font-bold text-ink">{f.name}</p>
+              <p className="mt-1 text-xs font-mono text-cyan-400">{f.role}</p>
+              <p className="mt-3 text-xs text-ink/60 leading-relaxed">{f.responsibilities}</p>
             </div>
           ))}
         </div>
         <div className="mt-8">
           <LinkButton href="/founders" variant="secondary" size="sm">
-            Meet the full team <ArrowRight size={14} />
+            Meet the Full Team <ArrowRight size={14} />
           </LinkButton>
         </div>
       </Section>
 
-      {/* Faculty guide */}
+      {/* Institutional Mentorship & Faculty Guides */}
       <Section className="pt-0">
-        <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-4">Faculty Guide</p>
-        <div className="space-y-4">
-          <div className="border border-ink/10 rounded-sm bg-surface p-8 md:p-10">
-            <p className="text-lg font-medium text-ink">{settings.faculty_guide_name}</p>
-            <p className="text-sm text-ink/55 mt-1">{settings.faculty_guide_title}</p>
+        <p className="text-xs font-mono font-semibold tracking-widest uppercase text-cyan-400 mb-4">
+          // INSTITUTIONAL MENTORSHIP &amp; ADVISORS
+        </p>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="tech-card hud-corner p-6 rounded-sm">
+            <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/20">
+              FACULTY GUIDE
+            </span>
+            <p className="text-lg font-serif font-bold text-ink mt-2">{settings.faculty_guide_name}</p>
+            <p className="text-xs text-ink/60 mt-1">{settings.faculty_guide_title}</p>
           </div>
           {additionalFacultyGuides.map((f) => (
-            <div key={f.name} className="border border-ink/10 rounded-sm bg-surface p-8 md:p-10">
-              <p className="text-lg font-medium text-ink">{f.name}</p>
-              <p className="text-sm text-ink/55 mt-1">{f.title}</p>
+            <div key={f.name} className="tech-card hud-corner p-6 rounded-sm">
+              <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/20">
+                ADDITIONAL FACULTY GUIDE
+              </span>
+              <p className="text-lg font-serif font-bold text-ink mt-2">{f.name}</p>
+              <p className="text-xs text-ink/60 mt-1">{f.title}</p>
             </div>
           ))}
         </div>
       </Section>
 
-      {/* Join CTA */}
-      <Section className="pt-0 pb-24">
-        <div className="border border-accent/30 rounded-sm bg-accent text-white p-10 md:p-14 text-center">
-          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Don&rsquo;t just participate. Build.</h2>
-          <p className="mt-3 text-white/65 max-w-lg mx-auto">
-            Join FusionX and become part of a network of students building, researching, and
-            competing together.
-          </p>
-          <div className="mt-7">
-            <LinkButton href="/join" variant="secondary" size="lg" className="border-white/30 text-white hover:border-white bg-transparent">
-              Join FusionX <ArrowRight size={16} />
-            </LinkButton>
+      {/* High-Impact Techfest Style Join Banner */}
+      <Section className="pt-6 pb-24">
+        <div className="relative overflow-hidden rounded-sm border border-cyan-500/30 bg-gradient-to-r from-blue-950 via-slate-900 to-cyan-950 p-10 md:p-16 text-center shadow-[0_0_50px_rgba(47,107,255,0.2)]">
+          {/* Cyber ambient glow */}
+          <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-64 w-96 rounded-full bg-cyan-500/20 blur-[100px]" aria-hidden />
+
+          <div className="relative z-10 max-w-2xl mx-auto">
+            <span className="inline-block text-[11px] font-mono font-bold tracking-widest text-cyan-400 uppercase mb-3">
+              ✦ INITIALIZE YOUR JOURNEY ✦
+            </span>
+            <h2 className="text-3xl md:text-5xl font-serif font-bold tracking-tight text-white leading-tight">
+              Don&rsquo;t Just Attend Events. <br />
+              <span className="bg-gradient-to-r from-cyan-300 via-blue-200 to-indigo-300 bg-clip-text text-transparent">
+                Build What&rsquo;s Next.
+              </span>
+            </h2>
+            <p className="mt-4 text-sm md:text-base text-white/70 leading-relaxed">
+              Step into SCRIET&rsquo;s most ambitious student innovation ecosystem. Form teams, build
+              breakthrough projects, publish research, and represent our college at national hackathons.
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-4">
+              <LinkButton
+                href="/join"
+                size="lg"
+                className="bg-cyan-500 text-slate-950 font-bold hover:bg-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.4)] transition-all"
+              >
+                Join FusionX Network <ArrowRight size={16} />
+              </LinkButton>
+              <LinkButton
+                href="/about"
+                variant="secondary"
+                size="lg"
+                className="border-white/20 text-white hover:border-white/60 bg-white/5"
+              >
+                Read Manifesto
+              </LinkButton>
+            </div>
           </div>
         </div>
       </Section>
