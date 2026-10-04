@@ -460,3 +460,65 @@ body {
   background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.8), transparent);
   animation: energy-pulse 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
+
+/* =========================================================================
+   LIGHT THEME ADAPTATIONS (Crisp, High-Contrast Tech Blueprint Aesthetic)
+   ========================================================================= */
+
+:root[data-theme="light"] {
+  --color-paper: #f8fafc;
+  --color-ink: #0b1329;
+  --color-accent: #0284c7;
+  --color-surface: #ffffff;
+  --color-line: rgba(15, 23, 42, 0.1);
+}
+
+:root[data-theme="light"] .bg-cyber-mesh {
+  background-color: #f8fafc;
+  background-image: 
+    linear-gradient(rgba(37, 99, 235, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.06) 1px, transparent 1px),
+    radial-gradient(ellipse at 50% 0%, rgba(6, 182, 212, 0.08) 0%, transparent 70%);
+}
+
+:root[data-theme="light"] .cyber-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 100%);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06);
+}
+
+:root[data-theme="light"] .cyber-card:hover {
+  border-color: rgba(2, 132, 199, 0.6);
+  box-shadow: 0 0 25px -5px rgba(2, 132, 199, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.08);
+}
+
+:root[data-theme="light"] .hud-corner::before {
+  border-top-color: #0284c7;
+  border-left-color: #0284c7;
+}
+
+:root[data-theme="light"] .hud-corner::after {
+  border-bottom-color: #2563eb;
+  border-right-color: #2563eb;
+}
+
+:root[data-theme="light"] .hud-corner:hover::before {
+  border-color: #0284c7;
+  box-shadow: 0 0 8px rgba(2, 132, 199, 0.4);
+}
+
+:root[data-theme="light"] .hud-corner:hover::after {
+  border-color: #2563eb;
+  box-shadow: 0 0 8px rgba(37, 99, 235, 0.4);
+}
+
+:root[data-theme="light"] .telemetry-badge {
+  background: rgba(2, 132, 199, 0.1);
+  border-color: rgba(2, 132, 199, 0.35);
+  color: #0369a1;
+}
+
+:root[data-theme="light"] .glow-text-cyan {
+  text-shadow: 0 0 15px rgba(2, 132, 199, 0.3);
+  color: #0284c7;
+}

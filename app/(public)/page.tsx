@@ -1,13 +1,12 @@
 import Image from "next/image";
-import { ArrowRight, Hammer, FlaskConical, Users, Trophy, Sparkles, Terminal, Activity, Zap } from "lucide-react";
+import { ArrowRight, Hammer, FlaskConical, Users, Trophy, Sparkles, Terminal } from "lucide-react";
 import { LinkButton } from "@/components/ui/button";
-import { Section, SectionHeading } from "@/components/ui/section";
+import { Section } from "@/components/ui/section";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Badge } from "@/components/ui/badge";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
-import { StarField } from "@/components/ui/star-field";
 import { CyberNexus } from "@/components/ui/cyber-nexus";
+import { CognizanceParticleBackground } from "@/components/ui/cognizance-particle-background";
 import { founders, programs, journeyStages, buildPipeline, coreAreas, additionalFacultyGuides } from "@/lib/site-config";
 import { getOrganizationSettings } from "@/lib/data/organization";
 import { createClient } from "@/lib/supabase/server";
@@ -59,16 +58,17 @@ export default async function HomePage() {
 
   return (
     <>
+      {/* 3D Cognizance Particle Constellation Point-Cloud Background */}
+      <CognizanceParticleBackground />
+
       {/* ================================================================
           HERO — Techfest / Cognizance High-End Cyber Experience
           ================================================================ */}
       <section className="relative min-h-[92vh] flex items-center overflow-hidden bg-cyber-mesh border-b border-cyan-500/20">
-        <StarField count={60} />
-
         {/* Ambient atmospheric neon laser spotlights */}
-        <div className="pointer-events-none absolute -top-40 left-1/4 h-[500px] w-[500px] rounded-full bg-blue-600/20 blur-[140px]" aria-hidden />
-        <div className="pointer-events-none absolute top-1/2 -right-20 h-[500px] w-[500px] rounded-full bg-cyan-500/15 blur-[150px]" aria-hidden />
-        <div className="pointer-events-none absolute -bottom-32 left-10 h-[400px] w-[400px] rounded-full bg-indigo-600/15 blur-[120px]" aria-hidden />
+        <div className="pointer-events-none absolute -top-40 left-1/4 h-[500px] w-[500px] rounded-full bg-blue-600/15 blur-[140px]" aria-hidden />
+        <div className="pointer-events-none absolute top-1/2 -right-20 h-[500px] w-[500px] rounded-full bg-cyan-500/12 blur-[150px]" aria-hidden />
+        <div className="pointer-events-none absolute -bottom-32 left-10 h-[400px] w-[400px] rounded-full bg-indigo-600/12 blur-[120px]" aria-hidden />
 
         <div className="container-fx relative z-10 py-16 md:py-24 lg:py-28 w-full">
           <div className="grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
@@ -83,21 +83,21 @@ export default async function HomePage() {
                   </span>
                   <span>A Student-Led Movement</span>
                 </div>
-                <span className="hidden sm:inline font-mono text-[10px] tracking-widest text-cyan-400/60 uppercase">
+                <span className="hidden sm:inline font-mono text-[10px] tracking-widest text-cyan-500 font-semibold uppercase">
                   // SCRIET &bull; MEERUT
                 </span>
               </div>
 
               {/* Grand Impact Typography */}
               <h1 className="font-serif text-[clamp(2.75rem,6.5vw,5.5rem)] leading-[1.03] tracking-tight animate-reveal">
-                <span className="text-white drop-shadow-sm">Ideas Grow</span>
+                <span className="text-ink drop-shadow-sm">Ideas Grow</span>
                 <br />
-                <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-indigo-300 bg-clip-text text-transparent glow-text-cyan">
+                <span className="bg-gradient-to-r from-blue-500 via-cyan-400 to-indigo-400 bg-clip-text text-transparent glow-text-cyan">
                   Here.
                 </span>
               </h1>
 
-              <p className="mt-6 text-base md:text-lg text-ink/70 leading-relaxed max-w-xl animate-reveal stagger-2">
+              <p className="mt-6 text-base md:text-lg text-ink/75 leading-relaxed max-w-xl animate-reveal stagger-2">
                 {settings.chapter_name} brings together students, ideas, and opportunities to
                 build, research, and create real-world impact — together.
               </p>
@@ -115,7 +115,7 @@ export default async function HomePage() {
                   href="/join"
                   variant="secondary"
                   size="lg"
-                  className="border-cyan-500/30 text-ink hover:border-cyan-400/70 hover:bg-cyan-950/30 backdrop-blur-md transition-all"
+                  className="border-cyan-500/30 text-ink hover:border-cyan-400/70 hover:bg-cyan-950/20 backdrop-blur-md transition-all"
                 >
                   Join the Network
                 </LinkButton>
@@ -125,26 +125,26 @@ export default async function HomePage() {
               <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3 animate-reveal stagger-4">
                 {stats.map((s) => (
                   <div key={s.label} className="hud-corner cyber-card p-4 rounded-sm">
-                    <p className="font-mono text-[10px] tracking-wider text-cyan-400/80 uppercase">
+                    <p className="font-mono text-[10px] tracking-wider text-cyan-500 font-bold uppercase">
                       {s.label}
                     </p>
                     <AnimatedCounter
                       value={s.value}
-                      className="font-serif text-3xl font-bold text-white mt-1 block"
+                      className="font-serif text-3xl font-bold text-ink mt-1 block"
                     />
-                    <p className="font-mono text-[9px] text-ink/40 tracking-widest mt-1 uppercase">
+                    <p className="font-mono text-[9px] text-ink/40 tracking-widest mt-1 uppercase font-semibold">
                       {s.code}
                     </p>
                   </div>
                 ))}
                 <div className="hud-corner cyber-card p-4 rounded-sm">
-                  <p className="font-mono text-[10px] tracking-wider text-cyan-400/80 uppercase">
+                  <p className="font-mono text-[10px] tracking-wider text-cyan-500 font-bold uppercase">
                     Impact
                   </p>
-                  <p className="font-serif text-3xl font-bold text-cyan-300 mt-1 glow-text-cyan">
+                  <p className="font-serif text-3xl font-bold text-cyan-400 mt-1 glow-text-cyan">
                     &infin;
                   </p>
-                  <p className="font-mono text-[9px] text-ink/40 tracking-widest mt-1 uppercase">
+                  <p className="font-mono text-[9px] text-ink/40 tracking-widest mt-1 uppercase font-semibold">
                     CAMPUS LEGACY
                   </p>
                 </div>
@@ -152,13 +152,13 @@ export default async function HomePage() {
 
               {/* Core Domains Monospace Bar */}
               <div className="mt-10 pt-6 border-t border-ink/10 flex flex-wrap items-center gap-2 animate-reveal stagger-5">
-                <span className="font-mono text-[11px] uppercase tracking-widest text-cyan-400/70 font-semibold mr-2">
+                <span className="font-mono text-[11px] uppercase tracking-widest text-cyan-500 font-bold mr-2">
                   // CORE DOMAINS:
                 </span>
                 {coreAreas.map((a) => (
                   <span
                     key={a}
-                    className="font-mono text-xs px-2.5 py-1 rounded border border-cyan-500/20 bg-surface/60 text-ink/80 hover:border-cyan-400/50 hover:text-cyan-300 transition-colors"
+                    className="font-mono text-xs px-2.5 py-1 rounded border border-cyan-500/25 bg-surface/80 text-ink/85 hover:border-cyan-400/60 hover:text-cyan-500 transition-colors"
                   >
                     {a}
                   </span>
@@ -173,24 +173,24 @@ export default async function HomePage() {
               {/* Sub-panel with institutional context */}
               <div className="mt-6 w-full max-w-[460px] hud-corner cyber-card p-5 rounded-sm">
                 <div className="flex items-center gap-3">
-                  <Terminal size={18} className="text-cyan-400 shrink-0" />
-                  <div className="flex items-center gap-2 font-mono text-[11px] text-cyan-300">
+                  <Terminal size={18} className="text-cyan-500 shrink-0" />
+                  <div className="flex items-center gap-2 font-mono text-[11px]">
                     <span className="text-ink">Learn.</span>
-                    <span className="text-cyan-400">&bull;</span>
+                    <span className="text-cyan-500">&bull;</span>
                     <span className="text-ink">Build.</span>
-                    <span className="text-cyan-400">&bull;</span>
+                    <span className="text-cyan-500">&bull;</span>
                     <span className="text-ink">Research.</span>
-                    <span className="text-cyan-400">&bull;</span>
-                    <span className="text-cyan-300 font-semibold">Impact.</span>
+                    <span className="text-cyan-500">&bull;</span>
+                    <span className="text-cyan-500 font-bold">Impact.</span>
                   </div>
                 </div>
-                <p className="mt-3 text-xs text-ink/60 leading-relaxed font-sans">
+                <p className="mt-3 text-xs text-ink/65 leading-relaxed font-sans">
                   A network where campus conversations turn into working projects, documented
                   research, and outcomes that outlast a single event.
                 </p>
-                <div className="mt-3 pt-3 border-t border-ink/10 flex items-center justify-between text-[10px] font-mono text-ink/40 uppercase tracking-wider">
+                <div className="mt-3 pt-3 border-t border-ink/10 flex items-center justify-between text-[10px] font-mono text-ink/45 uppercase tracking-wider">
                   <span>Student Innovation &amp; Research</span>
-                  <span className="text-cyan-400/70">SCRIET &bull; CCSU</span>
+                  <span className="text-cyan-500 font-bold">SCRIET &bull; CCSU</span>
                 </div>
               </div>
             </div>
@@ -203,7 +203,7 @@ export default async function HomePage() {
           ================================================================ */}
       <section className="border-y border-cyan-500/20 bg-surface/50 overflow-hidden select-none" aria-hidden>
         <div className="py-3">
-          <div className="marquee-track gap-8 text-[11px] uppercase tracking-[0.2em] font-mono font-semibold text-cyan-300/60">
+          <div className="marquee-track gap-8 text-[11px] uppercase tracking-[0.2em] font-mono font-semibold text-cyan-500/70">
             {[...Array(3)].map((_, setIdx) => (
               <div key={setIdx} className="flex items-center gap-8 px-4">
                 {["Build", "Research", "Innovate", "Collaborate", "Compete", "Prototype", "Publish", "Launch"].map((word) => (
@@ -224,24 +224,24 @@ export default async function HomePage() {
         <Section className="py-12 md:py-16">
           <div className="hud-corner cyber-card energy-line rounded-sm p-6 md:p-8 overflow-x-auto">
             <div className="flex items-center justify-between mb-4 border-b border-ink/10 pb-3">
-              <span className="font-mono text-xs uppercase tracking-widest text-cyan-400 font-semibold">
+              <span className="font-mono text-xs uppercase tracking-widest text-cyan-500 font-bold">
                 // SYSTEM PIPELINE: IDEA TO IMPACT
               </span>
-              <span className="font-mono text-[10px] text-ink/40 uppercase tracking-widest">
+              <span className="font-mono text-[10px] text-ink/45 uppercase tracking-widest">
                 STAGE_PROGRESSION: CONTINUOUS
               </span>
             </div>
             <div className="flex items-center gap-4 md:gap-6 min-w-max text-sm font-medium">
               {["Idea", "Team", "Build", "Research", "Impact"].map((step, i, arr) => (
                 <div key={step} className="flex items-center gap-4 md:gap-6">
-                  <div className="flex items-center gap-2.5 px-4 py-2 rounded-sm border border-cyan-500/30 bg-paper/90 text-ink/85 whitespace-nowrap hover:border-cyan-400 hover:text-cyan-300 transition-all shadow-sm">
-                    <span className="font-mono text-[10px] text-cyan-400/70 font-semibold">
+                  <div className="flex items-center gap-2.5 px-4 py-2 rounded-sm border border-cyan-500/30 bg-paper/90 text-ink/90 whitespace-nowrap hover:border-cyan-400 hover:text-cyan-500 transition-all shadow-sm">
+                    <span className="font-mono text-[10px] text-cyan-500 font-bold">
                       0{i + 1}
                     </span>
                     <span className="font-sans font-medium">{step}</span>
                   </div>
                   {i < arr.length - 1 && (
-                    <ArrowRight size={16} className="text-cyan-400/40 shrink-0" />
+                    <ArrowRight size={16} className="text-cyan-500/40 shrink-0" />
                   )}
                 </div>
               ))}
@@ -258,15 +258,15 @@ export default async function HomePage() {
           <div className="hud-corner cyber-card p-8 md:p-12 rounded-sm">
             <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-center">
               <div className="lg:col-span-5">
-                <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-400 mb-2">
+                <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-500 mb-2">
                   // ABOUT PROTOCOL
                 </p>
-                <h2 className="font-serif text-3xl md:text-4xl tracking-tight text-white leading-tight">
+                <h2 className="font-serif text-3xl md:text-4xl tracking-tight text-ink leading-tight">
                   An ecosystem, not just a club.
                 </h2>
               </div>
               <div className="lg:col-span-7">
-                <p className="text-base md:text-lg text-ink/70 leading-relaxed">
+                <p className="text-base md:text-lg text-ink/75 leading-relaxed">
                   FusionX@SCRIET exists to help students move beyond attending events — into
                   actually building projects, conducting research, protecting their ideas, and carrying
                   work forward past a single competition.
@@ -284,10 +284,10 @@ export default async function HomePage() {
         <ScrollReveal>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-400 mb-1">
+              <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-500 mb-1">
                 // ARCHITECTURE
               </p>
-              <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-white">
+              <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-ink">
                 The full pipeline, not a single weekend.
               </h2>
             </div>
@@ -298,11 +298,11 @@ export default async function HomePage() {
           <div className="flex flex-wrap gap-2.5 mt-6">
             {buildPipeline.map((stage, i) => (
               <div key={stage} className="flex items-center gap-2.5">
-                <span className="font-mono text-xs px-3 py-1.5 rounded-sm border border-cyan-500/25 bg-surface/80 text-ink/80 hover:border-cyan-400 transition-colors">
+                <span className="font-mono text-xs px-3 py-1.5 rounded-sm border border-cyan-500/25 bg-surface/80 text-ink/85 hover:border-cyan-400 transition-colors">
                   {stage}
                 </span>
                 {i < buildPipeline.length - 1 && (
-                  <ArrowRight size={14} className="text-cyan-400/30" />
+                  <ArrowRight size={14} className="text-cyan-400/40" />
                 )}
               </div>
             ))}
@@ -314,9 +314,9 @@ export default async function HomePage() {
             {journeyStages.map((stage, idx) => (
               <span
                 key={stage}
-                className="font-mono text-xs text-ink/50 px-3 py-1 border-l border-cyan-500/30 first:border-l-0 hover:text-cyan-300 transition-colors"
+                className="font-mono text-xs text-ink/50 px-3 py-1 border-l border-cyan-500/30 first:border-l-0 hover:text-cyan-500 transition-colors"
               >
-                <span className="text-cyan-400/40 mr-1.5">0{idx + 1}</span>
+                <span className="text-cyan-500/60 mr-1.5 font-bold">0{idx + 1}</span>
                 {stage}
               </span>
             ))}
@@ -331,10 +331,10 @@ export default async function HomePage() {
         <ScrollReveal>
           <div className="flex items-center justify-between mb-6">
             <div>
-              <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-400 mb-1">
+              <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-500 mb-1">
                 // MODULES
               </p>
-              <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-white">
+              <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-ink">
                 Five ways to get involved.
               </h2>
             </div>
@@ -346,17 +346,17 @@ export default async function HomePage() {
             <ScrollReveal key={area} delay={i * 80}>
               <div className="hud-corner cyber-card rounded-sm p-6 group h-full flex flex-col justify-between">
                 <div>
-                  <div className="text-cyan-400 mb-4 p-2.5 rounded-sm bg-cyan-950/40 border border-cyan-500/20 w-fit group-hover:scale-110 group-hover:border-cyan-400 transition-all">
+                  <div className="text-cyan-500 mb-4 p-2.5 rounded-sm bg-cyan-950/20 border border-cyan-500/20 w-fit group-hover:scale-110 group-hover:border-cyan-400 transition-all">
                     {areaIcons[area]}
                   </div>
-                  <span className="font-mono text-[10px] text-ink/30 block mb-1">
+                  <span className="font-mono text-[10px] text-ink/35 block mb-1">
                     TRACK_0{i + 1}
                   </span>
-                  <p className="font-serif text-lg font-medium text-white group-hover:text-cyan-300 transition-colors">
+                  <p className="font-serif text-lg font-medium text-ink group-hover:text-cyan-500 transition-colors">
                     {area}
                   </p>
                 </div>
-                <div className="mt-4 pt-3 border-t border-ink/8 flex items-center justify-between text-[10px] font-mono text-cyan-400/60">
+                <div className="mt-4 pt-3 border-t border-ink/8 flex items-center justify-between text-[10px] font-mono text-cyan-500 font-semibold">
                   <span>ACTIVE</span>
                   <span>&rarr;</span>
                 </div>
@@ -373,13 +373,13 @@ export default async function HomePage() {
         <ScrollReveal>
           <div className="flex items-center justify-between mb-2">
             <div>
-              <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-400 mb-1">
+              <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-500 mb-1">
                 // TRACKS
               </p>
-              <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-white">
+              <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-ink">
                 Structured tracks for every stage of the journey.
               </h2>
-              <p className="mt-2 text-sm text-ink/60 max-w-xl">
+              <p className="mt-2 text-sm text-ink/65 max-w-xl">
                 Six focused programs, each built around a different part of the idea-to-impact pipeline.
               </p>
             </div>
@@ -392,15 +392,15 @@ export default async function HomePage() {
               <div className="hud-corner cyber-card rounded-sm p-6 group h-full flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <span className="font-mono text-[10px] tracking-wider text-cyan-400/70 font-semibold uppercase">
+                    <span className="font-mono text-[10px] tracking-wider text-cyan-500 font-bold uppercase">
                       [ PRG_0{i + 1} ]
                     </span>
                     <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/50 group-hover:bg-cyan-400" />
                   </div>
-                  <p className="font-serif text-xl font-medium text-white group-hover:text-cyan-300 transition-colors">
+                  <p className="font-serif text-xl font-medium text-ink group-hover:text-cyan-500 transition-colors">
                     {p.name}
                   </p>
-                  <p className="mt-3 text-sm text-ink/60 leading-relaxed font-sans">{p.summary}</p>
+                  <p className="mt-3 text-sm text-ink/65 leading-relaxed font-sans">{p.summary}</p>
                 </div>
               </div>
             </ScrollReveal>
@@ -428,10 +428,10 @@ export default async function HomePage() {
         <ScrollReveal>
           <div className="flex items-center justify-between mb-2">
             <div>
-              <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-400 mb-1">
+              <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-500 mb-1">
                 // SHOWCASE
               </p>
-              <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-white">
+              <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-ink">
                 What students are building right now.
               </h2>
             </div>
@@ -445,19 +445,19 @@ export default async function HomePage() {
                 <div className="hud-corner cyber-card rounded-sm p-6 h-full flex flex-col justify-between group">
                   <div>
                     <div className="flex items-center justify-between mb-3">
-                      <span className="font-mono text-[10px] px-2 py-0.5 rounded border border-cyan-500/30 bg-cyan-950/40 text-cyan-300 uppercase">
+                      <span className="font-mono text-[10px] px-2 py-0.5 rounded border border-cyan-500/30 bg-cyan-950/20 text-cyan-500 uppercase font-semibold">
                         {p.status}
                       </span>
                       {p.domain && (
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-ink/40">
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-ink/45">
                           {p.domain}
                         </span>
                       )}
                     </div>
-                    <p className="font-serif text-lg font-medium text-white group-hover:text-cyan-300 transition-colors">
+                    <p className="font-serif text-lg font-medium text-ink group-hover:text-cyan-500 transition-colors">
                       {p.title}
                     </p>
-                    <p className="mt-2 text-sm text-ink/60 line-clamp-3 leading-relaxed">
+                    <p className="mt-2 text-sm text-ink/65 line-clamp-3 leading-relaxed">
                       {p.description}
                     </p>
                   </div>
@@ -466,7 +466,7 @@ export default async function HomePage() {
                       {p.technologies.slice(0, 4).map((t: string) => (
                         <span
                           key={t}
-                          className="font-mono text-[10px] text-cyan-400/80 bg-cyan-950/30 border border-cyan-500/20 rounded px-2 py-0.5"
+                          className="font-mono text-[10px] text-cyan-500 bg-cyan-950/20 border border-cyan-500/20 rounded px-2 py-0.5"
                         >
                           {t}
                         </span>
@@ -509,10 +509,10 @@ export default async function HomePage() {
         <ScrollReveal>
           <div className="flex items-center justify-between mb-2">
             <div>
-              <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-400 mb-1">
+              <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-500 mb-1">
                 // TIMELINE
               </p>
-              <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-white">
+              <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-ink">
                 Upcoming on the calendar.
               </h2>
             </div>
@@ -526,14 +526,14 @@ export default async function HomePage() {
                 <div className="hud-corner cyber-card rounded-sm p-6 h-full flex flex-col justify-between group">
                   <div>
                     <div className="flex items-center justify-between mb-3">
-                      <span className="font-mono text-[10px] px-2 py-0.5 rounded border border-cyan-500/30 bg-cyan-950/40 text-cyan-300 uppercase">
+                      <span className="font-mono text-[10px] px-2 py-0.5 rounded border border-cyan-500/30 bg-cyan-950/20 text-cyan-500 uppercase font-semibold">
                         {e.status}
                       </span>
                     </div>
-                    <p className="font-serif text-lg font-medium text-white group-hover:text-cyan-300 transition-colors">
+                    <p className="font-serif text-lg font-medium text-ink group-hover:text-cyan-500 transition-colors">
                       {e.title}
                     </p>
-                    <p className="mt-2 text-sm text-ink/60 font-sans">
+                    <p className="mt-2 text-sm text-ink/65 font-sans">
                       {new Date(e.event_date).toLocaleDateString("en-IN", {
                         day: "numeric",
                         month: "long",
@@ -565,10 +565,10 @@ export default async function HomePage() {
         <ScrollReveal>
           <div className="flex items-center justify-between mb-2">
             <div>
-              <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-400 mb-1">
+              <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-500 mb-1">
                 // CREATORS
               </p>
-              <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-white">
+              <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-ink">
                 Built by students, for students.
               </h2>
             </div>
@@ -580,11 +580,11 @@ export default async function HomePage() {
             <ScrollReveal key={f.name} delay={i * 80}>
               <div className="hud-corner cyber-card rounded-sm p-6 h-full flex flex-col justify-between group">
                 <div>
-                  <div className="h-10 w-10 rounded-full bg-cyan-950/50 border border-cyan-500/30 flex items-center justify-center font-mono text-cyan-300 font-bold text-xs mb-4">
+                  <div className="h-10 w-10 rounded-full bg-cyan-950/30 border border-cyan-500/30 flex items-center justify-center font-mono text-cyan-500 font-bold text-xs mb-4">
                     {f.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
                   </div>
-                  <p className="font-serif text-lg font-medium text-white">{f.name}</p>
-                  <p className="font-mono text-xs text-cyan-400 mt-1 uppercase tracking-wider">{f.role}</p>
+                  <p className="font-serif text-lg font-medium text-ink">{f.name}</p>
+                  <p className="font-mono text-xs text-cyan-500 mt-1 uppercase tracking-wider font-semibold">{f.role}</p>
                 </div>
               </div>
             </ScrollReveal>
@@ -610,28 +610,28 @@ export default async function HomePage() {
           ================================================================ */}
       <Section className="pt-0">
         <ScrollReveal>
-          <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-400 mb-4">
+          <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-500 mb-4 font-bold">
             // FACULTY ADVISORY
           </p>
         </ScrollReveal>
         <div className="space-y-4">
           <ScrollReveal>
             <div className="hud-corner cyber-card rounded-sm p-8 md:p-10">
-              <span className="font-mono text-[10px] text-cyan-400 uppercase tracking-widest block mb-2">
+              <span className="font-mono text-[10px] text-cyan-500 uppercase tracking-widest block mb-2 font-bold">
                 FACULTY GUIDE
               </span>
-              <p className="font-serif text-2xl font-medium text-white">{settings.faculty_guide_name}</p>
-              <p className="text-sm text-ink/60 mt-1">{settings.faculty_guide_title}</p>
+              <p className="font-serif text-2xl font-medium text-ink">{settings.faculty_guide_name}</p>
+              <p className="text-sm text-ink/65 mt-1">{settings.faculty_guide_title}</p>
             </div>
           </ScrollReveal>
           {additionalFacultyGuides.map((f, i) => (
             <ScrollReveal key={f.name} delay={(i + 1) * 100}>
               <div className="hud-corner cyber-card rounded-sm p-8 md:p-10">
-                <span className="font-mono text-[10px] text-cyan-400 uppercase tracking-widest block mb-2">
+                <span className="font-mono text-[10px] text-cyan-500 uppercase tracking-widest block mb-2 font-bold">
                   ADDITIONAL GUIDE
                 </span>
-                <p className="font-serif text-2xl font-medium text-white">{f.name}</p>
-                <p className="text-sm text-ink/60 mt-1">{f.title}</p>
+                <p className="font-serif text-2xl font-medium text-ink">{f.name}</p>
+                <p className="text-sm text-ink/65 mt-1">{f.title}</p>
               </div>
             </ScrollReveal>
           ))}
@@ -643,18 +643,18 @@ export default async function HomePage() {
           ================================================================ */}
       <Section className="pt-0 pb-24">
         <ScrollReveal>
-          <div className="hud-corner relative overflow-hidden rounded-sm bg-gradient-to-br from-blue-900/40 via-surface to-cyan-950/40 border border-cyan-500/40 text-white p-10 md:p-16 text-center shadow-[0_0_50px_rgba(6,182,212,0.15)]">
-            <div className="absolute inset-0 bg-cyber-mesh opacity-40 pointer-events-none" aria-hidden />
+          <div className="hud-corner relative overflow-hidden rounded-sm bg-gradient-to-br from-blue-900/30 via-surface to-cyan-950/30 border border-cyan-500/40 text-ink p-10 md:p-16 text-center shadow-[0_0_50px_rgba(6,182,212,0.15)]">
+            <div className="absolute inset-0 bg-cyber-mesh opacity-30 pointer-events-none" aria-hidden />
             <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-cyan-500/10 rounded-full blur-[120px]" aria-hidden />
 
             <div className="relative z-10 max-w-xl mx-auto">
-              <span className="font-mono text-[10px] tracking-[0.25em] text-cyan-300 font-semibold uppercase block mb-3">
+              <span className="font-mono text-[10px] tracking-[0.25em] text-cyan-500 font-bold uppercase block mb-3">
                 [ JOIN THE NETWORK ]
               </span>
-              <h2 className="text-3xl md:text-4xl font-serif font-bold tracking-tight text-white leading-tight">
+              <h2 className="text-3xl md:text-4xl font-serif font-bold tracking-tight text-ink leading-tight">
                 Don&rsquo;t just participate. Build.
               </h2>
-              <p className="mt-4 text-sm md:text-base text-ink/70 leading-relaxed max-w-lg mx-auto">
+              <p className="mt-4 text-sm md:text-base text-ink/75 leading-relaxed max-w-lg mx-auto">
                 Join FusionX and become part of a network of students building, researching, and
                 competing together.
               </p>

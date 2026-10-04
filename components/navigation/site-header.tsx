@@ -108,25 +108,40 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
       )}
     >
       <div className="container-fx flex h-16 items-center justify-between">
-        {/* Logo */}
-        <div className="flex items-center gap-3">
+        {/* Logos & Brand */}
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          {/* College Official Logo */}
+          <Link href="/" className="flex items-center shrink-0" aria-label="CCSU Meerut">
+            <Image
+              src="/ccsu-logo.webp"
+              alt="Chaudhary Charan Singh University, Meerut"
+              width={34}
+              height={34}
+              className="h-8 w-auto object-contain shrink-0 drop-shadow-sm hover:scale-105 transition-transform"
+            />
+          </Link>
+
+          {/* Elegant Divider */}
+          <span className="h-6 w-px bg-ink/20" aria-hidden />
+
+          {/* FusionX Official Logo & Name */}
           <Link href="/" className="flex items-center gap-2.5 group" onClick={() => setOpen(false)}>
-            <div className="relative">
+            <div className="relative shrink-0">
               <Image
-                src="/logo-mark.png"
+                src="/fusionx-official-logo.png"
                 alt="FusionX logo"
                 width={32}
                 height={32}
-                className="h-8 w-8 rounded-full transition-transform group-hover:scale-110 drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]"
+                className="h-8 w-8 rounded-full object-cover transition-transform group-hover:scale-110 drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]"
               />
               <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-cyan-400 border border-paper animate-pulse" />
             </div>
             <div className="flex flex-col">
-              <span className="font-semibold tracking-tight text-white text-sm leading-tight group-hover:text-cyan-300 transition-colors">
+              <span className="font-semibold tracking-tight text-ink text-sm leading-tight group-hover:text-cyan-500 transition-colors">
                 <span className="hidden sm:inline">{chapterName}</span>
                 <span className="sm:hidden">FusionX</span>
               </span>
-              <span className="hidden sm:block font-mono text-[9px] uppercase tracking-[0.16em] text-cyan-400/70 leading-tight">
+              <span className="hidden sm:block font-mono text-[9px] uppercase tracking-[0.16em] text-cyan-500/80 leading-tight">
                 INNOVATION &bull; RESEARCH
               </span>
             </div>
@@ -142,8 +157,8 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
               className={cn(
                 "relative px-3.5 py-1.5 text-[13px] font-medium rounded-sm transition-all",
                 pathname?.startsWith(item.href)
-                  ? "text-cyan-300 font-semibold"
-                  : "text-ink/65 hover:text-white hover:bg-white/5"
+                  ? "text-cyan-500 font-semibold"
+                  : "text-ink/65 hover:text-ink hover:bg-ink/5"
               )}
             >
               {item.label}
