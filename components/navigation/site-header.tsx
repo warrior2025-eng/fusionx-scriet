@@ -1,10 +1,10 @@
-﻿"use client";
+"use client";
 
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { Menu, X, Search, Bell, LayoutGrid, ChevronDown } from "lucide-react";
+import { Menu, X, Search, Bell, LayoutGrid, ChevronDown, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LinkButton } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -88,67 +88,99 @@ function ProfileMenu({ user }: { user: SiteUser }) {
 
 export function SiteHeader({ chapterName, user }: { chapterName: string; user: SiteUser | null }) {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
 
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
-    <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper/90 backdrop-blur">
+    <header
+      className={cn(
+        "sticky top-0 z-40 transition-all duration-300",
+        scrolled
+          ? "bg-paper/90 backdrop-blur-xl border-b border-cyan-500/20 shadow-[0_4px_30px_rgba(0,0,0,0.7)]"
+          : "bg-transparent border-b border-transparent"
+      )}
+    >
       <div className="container-fx flex h-16 items-center justify-between">
+        {/* Logo */}
         <div className="flex items-center gap-3">
-          <Image
-            src="/ccsu-logo.webp"
-            alt="Chaudhary Charan Singh University, Meerut"
-            width={32}
-            height={32}
-            className="h-8 w-8 object-contain shrink-0"
-          />
-          <span className="hidden sm:block h-6 w-px bg-ink/15" aria-hidden />
-          <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight text-ink" onClick={() => setOpen(false)}>
-            <Image src="/logo-mark.png" alt="FusionX logo" width={28} height={28} className="h-7 w-7 rounded-full" />
-            <span className="hidden sm:inline">{chapterName}</span>
-            <span className="sm:hidden">FusionX</span>
+          <Link href="/" className="flex items-center gap-2.5 group" onClick={() => setOpen(false)}>
+            <div className="relative">
+              <Image
+                src="/logo-mark.png"
+                alt="FusionX logo"
+                width={32}
+                height={32}
+                className="h-8 w-8 rounded-full transition-transform group-hover:scale-110 drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]"
+              />
+              <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-cyan-400 border border-paper animate-pulse" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-semibold tracking-tight text-white text-sm leading-tight group-hover:text-cyan-300 transition-colors">
+                <span className="hidden sm:inline">{chapterName}</span>
+                <span className="sm:hidden">FusionX</span>
+              </span>
+              <span className="hidden sm:block font-mono text-[9px] uppercase tracking-[0.16em] text-cyan-400/70 leading-tight">
+                INNOVATION &bull; RESEARCH
+              </span>
+            </div>
           </Link>
         </div>
 
-        <nav className="hidden md:flex items-center gap-7 text-sm">
+        {/* Desktop Nav */}
+        <nav className="hidden md:flex items-center gap-1">
           {nav.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                "text-ink/65 hover:text-ink transition-colors",
-                pathname?.startsWith(item.href) && "text-ink font-medium"
+                "relative px-3.5 py-1.5 text-[13px] font-medium rounded-sm transition-all",
+                pathname?.startsWith(item.href)
+                  ? "text-cyan-300 font-semibold"
+                  : "text-ink/65 hover:text-white hover:bg-white/5"
               )}
             >
               {item.label}
+              {pathname?.startsWith(item.href) && (
+                <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-gradient-to-r from-blue-500 to-cyan-400 shadow-[0_0_8px_#06b6d4]" />
+              )}
             </Link>
           ))}
         </nav>
 
-        <div className="hidden md:flex items-center gap-3">
-          <Link href="/search" aria-label="Search" className="p-2 text-ink/65 hover:text-ink transition-colors">
-            <Search size={18} />
+        {/* Desktop Actions */}
+        <div className="hidden md:flex items-center gap-2">
+          <Link href="/search" aria-label="Search" className="p-2 text-ink/50 hover:text-ink transition-colors rounded-sm hover:bg-ink/5">
+            <Search size={16} />
           </Link>
-          <ThemeToggle />
+          <ThemeToggle className="p-2 text-ink/50 hover:text-ink transition-colors rounded-sm hover:bg-ink/5" />
           {user ? (
             <>
-              <Link href="/notifications" aria-label="Notifications" className="p-2 text-ink/65 hover:text-ink transition-colors">
-                <Bell size={18} />
+              <Link href="/notifications" aria-label="Notifications" className="p-2 text-ink/50 hover:text-ink transition-colors rounded-sm hover:bg-ink/5">
+                <Bell size={16} />
               </Link>
-              <Link href="/projects/mine" aria-label="My projects" className="p-2 text-ink/65 hover:text-ink transition-colors">
-                <LayoutGrid size={18} />
+              <Link href="/projects/mine" aria-label="My projects" className="p-2 text-ink/50 hover:text-ink transition-colors rounded-sm hover:bg-ink/5">
+                <LayoutGrid size={16} />
               </Link>
               <ProfileMenu user={user} />
             </>
           ) : (
-            <Link href="/login" className="text-sm text-ink/65 hover:text-ink transition-colors">
+            <Link href="/login" className="text-[13px] font-medium text-ink/55 hover:text-ink transition-colors px-3 py-1.5">
               Sign in
             </Link>
           )}
-          <LinkButton href="/join" size="sm">
-            Join FusionX
+          <LinkButton href="/join" size="sm" className="ml-1">
+            Join <ArrowRight size={14} />
           </LinkButton>
         </div>
 
+        {/* Mobile toggle */}
         <button
           className="md:hidden p-2 -mr-2 text-ink"
           aria-label={open ? "Close menu" : "Open menu"}
@@ -159,6 +191,7 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
         </button>
       </div>
 
+      {/* Mobile Nav */}
       {open && (
         <nav className="md:hidden border-t border-ink/10 bg-paper px-6 py-4 flex flex-col gap-1">
           <div className="flex items-center justify-between pb-3 mb-2 border-b border-ink/10">
@@ -186,7 +219,12 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
               key={item.href}
               href={item.href}
               onClick={() => setOpen(false)}
-              className="py-2.5 text-sm text-ink/75 hover:text-ink border-b border-ink/5 last:border-0"
+              className={cn(
+                "py-2.5 text-sm border-b border-ink/5 last:border-0 transition-colors",
+                pathname?.startsWith(item.href)
+                  ? "text-accent font-medium"
+                  : "text-ink/75 hover:text-ink"
+              )}
             >
               {item.label}
             </Link>

@@ -1,22 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --color-paper: #0a0e18;
-  --color-ink: #eef1f6;
-  --color-accent: #2f6bff;
-  --color-surface: #111a2d;
-  --color-line: rgba(255, 255, 255, 0.12);
+  --color-paper: #050a12;
+  --color-ink: #e8ecf4;
+  --color-accent: #2563eb;
+  --color-surface: #0c1222;
+  --color-line: rgba(255, 255, 255, 0.08);
 }
 
-/* Light theme — applied when <html data-theme="light">. Dark (above) stays
-   the default so the site's existing navy identity doesn't shift for
-   anyone who hasn't explicitly chosen light mode. */
 :root[data-theme="light"] {
-  --color-paper: #f7f9fc;
+  --color-paper: #f8f9fc;
   --color-ink: #0f172a;
   --color-accent: #1d4fd6;
   --color-surface: #ffffff;
-  --color-line: rgba(15, 23, 42, 0.1);
+  --color-line: rgba(15, 23, 42, 0.08);
 }
 
 @theme inline {
@@ -52,9 +49,15 @@ body {
 }
 
 .container-fx {
-  max-width: 72rem;
+  max-width: 76rem;
   margin-inline: auto;
   padding-inline: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .container-fx {
+    padding-inline: 2.5rem;
+  }
 }
 
 .prose-fx :where(p, ul, ol) {
@@ -80,129 +83,380 @@ body {
 }
 
 /* =========================================================================
-   TECHFEST & COGNIZANCE FUTURISTIC TECH STYLES
+   PREMIUM DESIGN SYSTEM — Inspired by high-end tech event sites
    ========================================================================= */
 
-@keyframes marquee {
-  0% { transform: translateX(0%); }
+/* Scroll-triggered reveal animation */
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes counter-tick {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes marquee-scroll {
+  0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
 
-@keyframes marquee-reverse {
-  0% { transform: translateX(-50%); }
-  100% { transform: translateX(0%); }
+/* Animation utility classes */
+.animate-reveal {
+  animation: reveal-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@keyframes pulse-subtle {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 0.85; transform: scale(1.05); }
+.animate-fade {
+  animation: fade-in 0.8s ease both;
 }
 
-@keyframes scanline {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(1000%); }
+.animate-slide-right {
+  animation: slide-in-right 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.animate-marquee {
-  display: flex;
-  width: max-content;
-  animation: marquee 35s linear infinite;
+.animate-counter {
+  animation: counter-tick 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.animate-marquee:hover {
+.animate-marquee-scroll {
+  animation: marquee-scroll 40s linear infinite;
+}
+
+.animate-marquee-scroll:hover {
   animation-play-state: paused;
 }
 
-.animate-marquee-fast {
+/* Stagger delays for section children */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+
+/* Subtle grid overlay for hero backgrounds */
+.bg-grid-subtle {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* Horizontal rule with editorial accent */
+.hr-accent {
+  height: 1px;
+  border: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-accent) 30%,
+    var(--color-accent) 70%,
+    transparent
+  );
+  opacity: 0.35;
+}
+
+/* Premium card — no glassmorphism, just clean elevation */
+.card-elevated {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.card-elevated:hover {
+  border-color: color-mix(in srgb, var(--color-ink) 18%, transparent);
+  transform: translateY(-1px);
+}
+
+/* Number counter display */
+.stat-number {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Section divider line with number */
+.numbered-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.numbered-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-line);
+}
+
+/* =========================================================================
+   SCROLL REVEAL — IntersectionObserver-driven transitions
+   ========================================================================= */
+
+.scroll-reveal {
+  will-change: opacity, transform;
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.scroll-reveal-up {
+  opacity: 0;
+  transform: translateY(40px);
+}
+.scroll-reveal-down {
+  opacity: 0;
+  transform: translateY(-40px);
+}
+.scroll-reveal-left {
+  opacity: 0;
+  transform: translateX(-40px);
+}
+.scroll-reveal-right {
+  opacity: 0;
+  transform: translateX(40px);
+}
+.scroll-reveal-fade {
+  opacity: 0;
+}
+
+.scroll-revealed {
+  opacity: 1 !important;
+  transform: translate(0) !important;
+}
+
+/* =========================================================================
+   AMBIENT STAR FIELD — subtle floating particles for hero depth
+   ========================================================================= */
+
+@keyframes drift {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(-100vh) translateX(20px); opacity: 0; }
+}
+
+.star-field {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.star-field .star {
+  position: absolute;
+  width: 1.5px;
+  height: 1.5px;
+  background: white;
+  border-radius: 50%;
+  opacity: 0;
+  animation: drift linear infinite;
+}
+
+/* =========================================================================
+   MARQUEE — continuous horizontal scroll for social proof strip
+   ========================================================================= */
+
+.marquee-track {
   display: flex;
   width: max-content;
-  animation: marquee 20s linear infinite;
+  animation: marquee-scroll 50s linear infinite;
 }
 
-.animate-pulse-subtle {
-  animation: pulse-subtle 4s ease-in-out infinite;
+.marquee-track:hover {
+  animation-play-state: paused;
 }
 
-/* Cyber Grid Backgrounds */
-.bg-cyber-grid {
-  background-size: 44px 44px;
-  background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+/* =========================================================================
+   LINE GLOW — accent-colored animated underline for CTA
+   ========================================================================= */
+
+@keyframes line-glow-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
 
-.bg-cyber-grid-dense {
-  background-size: 24px 24px;
-  background-image: 
-    linear-gradient(to right, rgba(47, 107, 255, 0.08) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(47, 107, 255, 0.08) 1px, transparent 1px);
-}
-
-.bg-cyber-dots {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px);
-  background-size: 20px 20px;
-}
-
-/* Futuristic Tech Card with Glassmorphism & Neon Glow */
-.tech-card {
+.line-glow {
   position: relative;
-  background: rgba(17, 26, 45, 0.65);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.tech-card:hover {
-  border-color: rgba(47, 107, 255, 0.45);
-  box-shadow: 0 0 25px -5px rgba(47, 107, 255, 0.22), inset 0 0 12px rgba(47, 107, 255, 0.06);
-  transform: translateY(-2px);
+.line-glow::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--color-accent);
+  animation: line-glow-pulse 2.5s ease-in-out infinite;
 }
 
-.tech-card-cyan:hover {
-  border-color: rgba(6, 182, 212, 0.5);
-  box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.25), inset 0 0 12px rgba(6, 182, 212, 0.06);
-  transform: translateY(-2px);
+/* =========================================================================
+   TECHFEST & COGNIZANCE CYBER HUD SYSTEM
+   ========================================================================= */
+
+/* Cyber Grid with glowing scan lines */
+.bg-cyber-mesh {
+  background-color: var(--color-paper);
+  background-image: 
+    linear-gradient(rgba(37, 99, 235, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.07) 1px, transparent 1px),
+    radial-gradient(ellipse at 50% 0%, rgba(6, 182, 212, 0.12) 0%, transparent 70%);
+  background-size: 48px 48px, 48px 48px, 100% 100%;
 }
 
-/* Cyber Glow Accents */
-.glow-accent {
-  box-shadow: 0 0 40px -5px rgba(47, 107, 255, 0.45);
-}
-
-.glow-cyan {
-  box-shadow: 0 0 40px -5px rgba(6, 182, 212, 0.45);
-}
-
-.glow-purple {
-  box-shadow: 0 0 40px -5px rgba(168, 85, 247, 0.4);
-}
-
-.glow-text {
-  text-shadow: 0 0 20px rgba(47, 107, 255, 0.6);
-}
-
-/* Sci-Fi HUD Corner Bracket accents */
+/* HUD Corner Brackets */
 .hud-corner {
   position: relative;
 }
+
 .hud-corner::before,
 .hud-corner::after {
   content: '';
   position: absolute;
-  width: 6px;
-  height: 6px;
-  border-color: rgba(47, 107, 255, 0.6);
+  width: 8px;
+  height: 8px;
   pointer-events: none;
+  transition: all 0.3s ease;
 }
+
 .hud-corner::before {
   top: -1px;
   left: -1px;
-  border-top: 1.5px solid;
-  border-left: 1.5px solid;
+  border-top: 2px solid #06b6d4;
+  border-left: 2px solid #06b6d4;
 }
+
 .hud-corner::after {
   bottom: -1px;
   right: -1px;
-  border-bottom: 1.5px solid;
-  border-right: 1.5px solid;
+  border-bottom: 2px solid #2563eb;
+  border-right: 2px solid #2563eb;
+}
+
+.hud-corner:hover::before {
+  width: 14px;
+  height: 14px;
+  border-color: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
+}
+
+.hud-corner:hover::after {
+  width: 14px;
+  height: 14px;
+  border-color: #60a5fa;
+  box-shadow: 0 0 8px #60a5fa;
+}
+
+/* Cyber Card with futuristic glass & glow */
+.cyber-card {
+  position: relative;
+  background: linear-gradient(135deg, rgba(12, 18, 34, 0.85) 0%, rgba(5, 10, 18, 0.95) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cyber-card:hover {
+  border-color: rgba(6, 182, 212, 0.45);
+  box-shadow: 0 0 30px -5px rgba(6, 182, 212, 0.2), 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+  transform: translateY(-2px);
+}
+
+/* Glowing text effects */
+.glow-text-cyan {
+  text-shadow: 0 0 20px rgba(6, 182, 212, 0.6), 0 0 40px rgba(6, 182, 212, 0.3);
+}
+
+.glow-text-blue {
+  text-shadow: 0 0 20px rgba(37, 99, 235, 0.6), 0 0 40px rgba(37, 99, 235, 0.3);
+}
+
+/* Cyber radar spin animation */
+@keyframes radar-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes radar-spin-reverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 0.3; }
+  50% { transform: scale(1.05); opacity: 0.8; }
+  100% { transform: scale(0.95); opacity: 0.3; }
+}
+
+.animate-radar {
+  animation: radar-spin 25s linear infinite;
+}
+
+.animate-radar-reverse {
+  animation: radar-spin-reverse 35s linear infinite;
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 4s ease-in-out infinite;
+}
+
+/* Cyber telemetry badge */
+.telemetry-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  background: rgba(6, 182, 212, 0.08);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  color: #38bdf8;
+  backdrop-filter: blur(8px);
+}
+
+/* Energy pulse along circuit line */
+@keyframes energy-pulse {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+.energy-line {
+  position: relative;
+  overflow: hidden;
+}
+
+.energy-line::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.8), transparent);
+  animation: energy-pulse 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
