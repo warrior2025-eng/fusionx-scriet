@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Manrope, Fraunces } from "next/font/google";
 import "./globals.css";
+import { ParticleLogoField } from "@/components/ui/particle-logo-field";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -51,7 +52,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className="min-h-full flex flex-col bg-paper text-ink">{children}</body>
+     <body className="min-h-full flex flex-col bg-paper text-ink">
+  <ParticleLogoField />
+  {children}
+</body> 
     </html>
   );
 }

@@ -522,3 +522,25 @@ body {
   text-shadow: 0 0 15px rgba(2, 132, 199, 0.3);
   color: #0284c7;
 }
+
+/* ---------------------------------------------------------------------
+   Light mode hardening — boosts contrast on cards/borders/shadows that
+   were tuned for the dark background, so nothing looks washed out when
+   data-theme="light" is active.
+   --------------------------------------------------------------------- */
+:root[data-theme="light"] {
+  --color-line: rgba(15, 23, 42, 0.14);
+}
+
+:root[data-theme="light"] .bg-surface {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+:root[data-theme="light"] .hover-lift:hover {
+  box-shadow: 0 16px 36px -14px color-mix(in srgb, var(--color-accent) 28%, transparent);
+}
+
+:root[data-theme="light"] ::selection {
+  background: var(--color-accent);
+  color: white;
+}
