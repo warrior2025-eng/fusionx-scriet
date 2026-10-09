@@ -11,7 +11,7 @@ export default function PrivacyPage() {
       <div className="prose-fx">
         <p>
           {siteName} collects only the personal information necessary to operate the
-          network — for example, your name, college email, department, and the details you
+          network, for example your name, college email, department, and the details you
           choose to share on your profile or in an application.
         </p>
         <h2>What we collect</h2>

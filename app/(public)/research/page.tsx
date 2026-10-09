@@ -84,8 +84,8 @@ export default async function ResearchPage() {
             <p>
               FusionX may coordinate with the college&rsquo;s technology and intellectual property
               support mechanisms, including TCPO, where applicable. The IP &amp; Innovation Cell
-              helps members understand prior-art review, novelty, and documentation practices —
-              it does not itself file or grant patents.
+              helps members understand prior-art review, novelty, and documentation practices.
+              It does not itself file or grant patents.
             </p>
           </div>
         </ScrollReveal>

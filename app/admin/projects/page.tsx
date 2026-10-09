@@ -16,7 +16,7 @@ export default async function AdminProjectsPage() {
       <h1 className="text-2xl font-semibold text-ink mb-2">Projects</h1>
       <p className="text-sm text-ink/50 mb-8">
         Full create/edit tooling lives on each project&rsquo;s own page for its owner. This view is
-        for moderation — publish, unpublish, or remove listings that violate the Code of Conduct.
+        for moderation: publish, unpublish, or remove listings that violate the Code of Conduct.
       </p>
       {projects && projects.length > 0 ? (
         <div className="space-y-2">

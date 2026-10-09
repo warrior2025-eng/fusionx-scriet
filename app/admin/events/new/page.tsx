@@ -63,7 +63,7 @@ export default function NewEventPage() {
           </div>
         </div>
         <div>
-          <Label htmlFor="poster">Poster (optional — JPEG/PNG/WEBP, under 4MB)</Label>
+          <Label htmlFor="poster">Poster (optional, JPEG/PNG/WEBP, under 4MB)</Label>
           <input
             id="poster"
             name="poster"

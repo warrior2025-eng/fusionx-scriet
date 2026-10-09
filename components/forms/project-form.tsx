@@ -63,7 +63,7 @@ export function ProjectForm({
       </div>
 
       <div>
-        <Label htmlFor="image">Cover image (optional — JPEG/PNG/WEBP, under 4MB)</Label>
+        <Label htmlFor="image">Cover image (optional, JPEG/PNG/WEBP, under 4MB)</Label>
         {project?.image_path && (
           // eslint-disable-next-line @next/next/no-img-element
           <img

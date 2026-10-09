@@ -16,7 +16,7 @@ export function ApplicationRow({ application }: { application: Application }) {
         <div>
           <p className="font-medium text-ink">{application.full_name}</p>
           <p className="text-xs text-ink/45 mt-0.5">
-            {application.college_email} · {application.department} · {application.year}
+            {application.college_email}, {application.department}, {application.year}
           </p>
           <p className="text-xs text-ink/45 mt-0.5">Interested in: {application.preferred_functional_area}</p>
         </div>

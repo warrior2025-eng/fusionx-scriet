@@ -9,7 +9,7 @@ const STATUS_MESSAGES: Record<ApplicationStatus, string> = {
   submitted: "Your application was received.",
   under_review: "Your application is now under review.",
   shortlisted: "You've been shortlisted! We'll be in touch about next steps.",
-  selected: "Congratulations — you've been selected to join FusionX!",
+  selected: "Congratulations, you've been selected to join FusionX!",
   rejected: "Your application wasn't selected this time.",
   archived: "Your application has been archived.",
 };

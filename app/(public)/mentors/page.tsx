@@ -4,6 +4,7 @@ import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { createClient } from "@/lib/supabase/server";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Mentors",
@@ -53,8 +54,8 @@ export default async function MentorsPage() {
                   <div className="mt-6 pt-5 border-t border-ink/8 flex items-center justify-between text-xs text-ink/45">
                     {m.availability ? <span>{m.availability}</span> : <span />}
                     {m.linkedin_url && (
-                      <a href={m.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-accent font-medium hover:underline">
-                        LinkedIn →
+                      <a href={m.linkedin_url} target="_blank" rel="noopener noreferrer" className="group inline-flex items-center gap-1.5 text-accent font-medium hover:underline">
+                        LinkedIn <ArrowRight size={14} className="arrow-nudge" aria-hidden />
                       </a>
                     )}
                   </div>

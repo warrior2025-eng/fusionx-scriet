@@ -27,7 +27,7 @@ export function ProfileForm({ profile, email }: { profile: Profile; email: strin
           </span>
         )}
         <div>
-          <Label htmlFor="avatar">Profile photo (optional — under 2MB)</Label>
+          <Label htmlFor="avatar">Profile photo (optional, under 2MB)</Label>
           <input
             id="avatar"
             name="avatar"
@@ -94,7 +94,7 @@ export function ProfileForm({ profile, email }: { profile: Profile; email: strin
       </div>
 
       <div className="space-y-2 pt-2 border-t border-ink/10">
-        <p className="text-xs text-ink/40 pt-4">Privacy — off by default, on only if you choose.</p>
+        <p className="text-xs text-ink/40 pt-4">Privacy: off by default, on only if you choose.</p>
         <label className="flex items-center gap-2 text-sm text-ink/70">
           <input type="checkbox" name="is_profile_public" defaultChecked={profile.is_profile_public} className="accent-accent" />
           Make my profile visible to other members

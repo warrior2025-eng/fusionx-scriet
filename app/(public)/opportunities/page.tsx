@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Opportunities",
@@ -31,7 +32,7 @@ export default async function OpportunitiesPage() {
             </h1>
             <p className="mt-4 text-sm text-ink/50 max-w-xl leading-relaxed">
               FusionX shares opportunities it becomes aware of. Listing here isn&rsquo;t a guarantee
-              of verification — always confirm details on the organizer&rsquo;s official page before
+              of verification. Always confirm details on the organizer&rsquo;s official page before
               applying.
             </p>
           </ScrollReveal>
@@ -64,9 +65,9 @@ export default async function OpportunitiesPage() {
                         href={o.registration_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm font-medium text-accent hover:underline shrink-0"
+                        className="group inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-accent hover:underline"
                       >
-                        View details →
+                        View details <ArrowRight size={14} className="arrow-nudge" aria-hidden />
                       </a>
                     )}
                   </div>

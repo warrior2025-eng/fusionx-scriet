@@ -57,7 +57,7 @@ export default async function FacultyDashboardPage() {
       </div>
 
       <p className="mt-10 text-sm text-ink/45 max-w-lg">
-        This is a read-oriented overview. Faculty oversight covers initiative activity — it does
+        This is a read-oriented overview. Faculty oversight covers initiative activity. It does
         not include unrestricted administrative controls over member data or settings.
       </p>
     </div>

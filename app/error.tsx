@@ -10,7 +10,7 @@ export default function Error({ reset }: { error: Error & { digest?: string }; r
           Something went wrong
         </h1>
         <p className="text-ink/55 mb-8 leading-relaxed">
-          An unexpected error occurred. It has been logged — please try again.
+          An unexpected error occurred. It has been logged. Please try again.
         </p>
         <button
           onClick={reset}

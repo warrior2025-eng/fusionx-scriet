@@ -116,7 +116,7 @@ export default async function HomePage() {
               <div className="hero-float mt-7" style={float(14, 1)}>
                 <p className="max-w-xl text-base leading-relaxed text-ink/85 md:text-lg animate-reveal stagger-2">
                   {settings.chapter_name} brings together students, ideas, and opportunities to
-                  build, research, and create real-world impact — together.
+                  build, research, and create real-world impact, together.
                 </p>
               </div>
 
@@ -171,7 +171,7 @@ export default async function HomePage() {
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-5 text-sm text-ink/65">Student Innovation &amp; Research &middot; SCRIET, CCSU</p>
+                  <p className="mt-5 text-sm text-ink/65">Student Innovation &amp; Research, SCRIET, CCSU</p>
                 </CutCard>
               </div>
             </div>
@@ -186,7 +186,7 @@ export default async function HomePage() {
             <SectionHeading index={1} eyebrow="About" title="An ecosystem, not just a club." />
             <CutCard className="p-8 md:p-10">
               <p className="max-w-3xl text-base leading-relaxed text-ink/80 md:text-lg">
-                {siteName} exists to help students move beyond attending events — into
+                {siteName} exists to help students move beyond attending events and into
                 actually building projects, conducting research, protecting their ideas, and carrying
                 work forward past a single competition.
               </p>

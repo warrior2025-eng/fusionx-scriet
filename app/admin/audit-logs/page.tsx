@@ -30,7 +30,7 @@ export default async function AdminAuditLogsPage() {
                 <p className="text-sm font-medium text-ink">{l.action.replace(/_/g, " ")}</p>
                 <p className="text-xs text-ink/40 mt-0.5">
                   {l.resource_type}
-                  {l.resource_id ? ` · ${l.resource_id}` : ""}
+                  {l.resource_id ? `, ${l.resource_id}` : ""}
                 </p>
               </div>
               <Badge>{new Date(l.created_at).toLocaleString("en-IN")}</Badge>

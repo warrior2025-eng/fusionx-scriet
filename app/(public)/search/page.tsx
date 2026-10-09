@@ -59,7 +59,7 @@ export default async function SearchPage({
       </form>
 
       {query.length > 0 && query.length < 2 && (
-        <p className="text-sm text-ink/45">Keep typing — at least 2 characters.</p>
+        <p className="text-sm text-ink/45">Keep typing: at least 2 characters.</p>
       )}
 
       {query.length >= 2 &&

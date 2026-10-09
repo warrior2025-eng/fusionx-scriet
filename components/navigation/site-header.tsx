@@ -109,7 +109,7 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
     >
       <div className="container-fx flex h-16 items-center justify-between">
         {/* Logos & Brand */}
-        <div className="flex items-center gap-2.5 sm:gap-3">
+        <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
           {/* College Official Logo */}
           <Link href="/" className="flex items-center shrink-0" aria-label="CCSU Meerut">
             <Image
@@ -125,7 +125,7 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
           <span className="h-6 w-px bg-ink/20" aria-hidden />
 
           {/* FusionX Official Logo & Name */}
-          <Link href="/" className="flex items-center gap-2.5 group" onClick={() => setOpen(false)}>
+          <Link href="/" className="flex min-w-0 items-center gap-2.5 group" onClick={() => setOpen(false)}>
             <Image
               src="/logo-mark.png"
               alt="FusionX logo"
@@ -133,13 +133,10 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
               height={32}
               className="h-8 w-8 shrink-0 rounded-full object-cover"
             />
-            <div className="flex flex-col">
-              <span className="font-semibold tracking-tight text-ink text-sm leading-tight">
-                <span className="hidden sm:inline">{chapterName}</span>
-                <span className="sm:hidden">FusionX</span>
-              </span>
-              <span className="hidden sm:block text-[11px] tracking-[0.04em] text-ink/60 leading-tight">
-                Innovation
+            <div className="flex min-w-0 flex-col justify-center">
+              <span className="truncate font-semibold tracking-tight text-ink text-sm leading-tight">{chapterName}</span>
+              <span className="truncate text-[9.5px] sm:text-[11px] text-ink/65 leading-tight mt-0.5">
+                Student Innovation &amp; Research Network
               </span>
             </div>
           </Link>

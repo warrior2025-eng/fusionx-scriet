@@ -7,6 +7,7 @@ import { EventRegisterButton } from "@/components/forms/event-register-button";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/permissions";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Events",
@@ -55,7 +56,7 @@ export default async function EventsPage() {
                       <Badge>{e.status}</Badge>
                       <span className="text-xs text-ink/45 font-medium">
                         {new Date(e.event_date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
-                        {e.event_time ? ` · ${e.event_time}` : ""}
+                        {e.event_time ? `, ${e.event_time}` : ""}
                       </span>
                     </div>
                     <p className="font-serif text-xl font-medium text-ink group-hover:text-accent transition-colors">{e.title}</p>
@@ -68,9 +69,9 @@ export default async function EventsPage() {
                         href={e.registration_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="shrink-0 text-sm font-medium text-accent hover:underline"
+                        className="group inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-accent hover:underline"
                       >
-                        Register →
+                        Register <ArrowRight size={14} className="arrow-nudge" aria-hidden />
                       </a>
                     ) : (
                       <div className="shrink-0">

@@ -13,7 +13,7 @@ const FALLBACK_SETTINGS: OrganizationSettings = {
   tagline: "From Ideas to Impact.",
   secondary_tagline: "Don't just participate. Build.",
   faculty_guide_name: "Manav Bansal",
-  faculty_guide_title: `Faculty Guide, ${siteName} · HOD, IT, SCRIET`,
+  faculty_guide_title: `Faculty Guide, ${siteName} and HOD, IT, SCRIET`,
   institutional_approval: "faculty_guide_confirmed",
   official_email: null,
   instagram_url: null,
@@ -44,7 +44,7 @@ export async function getOrganizationSettings(): Promise<OrganizationSettings> {
 export function approvalStatusLabel(status: OrganizationSettings["institutional_approval"]) {
   switch (status) {
     case "faculty_guide_confirmed":
-      return "Faculty Guide Confirmed — institutional approval process underway";
+      return "Faculty Guide Confirmed, institutional approval process underway";
     case "director_review_pending":
       return "Forwarded for Director review";
     case "officially_approved":

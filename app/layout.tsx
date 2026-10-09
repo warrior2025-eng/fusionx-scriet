@@ -19,14 +19,14 @@ const fraunces = Fraunces({
 
 export const metadata: Metadata = {
   title: {
-    default: `${siteName} — Student Innovation & Research Network`,
-    template: `%s · ${siteName}`,
+    default: `${siteName} | Student Innovation & Research Network`,
+    template: `%s | ${siteName}`,
   },
   description:
     "A student-led ecosystem at SCRIET, CCS University Meerut for building projects, exploring research, forming interdisciplinary teams, and turning ideas into impact.",
   metadataBase: process.env.NEXT_PUBLIC_SITE_URL ? new URL(process.env.NEXT_PUBLIC_SITE_URL) : undefined,
   openGraph: {
-    title: `${siteName} — Student Innovation & Research Network`,
+    title: `${siteName} | Student Innovation & Research Network`,
     description: "From Ideas to Impact.",
     siteName,
     type: "website",
