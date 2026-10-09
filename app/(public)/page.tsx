@@ -43,7 +43,7 @@ export default async function HomePage() {
   const [
     { data: projects },
     { data: events },
-    { count: memberCount },
+    { data: memberCount, error: memberCountError },
     { count: projectCount },
     { count: eventCount },
   ] = await Promise.all([
@@ -60,18 +60,22 @@ export default async function HomePage() {
       .in("status", ["upcoming", "live"])
       .order("event_date", { ascending: true })
       .limit(3),
-    supabase.from("profiles").select("*", { count: "exact", head: true }),
+    // Count-only function (migration 0006): the same number for every visitor,
+    // whatever the profiles RLS policy lets them read.
+    supabase.rpc("get_member_count"),
     supabase.from("projects").select("*", { count: "exact", head: true }).eq("is_published", true),
     supabase.from("events").select("*", { count: "exact", head: true }).eq("is_published", true),
   ]);
 
-  // Real counts only — never fabricated — and a count is shown only once
-  // there is something to count; see lib/site-config.ts for the rule.
+  if (memberCountError) console.error("get_member_count failed:", memberCountError.message);
+
+  // Real counts only, never fabricated: a failed or empty count shows as 0.
+  // All three are always shown, to every visitor.
   const stats = [
-    { label: "Students", value: memberCount ?? 0 },
+    { label: "Students", value: typeof memberCount === "number" ? memberCount : 0 },
     { label: "Projects", value: projectCount ?? 0 },
     { label: "Events", value: eventCount ?? 0 },
-  ].filter((s) => s.value > 0);
+  ];
 
   return (
     <>
@@ -131,23 +135,25 @@ export default async function HomePage() {
                 </div>
               </div>
 
-              {stats.length > 0 && (
-                <div className="hero-float mt-12" style={float(12, 0)}>
-                  <dl className="flex flex-wrap gap-x-12 gap-y-6 border-t border-line pt-7 animate-reveal stagger-4">
+              {/* Activity: shown to everyone, zeros included */}
+              <div className="hero-float mt-10 sm:max-w-md" style={float(12, 0)}>
+                <CutCard className="p-5 md:p-6 animate-reveal stagger-4">
+                  <Eyebrow>Activity</Eyebrow>
+                  <dl className="grid grid-cols-3 divide-x divide-line">
                     {stats.map((s) => (
-                      <div key={s.label}>
+                      <div key={s.label} className="flex flex-col-reverse px-4 first:pl-0 last:pr-0 sm:px-5">
+                        <dt className="mt-1 text-sm text-ink/70">{s.label}</dt>
                         <dd>
                           <AnimatedCounter
                             value={s.value}
                             className="block font-serif text-3xl font-medium tabular-nums text-ink md:text-4xl"
                           />
                         </dd>
-                        <dt className="mt-1 text-sm text-ink/70">{s.label}</dt>
                       </div>
                     ))}
                   </dl>
-                </div>
-              )}
+                </CutCard>
+              </div>
             </div>
 
             <div className="lg:col-span-5">

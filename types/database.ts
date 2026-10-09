@@ -1,6 +1,9 @@
 // Hand-maintained types mirroring supabase/migrations/0001_core_schema.sql.
 // If you have the Supabase CLI linked to a project, prefer generating this
 // file instead: `supabase gen types typescript --linked > types/database.ts`
+//
+// RPC functions (not typed through the client, which has no Database generic):
+//   get_member_count(): integer   -- supabase/migrations/0006_public_member_count.sql
 
 export type AppRole = "super_admin" | "admin" | "editor" | "faculty" | "mentor" | "member";
 

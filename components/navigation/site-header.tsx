@@ -109,7 +109,7 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
     >
       <div className="container-fx flex h-16 items-center justify-between">
         {/* Logos & Brand */}
-        <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-2.5 sm:gap-3">
           {/* College Official Logo */}
           <Link href="/" className="flex items-center shrink-0" aria-label="CCSU Meerut">
             <Image
@@ -125,7 +125,7 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
           <span className="h-6 w-px bg-ink/20" aria-hidden />
 
           {/* FusionX Official Logo & Name */}
-          <Link href="/" className="flex min-w-0 items-center gap-2.5 group" onClick={() => setOpen(false)}>
+          <Link href="/" className="flex items-center gap-2.5 group" onClick={() => setOpen(false)}>
             <Image
               src="/logo-mark.png"
               alt="FusionX logo"
@@ -133,9 +133,12 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
               height={32}
               className="h-8 w-8 shrink-0 rounded-full object-cover"
             />
-            <div className="flex min-w-0 flex-col justify-center">
-              <span className="truncate font-semibold tracking-tight text-ink text-sm leading-tight">{chapterName}</span>
-              <span className="truncate text-[9.5px] sm:text-[11px] text-ink/65 leading-tight mt-0.5">
+            {/* Never truncated: one line from sm up, two balanced lines on phones. */}
+            <div className="flex flex-col justify-center">
+              <span className="whitespace-nowrap font-semibold tracking-tight text-ink text-sm leading-tight">
+                {chapterName}
+              </span>
+              <span className="mt-0.5 max-w-[8.5rem] text-balance text-[10.5px] leading-[1.2] text-ink/65 sm:max-w-none sm:whitespace-nowrap sm:text-[11px]">
                 Student Innovation &amp; Research Network
               </span>
             </div>
@@ -143,13 +146,13 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
         </div>
 
         {/* Desktop Nav */}
-        <nav className="hidden xl:flex items-center gap-1">
+        <nav className="hidden xl:flex items-center gap-0.5">
           {nav.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                "relative px-3 py-1.5 text-[13px] font-medium rounded-sm transition-colors duration-150",
+                "relative whitespace-nowrap px-2 py-1.5 text-[13px] font-medium rounded-sm transition-colors duration-150",
                 pathname?.startsWith(item.href)
                   ? "text-ink font-semibold"
                   : "text-ink/65 hover:text-ink hover:bg-ink/5"
@@ -157,14 +160,14 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
             >
               {item.label}
               {pathname?.startsWith(item.href) && (
-                <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-accent" />
+                <span className="absolute bottom-0 left-2 right-2 h-[2px] bg-accent" />
               )}
             </Link>
           ))}
         </nav>
 
         {/* Desktop Actions */}
-        <div className="hidden xl:flex items-center gap-2">
+        <div className="hidden xl:flex shrink-0 items-center gap-1">
           <Link href="/search" aria-label="Search" className="p-2 text-ink/50 hover:text-ink transition-colors rounded-sm hover:bg-ink/5">
             <Search size={16} />
           </Link>
