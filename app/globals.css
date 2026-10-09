@@ -1,19 +1,50 @@
 @import "tailwindcss";
 
+/* =========================================================================
+   BRAND TOKENS — every colour on the site comes from the logo
+   (/public/logo-mark.png): the navy disc, the white "X", the blue slash.
+   Sampled values: navy #00030D, white #FEFEFE, blue #004DF6.
+
+   The accent is for marks, borders, button fills and large type. On navy it
+   reaches only 3.3:1, so small text is never set in it there — use ink.
+   ========================================================================= */
 :root {
-  --color-paper: #050a12;
-  --color-ink: #e8ecf4;
-  --color-accent: #2563eb;
-  --color-surface: #0c1222;
-  --color-line: rgba(255, 255, 255, 0.08);
+  --color-paper: #00030d;
+  --color-ink: #fefefe;
+  --color-accent: #004df6;
+  --color-surface: #060b18;
+  --color-line: rgba(254, 254, 254, 0.09);
 }
 
 :root[data-theme="light"] {
   --color-paper: #f8f9fc;
-  --color-ink: #0f172a;
-  --color-accent: #1d4fd6;
+  --color-ink: #00030d;
+  --color-accent: #004df6;
   --color-surface: #ffffff;
-  --color-line: rgba(15, 23, 42, 0.08);
+  --color-line: rgba(0, 3, 13, 0.1);
+}
+
+/* Pins the dark tokens on a subtree that sits directly on the 3D scene,
+   which is navy in both themes (the home hero). */
+.on-scene {
+  --color-paper: #00030d;
+  --color-ink: #fefefe;
+  --color-surface: #060b18;
+  --color-line: rgba(254, 254, 254, 0.14);
+  color: var(--color-ink);
+}
+
+/* Accent-coloured text on navy. The brand blue only reaches 3.3:1 there, which
+   passes for large type and marks but not for body-size text, so on the dark
+   theme small accent text is set in ink instead (links keep an underline).
+   Opt large type back in with `.accent-large`. */
+:root:not([data-theme="light"])
+  :is(.text-accent, .hover\:text-accent:hover, .group:hover .group-hover\:text-accent):not(.slash-mark, .accent-large) {
+  color: var(--color-ink);
+}
+:root:not([data-theme="light"]) a.text-accent {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 @theme inline {
@@ -21,6 +52,7 @@
   --color-ink: var(--color-ink);
   --color-accent: var(--color-accent);
   --color-surface: var(--color-surface);
+  --color-line: var(--color-line);
   --font-sans: var(--font-manrope);
   --font-serif: var(--font-fraunces);
 }
@@ -48,6 +80,16 @@ body {
   color: white;
 }
 
+/* One visible focus ring on every interactive element. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* =========================================================================
+   LAYOUT — the one container. Sections use <Section> (components/ui/section)
+   for the shared vertical rhythm.
+   ========================================================================= */
 .container-fx {
   max-width: 76rem;
   margin-inline: auto;
@@ -83,10 +125,8 @@ body {
 }
 
 /* =========================================================================
-   PREMIUM DESIGN SYSTEM — Inspired by high-end tech event sites
+   ENTRANCE ANIMATIONS
    ========================================================================= */
-
-/* Scroll-triggered reveal animation */
 @keyframes reveal-up {
   from {
     opacity: 0;
@@ -103,28 +143,6 @@ body {
   to { opacity: 1; }
 }
 
-@keyframes slide-in-right {
-  from {
-    opacity: 0;
-    transform: translateX(24px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes counter-tick {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes marquee-scroll {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
-/* Animation utility classes */
 .animate-reveal {
   animation: reveal-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -133,23 +151,6 @@ body {
   animation: fade-in 0.8s ease both;
 }
 
-.animate-slide-right {
-  animation: slide-in-right 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.animate-counter {
-  animation: counter-tick 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.animate-marquee-scroll {
-  animation: marquee-scroll 40s linear infinite;
-}
-
-.animate-marquee-scroll:hover {
-  animation-play-state: paused;
-}
-
-/* Stagger delays for section children */
 .stagger-1 { animation-delay: 0.05s; }
 .stagger-2 { animation-delay: 0.1s; }
 .stagger-3 { animation-delay: 0.15s; }
@@ -157,64 +158,7 @@ body {
 .stagger-5 { animation-delay: 0.25s; }
 .stagger-6 { animation-delay: 0.3s; }
 
-/* Subtle grid overlay for hero backgrounds */
-.bg-grid-subtle {
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size: 64px 64px;
-}
-
-/* Horizontal rule with editorial accent */
-.hr-accent {
-  height: 1px;
-  border: none;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--color-accent) 30%,
-    var(--color-accent) 70%,
-    transparent
-  );
-  opacity: 0.35;
-}
-
-/* Premium card — no glassmorphism, just clean elevation */
-.card-elevated {
-  background: var(--color-surface);
-  border: 1px solid var(--color-line);
-  transition: border-color 0.2s ease, transform 0.2s ease;
-}
-
-.card-elevated:hover {
-  border-color: color-mix(in srgb, var(--color-ink) 18%, transparent);
-  transform: translateY(-1px);
-}
-
-/* Number counter display */
-.stat-number {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-}
-
-/* Section divider line with number */
-.numbered-divider {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.numbered-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--color-line);
-}
-
-/* =========================================================================
-   SCROLL REVEAL — IntersectionObserver-driven transitions
-   ========================================================================= */
-
+/* Scroll reveal — IntersectionObserver-driven (components/ui/scroll-reveal) */
 .scroll-reveal {
   will-change: opacity, transform;
   transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
@@ -225,18 +169,22 @@ body {
   opacity: 0;
   transform: translateY(40px);
 }
+
 .scroll-reveal-down {
   opacity: 0;
   transform: translateY(-40px);
 }
+
 .scroll-reveal-left {
   opacity: 0;
   transform: translateX(-40px);
 }
+
 .scroll-reveal-right {
   opacity: 0;
   transform: translateX(40px);
 }
+
 .scroll-reveal-fade {
   opacity: 0;
 }
@@ -247,391 +195,215 @@ body {
 }
 
 /* =========================================================================
-   AMBIENT STAR FIELD — subtle floating particles for hero depth
+   CUT CORNER — primary cards and panels get one 45° clipped corner, always
+   top-right, echoing the cut edges of the logo's "X". The clip removes the
+   border along the cut, so ::after redraws it as a hairline.
+   `.card-elevated` (the card used across the inner pages) shares the rule.
    ========================================================================= */
-
-@keyframes drift {
-  0% { transform: translateY(0) translateX(0); opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { transform: translateY(-100vh) translateX(20px); opacity: 0; }
-}
-
-.star-field {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.star-field .star {
-  position: absolute;
-  width: 1.5px;
-  height: 1.5px;
-  background: white;
-  border-radius: 50%;
-  opacity: 0;
-  animation: drift linear infinite;
-}
-
-/* =========================================================================
-   MARQUEE — continuous horizontal scroll for social proof strip
-   ========================================================================= */
-
-.marquee-track {
-  display: flex;
-  width: max-content;
-  animation: marquee-scroll 50s linear infinite;
-}
-
-.marquee-track:hover {
-  animation-play-state: paused;
-}
-
-/* =========================================================================
-   LINE GLOW — accent-colored animated underline for CTA
-   ========================================================================= */
-
-@keyframes line-glow-pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
-
-.line-glow {
+.cut-corner,
+.card-elevated {
+  --cut: 16px;
+  --cut-line: var(--color-line);
   position: relative;
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
 }
 
-.line-glow::after {
-  content: '';
+.cut-corner::after,
+.card-elevated::after {
+  content: "";
   position: absolute;
-  bottom: -2px;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: var(--color-accent);
-  animation: line-glow-pulse 2.5s ease-in-out infinite;
-}
-
-/* =========================================================================
-   TECHFEST & COGNIZANCE CYBER HUD SYSTEM
-   ========================================================================= */
-
-/* Cyber Grid with glowing scan lines */
-.bg-cyber-mesh {
-  background-color: var(--color-paper);
-  background-image: 
-    linear-gradient(rgba(37, 99, 235, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(37, 99, 235, 0.07) 1px, transparent 1px),
-    radial-gradient(ellipse at 50% 0%, rgba(6, 182, 212, 0.12) 0%, transparent 70%);
-  background-size: 48px 48px, 48px 48px, 100% 100%;
-}
-
-/* HUD Corner Brackets */
-.hud-corner {
-  position: relative;
-}
-
-.hud-corner::before,
-.hud-corner::after {
-  content: '';
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  pointer-events: none;
-  transition: all 0.3s ease;
-}
-
-.hud-corner::before {
   top: -1px;
-  left: -1px;
-  border-top: 2px solid #06b6d4;
-  border-left: 2px solid #06b6d4;
-}
-
-.hud-corner::after {
-  bottom: -1px;
   right: -1px;
-  border-bottom: 2px solid #2563eb;
-  border-right: 2px solid #2563eb;
+  width: var(--cut);
+  height: var(--cut);
+  pointer-events: none;
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 1px),
+    var(--cut-line) calc(50% - 1px),
+    var(--cut-line) 50%,
+    transparent 50%
+  );
 }
 
-.hud-corner:hover::before {
-  width: 14px;
-  height: 14px;
-  border-color: #38bdf8;
-  box-shadow: 0 0 8px #38bdf8;
+.card-elevated {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  transition: border-color 0.15s ease, transform 0.15s ease;
 }
 
-.hud-corner:hover::after {
-  width: 14px;
-  height: 14px;
-  border-color: #60a5fa;
-  box-shadow: 0 0 8px #60a5fa;
+.cut-corner--interactive {
+  transition: border-color 0.15s ease, transform 0.15s ease;
 }
 
-/* Cyber Card with futuristic glass & glow */
-.cyber-card {
-  position: relative;
-  background: linear-gradient(135deg, rgba(12, 18, 34, 0.85) 0%, rgba(5, 10, 18, 0.95) 100%);
-  border: 1px solid rgba(59, 130, 246, 0.18);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.cyber-card:hover {
-  border-color: rgba(6, 182, 212, 0.45);
-  box-shadow: 0 0 30px -5px rgba(6, 182, 212, 0.2), 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+.card-elevated:hover,
+.cut-corner--interactive:hover,
+.cut-corner--interactive:focus-within {
+  --cut-line: var(--color-accent);
+  border-color: var(--color-accent);
   transform: translateY(-2px);
 }
 
-/* Glowing text effects */
-.glow-text-cyan {
-  text-shadow: 0 0 20px rgba(6, 182, 212, 0.6), 0 0 40px rgba(6, 182, 212, 0.3);
+/* =========================================================================
+   MICRO-INTERACTIONS
+   ========================================================================= */
+/* Text link: underline slides in from the left. */
+.link-slide {
+  padding-bottom: 2px;
+  background: linear-gradient(currentColor, currentColor) left bottom / 0 1px no-repeat;
+  transition: background-size 0.2s ease;
+}
+.link-slide:hover,
+.link-slide:focus-visible,
+.group:hover .link-slide {
+  background-size: 100% 1px;
 }
 
-.glow-text-blue {
-  text-shadow: 0 0 20px rgba(37, 99, 235, 0.6), 0 0 40px rgba(37, 99, 235, 0.3);
+/* Arrow that nudges 4px right when its card or link is hovered. */
+.arrow-nudge {
+  transition: transform 0.15s ease;
+}
+.group:hover .arrow-nudge,
+a:hover > .arrow-nudge {
+  transform: translateX(4px);
 }
 
-/* Cyber radar spin animation */
-@keyframes radar-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+/* =========================================================================
+   STEPPER — numbered nodes joined by a hairline, with a short connector at
+   the logo's 45° on each join. Vertical on small screens, horizontal ≥ lg.
+   ========================================================================= */
+.stepper {
+  --node: 2.25rem;
+  display: grid;
 }
 
-@keyframes radar-spin-reverse {
-  from { transform: rotate(360deg); }
-  to { transform: rotate(0deg); }
-}
-
-@keyframes pulse-ring {
-  0% { transform: scale(0.95); opacity: 0.3; }
-  50% { transform: scale(1.05); opacity: 0.8; }
-  100% { transform: scale(0.95); opacity: 0.3; }
-}
-
-.animate-radar {
-  animation: radar-spin 25s linear infinite;
-}
-
-.animate-radar-reverse {
-  animation: radar-spin-reverse 35s linear infinite;
-}
-
-.animate-pulse-ring {
-  animation: pulse-ring 4s ease-in-out infinite;
-}
-
-/* Cyber telemetry badge */
-.telemetry-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-family: monospace;
-  font-size: 0.7rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  padding: 0.35rem 0.85rem;
-  border-radius: 9999px;
-  background: rgba(6, 182, 212, 0.08);
-  border: 1px solid rgba(6, 182, 212, 0.3);
-  color: #38bdf8;
-  backdrop-filter: blur(8px);
-}
-
-/* Energy pulse along circuit line */
-@keyframes energy-pulse {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(200%); }
-}
-
-.energy-line {
+.stepper__step {
   position: relative;
-  overflow: hidden;
+  display: flex;
+  gap: 1rem;
+  padding-bottom: 1.5rem;
+}
+.stepper__step:last-child {
+  padding-bottom: 0;
 }
 
-.energy-line::after {
-  content: '';
+.stepper__node {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--node);
+  height: var(--node);
+  border: 1px solid color-mix(in srgb, var(--color-ink) 25%, transparent);
+  background: var(--color-surface);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.stepper__label {
+  align-self: center;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--color-ink);
+}
+
+/* the joining line */
+.stepper__step:not(:last-child)::before {
+  content: "";
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 50%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.8), transparent);
-  animation: energy-pulse 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  left: calc(var(--node) / 2);
+  top: var(--node);
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--color-ink) 20%, transparent);
+}
+
+/* the 45° connector, same lean as the logo slash */
+.stepper__step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: calc(var(--node) / 2 - 5px);
+  top: calc(var(--node) + 0.5rem);
+  width: 10px;
+  height: 10px;
+  background: linear-gradient(
+    to bottom right,
+    transparent calc(50% - 1px),
+    var(--color-accent) calc(50% - 1px),
+    var(--color-accent) calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+}
+
+@media (min-width: 1024px) {
+  .stepper {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+  }
+  .stepper__step {
+    flex-direction: column;
+    gap: 0.875rem;
+    padding: 0 1rem 0 0;
+  }
+  .stepper__label {
+    align-self: flex-start;
+  }
+  .stepper__step:not(:last-child)::before {
+    left: var(--node);
+    right: 0;
+    top: calc(var(--node) / 2);
+    bottom: auto;
+    width: auto;
+    height: 1px;
+  }
+  .stepper__step:not(:last-child)::after {
+    left: calc(var(--node) + 0.625rem);
+    top: calc(var(--node) / 2 - 5px);
+  }
 }
 
 /* =========================================================================
-   LIGHT THEME ADAPTATIONS (Crisp, High-Contrast Tech Blueprint Aesthetic)
+   HOME PAGE — one 3D scene behind the whole page.
+   .home-scene   fixed, full-viewport layer holding the single scene.
+   .home-below   everything after the hero. Dark theme: a navy scrim, so the
+                 scene stays visible but calm behind the sections. Light
+                 theme: opaque paper, so the page below the hero is a normal
+                 light page (the scene is paused while it is covered).
    ========================================================================= */
-
-:root[data-theme="light"] {
-  --color-paper: #f8fafc;
-  --color-ink: #0b1329;
-  --color-accent: #0284c7;
-  --color-surface: #ffffff;
-  --color-line: rgba(15, 23, 42, 0.1);
-}
-
-:root[data-theme="light"] .bg-cyber-mesh {
-  background-color: #f8fafc;
-  background-image: 
-    linear-gradient(rgba(37, 99, 235, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(37, 99, 235, 0.06) 1px, transparent 1px),
-    radial-gradient(ellipse at 50% 0%, rgba(6, 182, 212, 0.08) 0%, transparent 70%);
-}
-
-:root[data-theme="light"] .cyber-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 100%);
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06);
-}
-
-:root[data-theme="light"] .cyber-card:hover {
-  border-color: rgba(2, 132, 199, 0.6);
-  box-shadow: 0 0 25px -5px rgba(2, 132, 199, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.08);
-}
-
-:root[data-theme="light"] .hud-corner::before {
-  border-top-color: #0284c7;
-  border-left-color: #0284c7;
-}
-
-:root[data-theme="light"] .hud-corner::after {
-  border-bottom-color: #2563eb;
-  border-right-color: #2563eb;
-}
-
-:root[data-theme="light"] .hud-corner:hover::before {
-  border-color: #0284c7;
-  box-shadow: 0 0 8px rgba(2, 132, 199, 0.4);
-}
-
-:root[data-theme="light"] .hud-corner:hover::after {
-  border-color: #2563eb;
-  box-shadow: 0 0 8px rgba(37, 99, 235, 0.4);
-}
-
-:root[data-theme="light"] .telemetry-badge {
-  background: rgba(2, 132, 199, 0.1);
-  border-color: rgba(2, 132, 199, 0.35);
-  color: #0369a1;
-}
-
-:root[data-theme="light"] .glow-text-cyan {
-  text-shadow: 0 0 15px rgba(2, 132, 199, 0.3);
-  color: #0284c7;
-}
-
-/* ---------------------------------------------------------------------
-   Light mode hardening — boosts contrast on cards/borders/shadows that
-   were tuned for the dark background, so nothing looks washed out when
-   data-theme="light" is active.
-   --------------------------------------------------------------------- */
-:root[data-theme="light"] {
-  --color-line: rgba(15, 23, 42, 0.14);
-}
-
-:root[data-theme="light"] .bg-surface {
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
-}
-
-:root[data-theme="light"] .hover-lift:hover {
-  box-shadow: 0 16px 36px -14px color-mix(in srgb, var(--color-accent) 28%, transparent);
-}
-
-:root[data-theme="light"] ::selection {
-  background: var(--color-accent);
-  color: white;
-}
-
-/* =========================================================================
-   TECH BACKDROP — animated page background (home page).
-   CSS only, and every moving layer animates transform/opacity alone, so the
-   browser composites it without repainting. The global reduced-motion rule
-   at the top of this file stops all of it.
-   ========================================================================= */
-.tech-backdrop {
+.home-scene {
   position: fixed;
   inset: 0;
   z-index: -10;
-  overflow: hidden;
-  pointer-events: none;
-  --tech-line: color-mix(in srgb, var(--color-accent) 16%, transparent);
-  --tech-glow: color-mix(in srgb, var(--color-accent) 22%, transparent);
-  --tech-beam: color-mix(in srgb, var(--color-accent) 70%, transparent);
 }
 
-:root[data-theme="light"] .tech-backdrop {
-  --tech-line: color-mix(in srgb, var(--color-accent) 13%, transparent);
-  --tech-glow: color-mix(in srgb, var(--color-accent) 12%, transparent);
-  --tech-beam: color-mix(in srgb, var(--color-accent) 45%, transparent);
+.home-below {
+  --below: color-mix(in srgb, var(--color-paper) 68%, transparent);
+  position: relative;
+  background: var(--below);
 }
 
-/* Blueprint grid, drifting one cell diagonally and looping seamlessly. */
-.tech-backdrop__grid {
-  position: absolute;
-  inset: -56px;
-  background-image:
-    linear-gradient(var(--tech-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--tech-line) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(ellipse 90% 80% at 50% 40%, #000 30%, transparent 100%);
-  animation: tech-grid-drift 14s linear infinite;
-  will-change: transform;
+:root[data-theme="light"] .home-below {
+  --below: var(--color-paper);
 }
 
-/* Two soft light fields wandering slowly behind the grid. */
-.tech-backdrop__glow {
-  position: absolute;
-  width: 46vmax;
-  height: 46vmax;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--tech-glow) 0%, transparent 65%);
-  will-change: transform;
-}
-.tech-backdrop__glow--a {
-  top: -12vmax;
-  left: -10vmax;
-  animation: tech-glow-a 26s ease-in-out infinite alternate;
-}
-.tech-backdrop__glow--b {
-  bottom: -16vmax;
-  right: -12vmax;
-  animation: tech-glow-b 32s ease-in-out infinite alternate;
-}
-
-/* A scan beam sweeping down the viewport. */
-.tech-backdrop__beam {
+/* eases the hero into the scrim instead of meeting it on a hard edge */
+.home-below::before {
+  content: "";
   position: absolute;
   inset-inline: 0;
-  top: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--tech-beam), transparent);
-  box-shadow: 0 0 18px 1px var(--tech-glow);
-  animation: tech-beam-sweep 9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  will-change: transform, opacity;
-}
-
-@keyframes tech-grid-drift {
-  to { transform: translate3d(56px, 56px, 0); }
-}
-@keyframes tech-glow-a {
-  to { transform: translate3d(28vw, 22vh, 0) scale(1.15); }
-}
-@keyframes tech-glow-b {
-  to { transform: translate3d(-24vw, -26vh, 0) scale(0.9); }
-}
-@keyframes tech-beam-sweep {
-  0% { transform: translate3d(0, -2vh, 0); opacity: 0; }
-  12% { opacity: 1; }
-  88% { opacity: 1; }
-  100% { transform: translate3d(0, 102vh, 0); opacity: 0; }
+  bottom: 100%;
+  height: 9rem;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, var(--below));
 }
 
 /* =========================================================================
    HERO FLOAT — home hero layers riding the pointer.
-   --px / --py are written on the hero section once per frame (-1…1) by
+   --px / --py are written on the hero once per frame (-1…1) by
    components/hero/fusionx-hero.tsx. Each layer declares how far it rides
    (--pd, px at full deflection) and how much it turns (--pr, degrees), which
    is what gives the plane its depth. Same transform as the ThreeUI page.
@@ -648,131 +420,4 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .hero-float { transform: none; }
-}
-
-/* =========================================================================
-   HERO HUD — the instrument frame and panels drawn over the hero's 3D scene.
-   Fixed colours: the hero stays dark in both themes.
-   ========================================================================= */
-.hero-hud {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  --hud: rgba(143, 176, 255, 0.55);
-}
-
-/* Fine grid over the scene, strongest on the right where the scene is open. */
-.hero-hud__grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(143, 176, 255, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(143, 176, 255, 0.07) 1px, transparent 1px);
-  background-size: 64px 64px;
-  mask-image: radial-gradient(ellipse 75% 80% at 70% 45%, #000 0%, transparent 80%);
-}
-
-.hero-hud__corner {
-  position: absolute;
-  width: 22px;
-  height: 22px;
-  border: 0 solid var(--hud);
-}
-.hero-hud__corner--tl { top: 18px; left: 18px; border-top-width: 1px; border-left-width: 1px; }
-.hero-hud__corner--tr { top: 18px; right: 18px; border-top-width: 1px; border-right-width: 1px; }
-.hero-hud__corner--bl { bottom: 18px; left: 18px; border-bottom-width: 1px; border-left-width: 1px; }
-.hero-hud__corner--br { bottom: 18px; right: 18px; border-bottom-width: 1px; border-right-width: 1px; }
-
-/* Vertical sweep crossing the scene. */
-.hero-hud__sweep {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 1px;
-  background: linear-gradient(180deg, transparent, rgba(108, 155, 255, 0.75), transparent);
-  box-shadow: 0 0 22px 2px rgba(0, 77, 246, 0.45);
-  animation: hero-hud-sweep 11s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  will-change: transform, opacity;
-}
-
-/* Readout strip along the bottom edge. */
-.hero-hud__readout {
-  position: absolute;
-  inset-inline: 52px;
-  bottom: 20px;
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 10px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: rgba(143, 176, 255, 0.7);
-}
-.hero-hud__blink {
-  animation: hero-hud-blink 1.6s steps(2, jump-none) infinite;
-}
-
-/* Floating instrument panel. */
-.hud-panel {
-  position: relative;
-  border: 1px solid rgba(143, 176, 255, 0.22);
-  border-radius: 14px;
-  background:
-    linear-gradient(180deg, rgba(143, 176, 255, 0.07), rgba(143, 176, 255, 0) 40%),
-    rgba(2, 6, 18, 0.78);
-  box-shadow:
-    0 18px 40px -18px rgba(0, 0, 0, 0.8),
-    0 0 0 1px rgba(0, 77, 246, 0.08),
-    inset 0 1px rgba(255, 255, 255, 0.06);
-}
-/* Lit corner ticks, top-left and bottom-right. */
-.hud-panel::before,
-.hud-panel::after {
-  content: "";
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  border: 0 solid #6c9bff;
-  pointer-events: none;
-}
-.hud-panel::before { top: -1px; left: -1px; border-top-width: 2px; border-left-width: 2px; border-top-left-radius: 14px; }
-.hud-panel::after { bottom: -1px; right: -1px; border-bottom-width: 2px; border-right-width: 2px; border-bottom-right-radius: 14px; }
-
-.hud-panel__tag {
-  display: flex;
-  justify-content: space-between;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: #8fb0ff;
-}
-
-/* Bare readout: a lit rule down the left, no box. */
-.hud-readout {
-  padding-left: 12px;
-  border-left: 1px solid rgba(108, 155, 255, 0.6);
-  text-shadow: 0 1px 12px rgba(0, 3, 13, 0.9);
-}
-
-@keyframes hero-hud-sweep {
-  0% { transform: translate3d(-2vw, 0, 0); opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { transform: translate3d(102vw, 0, 0); opacity: 0; }
-}
-@keyframes hero-hud-blink {
-  to { opacity: 0.25; }
-}
-
-@media (max-width: 640px) {
-  .hero-hud__readout { display: none; }
-  .hero-hud__corner { width: 14px; height: 14px; }
-  .hero-hud__corner--tl, .hero-hud__corner--tr { top: 10px; }
-  .hero-hud__corner--bl, .hero-hud__corner--br { bottom: 10px; }
-  .hero-hud__corner--tl, .hero-hud__corner--bl { left: 10px; }
-  .hero-hud__corner--tr, .hero-hud__corner--br { right: 10px; }
 }

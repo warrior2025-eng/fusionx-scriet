@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { markAllNotificationsRead } from "@/actions/notifications";
+import { Eyebrow } from "@/components/ui/eyebrow";
 
 export const metadata: Metadata = { title: "Notifications" };
 
@@ -33,7 +34,7 @@ export default async function NotificationsPage() {
     <Section className="pt-16 pb-24 max-w-2xl">
       <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
         <div>
-          <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">Notifications</p>
+          <Eyebrow>Notifications</Eyebrow>
           <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-ink">Updates for you.</h1>
         </div>
         {hasUnread && (

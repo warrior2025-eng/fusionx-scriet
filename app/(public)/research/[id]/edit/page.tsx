@@ -6,6 +6,7 @@ import { updateResearch, deleteResearch } from "@/actions/research";
 import { createClient } from "@/lib/supabase/server";
 import { isStaff } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
 
 export const metadata: Metadata = { title: "Edit Research Entry" };
 
@@ -33,7 +34,7 @@ export default async function EditResearchPage({ params }: { params: Promise<{ i
 
   return (
     <Section className="pt-16 pb-24 max-w-2xl">
-      <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">Edit Research Entry</p>
+      <Eyebrow>Edit Research Entry</Eyebrow>
       <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-ink mb-8">{entry.title}</h1>
       <ResearchForm action={boundUpdate} research={entry} />
       <form action={remove} className="mt-10 pt-6 border-t border-ink/10">

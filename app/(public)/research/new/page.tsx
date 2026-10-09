@@ -4,6 +4,7 @@ import { Section } from "@/components/ui/section";
 import { ResearchForm } from "@/components/forms/research-form";
 import { createResearch } from "@/actions/research";
 import { createClient } from "@/lib/supabase/server";
+import { Eyebrow } from "@/components/ui/eyebrow";
 
 export const metadata: Metadata = { title: "New Research Entry" };
 
@@ -16,7 +17,7 @@ export default async function NewResearchPage() {
 
   return (
     <Section className="pt-16 pb-24 max-w-2xl">
-      <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">New Research Entry</p>
+      <Eyebrow>New Research Entry</Eyebrow>
       <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-ink mb-8">Document your research.</h1>
       <ResearchForm action={createResearch} />
     </Section>

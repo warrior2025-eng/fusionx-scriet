@@ -103,8 +103,8 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
       className={cn(
         "sticky top-0 z-40 transition-all duration-300",
         scrolled
-          ? "bg-paper/90 backdrop-blur-xl border-b border-cyan-500/20 shadow-[0_4px_30px_rgba(0,0,0,0.7)]"
-          : "bg-transparent border-b border-transparent"
+          ? "bg-paper border-b border-line"
+          : "bg-paper border-b border-transparent"
       )}
     >
       <div className="container-fx flex h-16 items-center justify-between">
@@ -117,7 +117,7 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
               alt="Chaudhary Charan Singh University, Meerut"
               width={34}
               height={34}
-              className="h-8 w-auto object-contain shrink-0 drop-shadow-sm hover:scale-105 transition-transform"
+              className="h-8 w-auto object-contain shrink-0"
             />
           </Link>
 
@@ -126,51 +126,48 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
 
           {/* FusionX Official Logo & Name */}
           <Link href="/" className="flex items-center gap-2.5 group" onClick={() => setOpen(false)}>
-            <div className="relative shrink-0">
-              <Image
-                src="/fusionx-official-logo.png"
-                alt="FusionX logo"
-                width={32}
-                height={32}
-                className="h-8 w-8 rounded-full object-cover transition-transform group-hover:scale-110 drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]"
-              />
-              <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-cyan-400 border border-paper animate-pulse" />
-            </div>
+            <Image
+              src="/logo-mark.png"
+              alt="FusionX logo"
+              width={32}
+              height={32}
+              className="h-8 w-8 shrink-0 rounded-full object-cover"
+            />
             <div className="flex flex-col">
-              <span className="font-semibold tracking-tight text-ink text-sm leading-tight group-hover:text-cyan-500 transition-colors">
+              <span className="font-semibold tracking-tight text-ink text-sm leading-tight">
                 <span className="hidden sm:inline">{chapterName}</span>
                 <span className="sm:hidden">FusionX</span>
               </span>
-              <span className="hidden sm:block font-mono text-[9px] uppercase tracking-[0.16em] text-cyan-500/80 leading-tight">
-                INNOVATION &bull; RESEARCH
+              <span className="hidden sm:block text-[11px] tracking-[0.04em] text-ink/60 leading-tight">
+                Innovation &middot; Research
               </span>
             </div>
           </Link>
         </div>
 
         {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden lg:flex items-center gap-1">
           {nav.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                "relative px-3.5 py-1.5 text-[13px] font-medium rounded-sm transition-all",
+                "relative px-3 py-1.5 text-[13px] font-medium rounded-sm transition-colors duration-150",
                 pathname?.startsWith(item.href)
-                  ? "text-cyan-500 font-semibold"
+                  ? "text-ink font-semibold"
                   : "text-ink/65 hover:text-ink hover:bg-ink/5"
               )}
             >
               {item.label}
               {pathname?.startsWith(item.href) && (
-                <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-gradient-to-r from-blue-500 to-cyan-400 shadow-[0_0_8px_#06b6d4]" />
+                <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-accent" />
               )}
             </Link>
           ))}
         </nav>
 
         {/* Desktop Actions */}
-        <div className="hidden md:flex items-center gap-2">
+        <div className="hidden lg:flex items-center gap-2">
           <Link href="/search" aria-label="Search" className="p-2 text-ink/50 hover:text-ink transition-colors rounded-sm hover:bg-ink/5">
             <Search size={16} />
           </Link>
@@ -197,7 +194,7 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
 
         {/* Mobile toggle */}
         <button
-          className="md:hidden p-2 -mr-2 text-ink"
+          className="lg:hidden p-2 -mr-2 text-ink"
           aria-label={open ? "Close menu" : "Open menu"}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
@@ -208,7 +205,7 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
 
       {/* Mobile Nav */}
       {open && (
-        <nav className="md:hidden border-t border-ink/10 bg-paper px-6 py-4 flex flex-col gap-1">
+        <nav className="lg:hidden border-t border-ink/10 bg-paper px-6 py-4 flex flex-col gap-1">
           <div className="flex items-center justify-between pb-3 mb-2 border-b border-ink/10">
             <span className="text-sm text-ink/65">Theme</span>
             <ThemeToggle className="p-1.5 rounded-full border border-ink/15 text-ink/70 hover:text-ink" />

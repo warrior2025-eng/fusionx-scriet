@@ -36,7 +36,7 @@ const columns = [
 
 export function SiteFooter({ settings }: { settings: OrganizationSettings }) {
   return (
-    <footer className="border-t border-ink/8 mt-auto bg-surface/50">
+    <footer className="border-t border-line mt-auto bg-surface">
       <div className="container-fx py-16 md:py-20">
         {/* Top: Brand + Tagline */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-12 md:gap-8">

@@ -10,21 +10,28 @@ import {
 } from "./fusionx-scene-document";
 
 /**
- * Decorative 3D backdrop for the home hero: ThreeUI's "Living Green" scene,
- * recoloured to the FusionX logo (see fusionx-palette.ts).
+ * The home page's 3D backdrop: ThreeUI's "Living Green" scene, recoloured to
+ * the FusionX logo (see fusionx-palette.ts). Mount it once, inside a fixed
+ * full-viewport layer — it is one WebGL context and one render loop.
  *
- * It is a background only. The heading, copy and CTAs stay real HTML in the
- * page, layered above this; the frame is hidden from assistive tech and taken
- * out of the tab order.
+ * It is a background only. All copy stays real HTML in the page, layered
+ * above this; the frame is hidden from assistive tech, taken out of the tab
+ * order, and never receives input itself.
  *
  *  - The static poster is what renders on the server, before the scene has
  *    loaded, under prefers-reduced-motion, and if WebGL or the scene fails.
  *  - The scene runs in a sandboxed iframe (scripts only, no same-origin
  *    access) and mounts after hydration, so it never blocks first paint.
- *  - Rendering is paused whenever the hero is scrolled out of view or the tab
- *    is hidden.
- *  - It also drives the pointer float: it writes --px / --py on its parent
- *    section for the `.hero-float` layers and relays the pointer to the scene.
+ *  - Rendering pauses when the tab is hidden and when nothing shows the scene.
+ *    What "shows the scene" is declared by the page: elements marked
+ *    `data-scene-window` are see-through to it; `data-scene-window="dark"`
+ *    marks one that is only see-through in the dark theme (it is opaque in
+ *    the light theme). With no windows declared, the component's own box is
+ *    used.
+ *  - It owns the pointer: the raw position is relayed to the scene (moss,
+ *    pollen trail, camera), and the eased position is written as --px / --py
+ *    (-1…1) on `floatTarget`, which the `.hero-float` layers ride on — the
+ *    same scheme, easing and rounding as the authored page.
  */
 
 const POSTER_URL = "/hero/fusionx-hero-poster.webp";
@@ -52,7 +59,7 @@ function loadSceneDocument() {
   return sceneDocument;
 }
 
-export function FusionXHero({ className }: { className?: string }) {
+export function FusionXHero({ className, floatTarget }: { className?: string; floatTarget?: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [srcDoc, setSrcDoc] = useState<string | null>(null);
@@ -81,15 +88,26 @@ export function FusionXHero({ className }: { className?: string }) {
     };
   }, [reducedMotion]);
 
+  // Pause / resume, and the scene's ready / failed reports.
   useEffect(() => {
     if (!showScene) return;
     const host = hostRef.current;
     if (!host) return;
 
-    let inView = true;
+    const declared = Array.from(document.querySelectorAll<HTMLElement>("[data-scene-window]"));
+    const windows = declared.length ? declared : [host];
+    const inView = new Set<Element>(windows);
+
+    const sceneShowing = () => {
+      const light = document.documentElement.dataset.theme === "light";
+      for (const el of inView) {
+        if (!(light && (el as HTMLElement).dataset.sceneWindow === "dark")) return true;
+      }
+      return false;
+    };
     const post = () =>
       frameRef.current?.contentWindow?.postMessage(
-        { type: FUSIONX_SCENE_MESSAGE, paused: !inView || document.hidden },
+        { type: FUSIONX_SCENE_MESSAGE, paused: document.hidden || !sceneShowing() },
         "*",
       );
 
@@ -104,30 +122,32 @@ export function FusionXHero({ className }: { className?: string }) {
       }
     };
 
-    const observer = new IntersectionObserver(([entry]) => {
-      inView = entry?.isIntersecting ?? true;
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) inView.add(entry.target);
+        else inView.delete(entry.target);
+      }
       post();
     });
-    observer.observe(host);
+    windows.forEach((el) => observer.observe(el));
+    const themeObserver = new MutationObserver(post);
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     window.addEventListener("message", onMessage);
     document.addEventListener("visibilitychange", post);
     return () => {
       observer.disconnect();
+      themeObserver.disconnect();
       window.removeEventListener("message", onMessage);
       document.removeEventListener("visibilitychange", post);
     };
   }, [showScene]);
 
-  // Pointer float. The hero section (this component's parent) owns the
-  // pointer: its eased position is written to --px / --py there (-1…1), which
-  // is what every `.hero-float` layer rides on — the same scheme, easing and
-  // rounding as the authored page — and the raw position is relayed to the
-  // scene so the moss, pollen trail and camera react exactly as they would to
-  // a direct pointer.
+  // Pointer: relay to the scene, and drive the float.
   useEffect(() => {
     if (reducedMotion) return;
-    const section = hostRef.current?.parentElement;
-    if (!section) return;
+    const host = hostRef.current;
+    if (!host) return;
+    const target = floatTarget ? document.querySelector<HTMLElement>(floatTarget) : null;
 
     const pointer = { x: 0, y: 0 };
     const smooth = { x: 0, y: 0 };
@@ -140,11 +160,11 @@ export function FusionXHero({ className }: { className?: string }) {
       smooth.y += (pointer.y - smooth.y) * 0.055;
       const nx = Math.round(smooth.x * 1000) / 1000;
       const ny = Math.round(smooth.y * 1000) / 1000;
-      if (nx !== lastX || ny !== lastY) {
+      if (target && (nx !== lastX || ny !== lastY)) {
         lastX = nx;
         lastY = ny;
-        section.style.setProperty("--px", String(nx));
-        section.style.setProperty("--py", String(ny));
+        target.style.setProperty("--px", String(nx));
+        target.style.setProperty("--py", String(ny));
       }
       const settled = Math.abs(pointer.x - smooth.x) < 0.0005 && Math.abs(pointer.y - smooth.y) < 0.0005;
       raf = settled ? 0 : requestAnimationFrame(tick);
@@ -157,7 +177,7 @@ export function FusionXHero({ className }: { className?: string }) {
 
     const onMove = (e: PointerEvent) => {
       if (e.pointerType === "touch") return;
-      const r = section.getBoundingClientRect();
+      const r = host.getBoundingClientRect();
       const x = e.clientX - r.left;
       const y = e.clientY - r.top;
       pointer.x = (x / r.width) * 2 - 1;
@@ -171,16 +191,16 @@ export function FusionXHero({ className }: { className?: string }) {
       wake();
     };
 
-    section.addEventListener("pointermove", onMove, { passive: true });
-    section.addEventListener("pointerleave", onLeave);
+    window.addEventListener("pointermove", onMove, { passive: true });
+    document.documentElement.addEventListener("pointerleave", onLeave);
     return () => {
       cancelAnimationFrame(raf);
-      section.removeEventListener("pointermove", onMove);
-      section.removeEventListener("pointerleave", onLeave);
-      section.style.removeProperty("--px");
-      section.style.removeProperty("--py");
+      window.removeEventListener("pointermove", onMove);
+      document.documentElement.removeEventListener("pointerleave", onLeave);
+      target?.style.removeProperty("--px");
+      target?.style.removeProperty("--py");
     };
-  }, [reducedMotion]);
+  }, [reducedMotion, floatTarget]);
 
   return (
     <div
@@ -198,10 +218,8 @@ export function FusionXHero({ className }: { className?: string }) {
           sandbox="allow-scripts"
           tabIndex={-1}
           loading="eager"
-          // The host section owns the pointer and relays it (see the float effect
-          // above), so the frame itself never intercepts input or scrolling.
           className={cn(
-            "absolute inset-0 block h-full w-full border-0 pointer-events-none transition-opacity duration-700",
+            "pointer-events-none absolute inset-0 block h-full w-full border-0 transition-opacity duration-700",
             state === "ready" ? "opacity-100" : "opacity-0",
           )}
         />

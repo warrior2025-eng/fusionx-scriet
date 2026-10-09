@@ -4,6 +4,7 @@ import { Section } from "@/components/ui/section";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
+import { Eyebrow } from "@/components/ui/eyebrow";
 
 export const metadata: Metadata = { title: "Search" };
 
@@ -41,7 +42,7 @@ export default async function SearchPage({
 
   return (
     <Section className="pt-16 pb-24">
-      <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">Search</p>
+      <Eyebrow>Search</Eyebrow>
       <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-ink mb-8">
         {query ? `Results for "${query}"` : "Search FusionX"}
       </h1>

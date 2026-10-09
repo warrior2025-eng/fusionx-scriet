@@ -1,8 +1,20 @@
-export function EmptyState({ title, description }: { title: string; description: string }) {
+import { SlashMark } from "./slash-mark";
+
+export function EmptyState({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+}) {
   return (
-    <div className="rounded border border-dashed border-ink/15 px-6 py-14 text-center">
-      <p className="text-sm font-medium text-ink/70">{title}</p>
-      <p className="mt-1.5 text-sm text-ink/45 max-w-md mx-auto">{description}</p>
+    <div className="border border-dashed border-ink/20 bg-surface/60 px-6 py-12">
+      <SlashMark className="text-lg" />
+      <p className="mt-3 font-medium text-ink">{title}</p>
+      <p className="mt-1.5 max-w-md text-sm text-ink/65">{description}</p>
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }

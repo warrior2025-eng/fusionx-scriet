@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Section } from "@/components/ui/section";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { programs } from "@/lib/site-config";
+import { Eyebrow } from "@/components/ui/eyebrow";
 
 export const metadata: Metadata = {
   title: "Programs",
@@ -20,14 +21,11 @@ const details: Record<string, string[]> = {
 export default function ProgramsPage() {
   return (
     <>
-      <section className="relative overflow-hidden border-b border-ink/8">
-        <div className="absolute inset-0 bg-grid-subtle" aria-hidden />
-        <div className="absolute inset-0 bg-gradient-to-b from-paper via-paper/95 to-transparent" aria-hidden />
-        <div className="pointer-events-none absolute top-0 left-1/3 w-[500px] h-[300px] bg-accent/[0.04] rounded-full blur-[100px]" aria-hidden />
+      <section className="border-b border-line">
 
-        <div className="container-fx relative z-10 pt-20 pb-12 md:pt-24 md:pb-16">
+        <div className="container-fx pt-20 pb-12 md:pt-24 md:pb-16">
           <ScrollReveal>
-            <p className="text-xs font-semibold tracking-[0.16em] uppercase text-accent mb-3">Programs</p>
+            <Eyebrow>Programs</Eyebrow>
             <h1 className="text-4xl md:text-5xl font-serif font-normal tracking-tight text-ink max-w-2xl">
               Six tracks, one pipeline from idea to impact.
             </h1>
@@ -35,14 +33,14 @@ export default function ProgramsPage() {
         </div>
       </section>
 
-      <Section className="py-12 md:py-16">
+      <Section>
         <div className="grid md:grid-cols-2 gap-6">
           {programs.map((p, i) => (
             <ScrollReveal key={p.slug} delay={i * 80}>
               <div id={p.slug} className="card-elevated rounded-sm p-7 md:p-8 h-full flex flex-col justify-between group">
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <span className="font-mono text-xs text-ink/30 font-medium">0{i + 1}</span>
+                    <span className="text-sm tabular-nums text-ink/45">0{i + 1}</span>
                     <span className="h-1.5 w-1.5 rounded-full bg-accent/40 group-hover:bg-accent transition-colors" />
                   </div>
                   <p className="font-serif text-xl font-medium text-ink group-hover:text-accent transition-colors">{p.name}</p>

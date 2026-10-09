@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Section } from "@/components/ui/section";
 import { ProfileForm } from "@/components/forms/profile-form";
 import { createClient } from "@/lib/supabase/server";
+import { Eyebrow } from "@/components/ui/eyebrow";
 
 export const metadata: Metadata = { title: "My Profile" };
 
@@ -17,7 +18,7 @@ export default async function ProfilePage() {
 
   return (
     <Section className="pt-16 pb-24 max-w-2xl">
-      <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">My Profile</p>
+      <Eyebrow>My Profile</Eyebrow>
       <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-ink mb-8">Edit your profile.</h1>
       {profile && <ProfileForm profile={profile} email={user.email ?? ""} />}
     </Section>

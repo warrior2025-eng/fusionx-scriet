@@ -5,6 +5,7 @@ import { createTeam, type TeamActionState } from "@/actions/teams";
 import { Section } from "@/components/ui/section";
 import { Label, Input, Textarea, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
 
 const initialState: TeamActionState = { status: "idle" };
 
@@ -13,7 +14,7 @@ export default function NewTeamPage() {
 
   return (
     <Section className="pt-16 pb-24 max-w-2xl">
-      <p className="text-xs font-semibold tracking-[0.14em] uppercase text-accent mb-3">New Team</p>
+      <Eyebrow>New Team</Eyebrow>
       <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-ink mb-8">Start a team.</h1>
 
       {state.status === "error" && state.message && !Object.keys(state.fieldErrors ?? {}).length && (

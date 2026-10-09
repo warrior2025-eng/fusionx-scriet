@@ -7,6 +7,7 @@ import { LinkButton } from "@/components/ui/button";
 import { TeamJoinButton } from "@/components/forms/team-join-button";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/permissions";
+import { Eyebrow } from "@/components/ui/eyebrow";
 
 export const metadata: Metadata = {
   title: "Teams",
@@ -20,14 +21,11 @@ export default async function TeamsPage() {
   if (!user) {
     return (
       <>
-        <section className="relative overflow-hidden border-b border-ink/8">
-          <div className="absolute inset-0 bg-grid-subtle" aria-hidden />
-          <div className="absolute inset-0 bg-gradient-to-b from-paper via-paper/95 to-transparent" aria-hidden />
-          <div className="pointer-events-none absolute top-0 left-1/3 w-[500px] h-[300px] bg-accent/[0.04] rounded-full blur-[100px]" aria-hidden />
+        <section className="border-b border-line">
 
-          <div className="container-fx relative z-10 pt-20 pb-12 md:pt-24 md:pb-16">
+          <div className="container-fx pt-20 pb-12 md:pt-24 md:pb-16">
             <ScrollReveal>
-              <p className="text-xs font-semibold tracking-[0.16em] uppercase text-accent mb-3">Teams</p>
+              <Eyebrow>Teams</Eyebrow>
               <h1 className="text-4xl md:text-5xl font-serif font-normal tracking-tight text-ink mb-4">
                 Find collaborators.
               </h1>
@@ -35,7 +33,7 @@ export default async function TeamsPage() {
           </div>
         </section>
 
-        <Section className="py-12 md:py-16">
+        <Section>
           <ScrollReveal>
             <EmptyState
               title="Sign in to view and join teams."
@@ -59,16 +57,13 @@ export default async function TeamsPage() {
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-ink/8">
-        <div className="absolute inset-0 bg-grid-subtle" aria-hidden />
-        <div className="absolute inset-0 bg-gradient-to-b from-paper via-paper/95 to-transparent" aria-hidden />
-        <div className="pointer-events-none absolute top-0 left-1/3 w-[500px] h-[300px] bg-accent/[0.04] rounded-full blur-[100px]" aria-hidden />
+      <section className="border-b border-line">
 
-        <div className="container-fx relative z-10 pt-20 pb-12 md:pt-24 md:pb-16">
+        <div className="container-fx pt-20 pb-12 md:pt-24 md:pb-16">
           <ScrollReveal>
             <div className="flex flex-wrap items-end justify-between gap-6">
               <div>
-                <p className="text-xs font-semibold tracking-[0.16em] uppercase text-accent mb-3">Teams</p>
+                <Eyebrow>Teams</Eyebrow>
                 <h1 className="text-4xl md:text-5xl font-serif font-normal tracking-tight text-ink">
                   Find collaborators.
                 </h1>
@@ -81,7 +76,7 @@ export default async function TeamsPage() {
         </div>
       </section>
 
-      <Section className="py-12 md:py-16">
+      <Section>
         {teams && teams.length > 0 ? (
           <div className="grid md:grid-cols-2 gap-6">
             {teams.map((t, i) => (
