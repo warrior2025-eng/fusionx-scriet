@@ -146,7 +146,7 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
         </div>
 
         {/* Desktop Nav */}
-        <nav className="hidden lg:flex items-center gap-1">
+        <nav className="hidden xl:flex items-center gap-1">
           {nav.map((item) => (
             <Link
               key={item.href}
@@ -167,7 +167,7 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
         </nav>
 
         {/* Desktop Actions */}
-        <div className="hidden lg:flex items-center gap-2">
+        <div className="hidden xl:flex items-center gap-2">
           <Link href="/search" aria-label="Search" className="p-2 text-ink/50 hover:text-ink transition-colors rounded-sm hover:bg-ink/5">
             <Search size={16} />
           </Link>
@@ -183,7 +183,7 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
               <ProfileMenu user={user} />
             </>
           ) : (
-            <Link href="/login" className="text-[13px] font-medium text-ink/55 hover:text-ink transition-colors px-3 py-1.5">
+            <Link href="/login" className="whitespace-nowrap text-[13px] font-medium text-ink/70 hover:text-ink transition-colors px-3 py-1.5">
               Sign in
             </Link>
           )}
@@ -194,7 +194,7 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
 
         {/* Mobile toggle */}
         <button
-          className="lg:hidden p-2 -mr-2 text-ink"
+          className="xl:hidden p-2 -mr-2 text-ink"
           aria-label={open ? "Close menu" : "Open menu"}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
@@ -205,7 +205,7 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
 
       {/* Mobile Nav */}
       {open && (
-        <nav className="lg:hidden border-t border-ink/10 bg-paper px-6 py-4 flex flex-col gap-1">
+        <nav className="xl:hidden border-t border-ink/10 bg-paper px-6 py-4 flex flex-col gap-1">
           <div className="flex items-center justify-between pb-3 mb-2 border-b border-ink/10">
             <span className="text-sm text-ink/65">Theme</span>
             <ThemeToggle className="p-1.5 rounded-full border border-ink/15 text-ink/70 hover:text-ink" />
