@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored ThreeUI scene + Three.js runtime, served as-is.
+    "public/landing-pages/**",
   ]),
 ]);
 

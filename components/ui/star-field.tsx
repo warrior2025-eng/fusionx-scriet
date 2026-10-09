@@ -2,6 +2,13 @@
 
 import { useMemo } from "react";
 
+// Deterministic 0–1 value per (star, property): keeps render pure, and the
+// server and client agree on every position.
+function seeded(i: number, salt: number) {
+  const x = Math.sin(i * 127.1 + salt * 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
 /**
  * CSS-only star field that creates subtle drifting particles.
  * No canvas, no heavy JS — just positioned divs with CSS animation.
@@ -11,12 +18,12 @@ export function StarField({ count = 40 }: { count?: number }) {
   const stars = useMemo(() => {
     return Array.from({ length: count }, (_, i) => ({
       id: i,
-      left: `${Math.random() * 100}%`,
-      top: `${60 + Math.random() * 40}%`,
-      size: 1 + Math.random() * 1.5,
-      duration: 8 + Math.random() * 16,
-      delay: Math.random() * 12,
-      opacity: 0.15 + Math.random() * 0.4,
+      left: `${seeded(i, 1) * 100}%`,
+      top: `${60 + seeded(i, 2) * 40}%`,
+      size: 1 + seeded(i, 3) * 1.5,
+      duration: 8 + seeded(i, 4) * 16,
+      delay: seeded(i, 5) * 12,
+      opacity: 0.15 + seeded(i, 6) * 0.4,
     }));
   }, [count]);
 

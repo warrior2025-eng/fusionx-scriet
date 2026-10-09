@@ -24,18 +24,17 @@ export function AnimatedCounter({
     const el = ref.current;
     if (!el || hasAnimated) return;
 
-    // Respect reduced motion
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setDisplay(value);
-      setHasAnimated(true);
-      return;
-    }
-
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && !hasAnimated) {
           setHasAnimated(true);
           observer.unobserve(el);
+
+          // Respect reduced motion: show the final value, no count-up.
+          if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            setDisplay(value);
+            return;
+          }
 
           const start = performance.now();
           function tick(now: number) {

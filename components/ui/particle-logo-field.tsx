@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 
 /**
  * Full-page, fixed, behind-all-content particle field (Canvas 2D — no WebGL
@@ -21,6 +22,9 @@ import { useEffect, useRef } from "react";
  * listener / no React state churn) — cheap, and avoids re-render thrash.
  * Returns null entirely under prefers-reduced-motion, and on very small
  * screens drops the particle count for performance.
+ *
+ * Not rendered on the home page: its hero runs its own 3D scene, and the two
+ * animations are not stacked.
  */
 
 type Phase = { formStart: number; formEnd: number; holdEnd: number };
@@ -78,6 +82,12 @@ async function sampleLogoPoints(maxPoints: number): Promise<{ x: number; y: numb
 }
 
 export function ParticleLogoField() {
+  const pathname = usePathname();
+  if (pathname === "/") return null;
+  return <ParticleLogoFieldCanvas />;
+}
+
+function ParticleLogoFieldCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {

@@ -1,12 +1,11 @@
-import Image from "next/image";
 import { ArrowRight, Hammer, FlaskConical, Users, Trophy, Sparkles, Terminal } from "lucide-react";
 import { LinkButton } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
-import { CyberNexus } from "@/components/ui/cyber-nexus";
-import { CognizanceParticleBackground } from "@/components/ui/cognizance-particle-background";
+import { FusionXHero } from "@/components/hero/fusionx-hero";
+import { TechBackdrop } from "@/components/ui/tech-backdrop";
 import { founders, programs, journeyStages, buildPipeline, coreAreas, additionalFacultyGuides } from "@/lib/site-config";
 import { getOrganizationSettings } from "@/lib/data/organization";
 import { createClient } from "@/lib/supabase/server";
@@ -18,6 +17,16 @@ const areaIcons: Record<string, React.ReactNode> = {
   Compete: <Trophy size={20} />,
   Create: <Sparkles size={20} />,
 };
+
+// The hero scene is dark in both themes, so the hero pins the dark tokens.
+const heroTokens = {
+  "--color-paper": "#050a12",
+  "--color-ink": "#e8ecf4",
+  "--color-surface": "#0c1222",
+} as React.CSSProperties;
+
+// A floating hero layer: how far it rides the pointer (px) and how much it turns (deg).
+const float = (pd: number, pr: number) => ({ "--pd": pd, "--pr": pr }) as React.CSSProperties;
 
 export default async function HomePage() {
   const settings = await getOrganizationSettings();
@@ -58,139 +67,171 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* 3D Cognizance Particle Constellation Point-Cloud Background */}
-      <CognizanceParticleBackground />
+      {/* Animated background for the whole page (CSS only) */}
+      <TechBackdrop />
 
       {/* ================================================================
-          HERO — Techfest / Cognizance High-End Cyber Experience
+          HERO — 3D scene backdrop (ThreeUI "Living Green", recoloured to the
+          FusionX logo) with the copy as real HTML above it, laid out the way
+          the authored page lays its own: headline, lede and panels as separate
+          layers that float on the pointer at different depths (`hero-float`;
+          --pd = travel in px, --pr = turn in degrees — the authored values).
+          The scene stays dark in both themes, so this section pins its own
+          dark tokens and uses fixed colours.
           ================================================================ */}
-      <section className="relative min-h-[92vh] flex items-center overflow-hidden bg-cyber-mesh border-b border-cyan-500/20">
-        {/* Ambient atmospheric neon laser spotlights */}
-        <div className="pointer-events-none absolute -top-40 left-1/4 h-[500px] w-[500px] rounded-full bg-blue-600/15 blur-[140px]" aria-hidden />
-        <div className="pointer-events-none absolute top-1/2 -right-20 h-[500px] w-[500px] rounded-full bg-cyan-500/12 blur-[150px]" aria-hidden />
-        <div className="pointer-events-none absolute -bottom-32 left-10 h-[400px] w-[400px] rounded-full bg-indigo-600/12 blur-[120px]" aria-hidden />
+      <section
+        className="relative isolate min-h-[92vh] overflow-hidden border-b border-white/10 bg-[#00030D] text-[#E8ECF4]"
+        style={heroTokens}
+      >
+        <FusionXHero />
+        {/* Scrim so the copy stays readable where it overlaps the scene */}
+        <div
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#00030D]/75 via-[#00030D]/35 to-transparent"
+          aria-hidden
+        />
+        {/* HUD frame over the scene: grid, corner brackets, sweep, readout */}
+        <div className="hero-hud" aria-hidden>
+          <div className="hero-hud__grid" />
+          <div className="hero-hud__sweep" />
+          <span className="hero-hud__corner hero-hud__corner--tl" />
+          <span className="hero-hud__corner hero-hud__corner--tr" />
+          <span className="hero-hud__corner hero-hud__corner--bl" />
+          <span className="hero-hud__corner hero-hud__corner--br" />
+          <div className="hero-hud__readout">
+            <span>
+              <span className="hero-hud__blink">&#9679;</span> Scene live
+            </span>
+            <span>{"// SCRIET"} &bull; MEERUT</span>
+          </div>
+        </div>
 
-        <div className="container-fx relative z-10 py-16 md:py-24 lg:py-28 w-full">
-          <div className="grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-            {/* Left: Futuristic Hero Copy — 7 cols */}
-            <div className="lg:col-span-7 flex flex-col justify-center">
-              {/* Telemetry HUD Badge */}
-              <div className="flex items-center gap-3 mb-6 animate-fade">
-                <div className="telemetry-badge">
+        <div className="container-fx relative z-10 w-full pt-14 pb-24 md:pt-20 lg:pt-24 lg:pb-28">
+          <div className="grid gap-10 lg:grid-cols-12 lg:gap-8">
+            {/* Headline layer */}
+            <div className="hero-float lg:col-span-5" style={float(18, 1.2)}>
+              <div className="mb-6 animate-fade">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-[#00030D]/60 px-3 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-widest text-white/90">
                   <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400"></span>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#4D82FF] opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#4D82FF]"></span>
                   </span>
                   <span>A Student-Led Movement</span>
                 </div>
-                <span className="hidden sm:inline font-mono text-[10px] tracking-widest text-cyan-500 font-semibold uppercase">
-                  // SCRIET &bull; MEERUT
-                </span>
               </div>
-
-              {/* Grand Impact Typography */}
-              <h1 className="font-serif text-[clamp(2.75rem,6.5vw,5.5rem)] leading-[1.03] tracking-tight animate-reveal">
-                <span className="text-ink drop-shadow-sm">Ideas Grow</span>
+              <h1 className="font-serif text-[clamp(2.75rem,6vw,5.25rem)] leading-[1.03] tracking-tight animate-reveal">
+                <span className="text-white">Ideas Grow</span>
                 <br />
-                <span className="bg-gradient-to-r from-blue-500 via-cyan-400 to-indigo-400 bg-clip-text text-transparent glow-text-cyan">
+                <span className="bg-gradient-to-r from-white via-[#8FB0FF] to-[#2F6BFF] bg-clip-text text-transparent">
                   Here.
                 </span>
               </h1>
+            </div>
 
-              <p className="mt-6 text-base md:text-lg text-ink/75 leading-relaxed max-w-xl animate-reveal stagger-2">
-                {settings.chapter_name} brings together students, ideas, and opportunities to
-                build, research, and create real-world impact — together.
-              </p>
-
-              {/* Cyber CTA Buttons */}
-              <div className="mt-8 flex flex-wrap gap-4 animate-reveal stagger-3">
-                <LinkButton
-                  href="/programs"
-                  size="lg"
-                  className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white shadow-[0_0_20px_rgba(6,182,212,0.35)] border border-cyan-400/30"
-                >
-                  Explore Programs <ArrowRight size={16} />
-                </LinkButton>
-                <LinkButton
-                  href="/join"
-                  variant="secondary"
-                  size="lg"
-                  className="border-cyan-500/30 text-ink hover:border-cyan-400/70 hover:bg-cyan-950/20 backdrop-blur-md transition-all"
-                >
-                  Join the Network
-                </LinkButton>
+            {/* Lede + actions layer */}
+            <div className="lg:col-span-3 lg:pt-16">
+              <div className="hero-float" style={float(14, 1)}>
+                <p className="text-base text-white/80 leading-relaxed max-w-xl animate-reveal stagger-2">
+                  {settings.chapter_name} brings together students, ideas, and opportunities to
+                  build, research, and create real-world impact — together.
+                </p>
               </div>
-
-              {/* Telemetry Metric Modules */}
-              <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3 animate-reveal stagger-4">
-                {stats.map((s) => (
-                  <div key={s.label} className="hud-corner cyber-card p-4 rounded-sm">
-                    <p className="font-mono text-[10px] tracking-wider text-cyan-500 font-bold uppercase">
-                      {s.label}
-                    </p>
-                    <AnimatedCounter
-                      value={s.value}
-                      className="font-serif text-3xl font-bold text-ink mt-1 block"
-                    />
-                    <p className="font-mono text-[9px] text-ink/40 tracking-widest mt-1 uppercase font-semibold">
-                      {s.code}
-                    </p>
-                  </div>
-                ))}
-                <div className="hud-corner cyber-card p-4 rounded-sm">
-                  <p className="font-mono text-[10px] tracking-wider text-cyan-500 font-bold uppercase">
-                    Impact
-                  </p>
-                  <p className="font-serif text-3xl font-bold text-cyan-400 mt-1 glow-text-cyan">
-                    &infin;
-                  </p>
-                  <p className="font-mono text-[9px] text-ink/40 tracking-widest mt-1 uppercase font-semibold">
-                    CAMPUS LEGACY
-                  </p>
-                </div>
-              </div>
-
-              {/* Core Domains Monospace Bar */}
-              <div className="mt-10 pt-6 border-t border-ink/10 flex flex-wrap items-center gap-2 animate-reveal stagger-5">
-                <span className="font-mono text-[11px] uppercase tracking-widest text-cyan-500 font-bold mr-2">
-                  // CORE DOMAINS:
-                </span>
-                {coreAreas.map((a) => (
-                  <span
-                    key={a}
-                    className="font-mono text-xs px-2.5 py-1 rounded border border-cyan-500/25 bg-surface/80 text-ink/85 hover:border-cyan-400/60 hover:text-cyan-500 transition-colors"
+              <div className="hero-float mt-7" style={float(15, 1.4)}>
+                <div className="flex flex-wrap gap-3 lg:flex-col lg:items-stretch animate-reveal stagger-3">
+                  <LinkButton
+                    href="/programs"
+                    size="lg"
+                    className="rounded-full bg-[#004DF6] hover:bg-[#1A5DFF] text-white border border-white/15 shadow-[0_0_24px_rgba(0,77,246,0.45)] focus-visible:outline-white"
                   >
-                    {a}
-                  </span>
-                ))}
+                    Explore Programs <ArrowRight size={16} />
+                  </LinkButton>
+                  <LinkButton
+                    href="/join"
+                    variant="secondary"
+                    size="lg"
+                    className="rounded-full border-white/30 bg-[#00030D]/50 text-white hover:border-white/70 hover:bg-white/10 focus-visible:outline-white"
+                  >
+                    Join the Network
+                  </LinkButton>
+                </div>
               </div>
             </div>
 
-            {/* Right: Holographic Cyber Nexus Centerpiece — 5 cols */}
-            <div className="lg:col-span-5 relative animate-slide-right stagger-3 flex flex-col items-center">
-              <CyberNexus />
-
-              {/* Sub-panel with institutional context */}
-              <div className="mt-6 w-full max-w-[460px] hud-corner cyber-card p-5 rounded-sm">
-                <div className="flex items-center gap-3">
-                  <Terminal size={18} className="text-cyan-500 shrink-0" />
-                  <div className="flex items-center gap-2 font-mono text-[11px]">
-                    <span className="text-ink">Learn.</span>
-                    <span className="text-cyan-500">&bull;</span>
-                    <span className="text-ink">Build.</span>
-                    <span className="text-cyan-500">&bull;</span>
-                    <span className="text-ink">Research.</span>
-                    <span className="text-cyan-500">&bull;</span>
-                    <span className="text-cyan-500 font-bold">Impact.</span>
+            {/* Floating panels */}
+            <div className="lg:col-span-4 flex flex-col gap-5">
+              <div className="hero-float" style={float(10, 2.2)}>
+                <div className="hud-panel p-5 animate-slide-right stagger-3">
+                  <div className="hud-panel__tag">
+                    <span>FX-01</span>
+                    <span>{"// NETWORK"}</span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-3">
+                    <Terminal size={18} className="text-[#6C9BFF] shrink-0" />
+                    <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
+                      <span className="text-white">Learn.</span>
+                      <span className="text-[#6C9BFF]">&bull;</span>
+                      <span className="text-white">Build.</span>
+                      <span className="text-[#6C9BFF]">&bull;</span>
+                      <span className="text-white">Research.</span>
+                      <span className="text-[#6C9BFF]">&bull;</span>
+                      <span className="text-[#8FB0FF] font-bold">Impact.</span>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs text-white/75 leading-relaxed font-sans">
+                    A network where campus conversations turn into working projects, documented
+                    research, and outcomes that outlast a single event.
+                  </p>
+                  <div className="mt-3 pt-3 border-t border-white/12 flex items-center justify-between text-[10px] font-mono text-white/60 uppercase tracking-wider">
+                    <span>Student Innovation &amp; Research</span>
+                    <span className="text-[#8FB0FF] font-bold">SCRIET &bull; CCSU</span>
                   </div>
                 </div>
-                <p className="mt-3 text-xs text-ink/65 leading-relaxed font-sans">
-                  A network where campus conversations turn into working projects, documented
-                  research, and outcomes that outlast a single event.
-                </p>
-                <div className="mt-3 pt-3 border-t border-ink/10 flex items-center justify-between text-[10px] font-mono text-ink/45 uppercase tracking-wider">
-                  <span>Student Innovation &amp; Research</span>
-                  <span className="text-cyan-500 font-bold">SCRIET &bull; CCSU</span>
+              </div>
+
+              {/* Readouts — real counts only */}
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4 pl-1 animate-reveal stagger-4">
+                {stats.map((s, i) => (
+                  <div key={s.label} className="hero-float" style={float(12 + (i % 2), 0)}>
+                    <div className="hud-readout">
+                      <p className="font-mono text-[10px] tracking-wider text-[#8FB0FF] font-bold uppercase">
+                        {s.label}
+                      </p>
+                      <AnimatedCounter value={s.value} className="font-serif text-2xl font-bold text-white block" />
+                      <p className="font-mono text-[9px] text-white/55 tracking-widest uppercase font-semibold">
+                        {s.code}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                <div className="hero-float" style={float(13, 0)}>
+                  <div className="hud-readout">
+                    <p className="font-mono text-[10px] tracking-wider text-[#8FB0FF] font-bold uppercase">Impact</p>
+                    <p className="font-serif text-2xl font-bold text-[#6C9BFF]">&infin;</p>
+                    <p className="font-mono text-[9px] text-white/55 tracking-widest uppercase font-semibold">
+                      CAMPUS LEGACY
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Nearest layer: rides furthest */}
+          <div className="mt-10 lg:mt-14 flex lg:justify-end">
+            <div className="hero-float w-full max-w-[420px]" style={float(22, 2.4)}>
+              <div className="hud-panel p-5 animate-reveal stagger-5">
+                <div className="hud-panel__tag">
+                  <span>FX-02</span>
+                  <span>{"// CORE DOMAINS"}</span>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {coreAreas.map((a) => (
+                    <span
+                      key={a}
+                      className="font-mono text-xs px-2.5 py-1 rounded border border-white/15 bg-[#00030D]/60 text-white/85 hover:border-[#6C9BFF] hover:text-[#8FB0FF] transition-colors"
+                    >
+                      {a}
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>
@@ -225,7 +266,7 @@ export default async function HomePage() {
           <div className="hud-corner cyber-card energy-line rounded-sm p-6 md:p-8 overflow-x-auto">
             <div className="flex items-center justify-between mb-4 border-b border-ink/10 pb-3">
               <span className="font-mono text-xs uppercase tracking-widest text-cyan-500 font-bold">
-                // SYSTEM PIPELINE: IDEA TO IMPACT
+                {"// SYSTEM PIPELINE: IDEA TO IMPACT"}
               </span>
               <span className="font-mono text-[10px] text-ink/45 uppercase tracking-widest">
                 STAGE_PROGRESSION: CONTINUOUS
@@ -259,7 +300,7 @@ export default async function HomePage() {
             <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-center">
               <div className="lg:col-span-5">
                 <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-500 mb-2">
-                  // ABOUT PROTOCOL
+                  {"// ABOUT PROTOCOL"}
                 </p>
                 <h2 className="font-serif text-3xl md:text-4xl tracking-tight text-ink leading-tight">
                   An ecosystem, not just a club.
@@ -285,7 +326,7 @@ export default async function HomePage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-500 mb-1">
-                // ARCHITECTURE
+                {"// ARCHITECTURE"}
               </p>
               <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-ink">
                 The full pipeline, not a single weekend.
@@ -332,7 +373,7 @@ export default async function HomePage() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-500 mb-1">
-                // MODULES
+                {"// MODULES"}
               </p>
               <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-ink">
                 Five ways to get involved.
@@ -374,7 +415,7 @@ export default async function HomePage() {
           <div className="flex items-center justify-between mb-2">
             <div>
               <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-500 mb-1">
-                // TRACKS
+                {"// TRACKS"}
               </p>
               <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-ink">
                 Structured tracks for every stage of the journey.
@@ -429,7 +470,7 @@ export default async function HomePage() {
           <div className="flex items-center justify-between mb-2">
             <div>
               <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-500 mb-1">
-                // SHOWCASE
+                {"// SHOWCASE"}
               </p>
               <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-ink">
                 What students are building right now.
@@ -510,7 +551,7 @@ export default async function HomePage() {
           <div className="flex items-center justify-between mb-2">
             <div>
               <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-500 mb-1">
-                // TIMELINE
+                {"// TIMELINE"}
               </p>
               <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-ink">
                 Upcoming on the calendar.
@@ -566,7 +607,7 @@ export default async function HomePage() {
           <div className="flex items-center justify-between mb-2">
             <div>
               <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-500 mb-1">
-                // CREATORS
+                {"// CREATORS"}
               </p>
               <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-ink">
                 Built by students, for students.
@@ -611,7 +652,7 @@ export default async function HomePage() {
       <Section className="pt-0">
         <ScrollReveal>
           <p className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-cyan-500 mb-4 font-bold">
-            // FACULTY ADVISORY
+            {"// FACULTY ADVISORY"}
           </p>
         </ScrollReveal>
         <div className="space-y-4">
