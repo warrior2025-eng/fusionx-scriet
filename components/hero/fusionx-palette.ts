@@ -128,3 +128,27 @@ export const FUSIONX_SCENE_PALETTE = {
 } as const;
 
 export type FusionXScenePalette = typeof FUSIONX_SCENE_PALETTE;
+
+/**
+ * Large-screen render budget — the only non-colour values changed in the
+ * scene. As authored (190,000 / 60,000 blades at full resolution) the scene,
+ * now filling the whole viewport behind the home page, measured ~30 fps on an
+ * integrated laptop GPU. Benchmarked standalone at 1440×900 on that GPU:
+ *
+ *   190k blades, 1.00×  37 fps      110k blades, 1.00×  47 fps
+ *   190k blades, 0.75×  48 fps      110k blades, 0.75×  60 fps
+ *
+ * Resolution matters more than blade count, so both are trimmed.
+ *  - bladesNear / bladesFar: moss blades on the near root / far ridge.
+ *  - renderScale: fraction of the device pixel ratio the scene renders at
+ *    (the browser upscales it); maxPixelRatio caps it on hi-dpi screens.
+ * Small screens keep the authored 70,000 / 20,000 blades and pixel ratio.
+ */
+export const FUSIONX_SCENE_DENSITY = {
+  bladesNear: 110_000,
+  bladesFar: 35_000,
+  renderScale: 0.75,
+  maxPixelRatio: 1.5,
+} as const;
+
+export type FusionXSceneDensity = typeof FUSIONX_SCENE_DENSITY;

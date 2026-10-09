@@ -1,4 +1,10 @@
-import { FUSIONX_SCENE_PALETTE, type FusionXScenePalette, type Rgb } from "./fusionx-palette";
+import {
+  FUSIONX_SCENE_DENSITY,
+  FUSIONX_SCENE_PALETTE,
+  type FusionXSceneDensity,
+  type FusionXScenePalette,
+  type Rgb,
+} from "./fusionx-palette";
 
 /**
  * Builds the document the hero iframe runs: ThreeUI's authored "Living Green"
@@ -13,7 +19,9 @@ import { FUSIONX_SCENE_PALETTE, type FusionXScenePalette, type Rgb } from "./fus
  *     copy or imagery is ever parsed, fetched or shown.
  *  2. Recolour — each colour constant listed in recolour() is swapped for its
  *     palette value. Only literals change; no shader logic, geometry, motion
- *     or interaction code is touched.
+ *     or interaction code is touched. The only non-colour literals changed are
+ *     the large-screen blade count and render resolution (density()), for
+ *     frame rate.
  *  3. Host bridge — a few lines that let the host page pause rendering and
  *     learn whether the scene started.
  *
@@ -145,6 +153,19 @@ function recolour(p: FusionXScenePalette): Swap[] {
   ];
 }
 
+/** Large-screen blade counts and render resolution (see FUSIONX_SCENE_DENSITY). */
+function density(d: FusionXSceneDensity): Swap[] {
+  return [
+    { what: "near blade count", find: "var BLADES_NEAR = small ? 70000 : 190000;", replace: `var BLADES_NEAR = small ? 70000 : ${Math.round(d.bladesNear)};` },
+    { what: "far blade count", find: "var BLADES_FAR  = small ? 20000 :  60000;", replace: `var BLADES_FAR  = small ? 20000 : ${Math.round(d.bladesFar)};` },
+    {
+      what: "pixel ratio",
+      find: "renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, small ? 1.6 : 2));",
+      replace: `renderer.setPixelRatio(small ? Math.min(window.devicePixelRatio || 1, 1.6) : Math.min((window.devicePixelRatio || 1) * ${d.renderScale}, ${d.maxPixelRatio}));`,
+    },
+  ];
+}
+
 /** The page behind the transparent canvas, plus the scene-only frame rules. */
 function sceneStyle(p: FusionXScenePalette) {
   const bg = p.background;
@@ -204,6 +225,7 @@ export function buildFusionXSceneDocument(
   authored: string,
   origin: string,
   palette: FusionXScenePalette = FUSIONX_SCENE_PALETTE,
+  sceneDensity: FusionXSceneDensity = FUSIONX_SCENE_DENSITY,
 ): string {
   const presentationStart = authored.indexOf(PRESENTATION_START);
   const runtimeStart = authored.indexOf(THREE_RUNTIME_TAG);
@@ -218,11 +240,11 @@ export function buildFusionXSceneDocument(
 
   let source = `${authored.slice(0, presentationStart)}${SCENE_ONLY_MARKUP}\n\n${authored.slice(runtimeStart)}`;
 
-  for (const swap of recolour(palette)) {
+  for (const swap of [...recolour(palette), ...density(sceneDensity)]) {
     const parts = source.split(swap.find);
     if (parts.length !== 2) {
       throw new Error(
-        `FusionX hero: expected exactly one "${swap.what}" colour in the authored scene, found ${parts.length - 1}.`,
+        `FusionX hero: expected exactly one "${swap.what}" in the authored scene, found ${parts.length - 1}.`,
       );
     }
     source = parts.join(swap.replace);
