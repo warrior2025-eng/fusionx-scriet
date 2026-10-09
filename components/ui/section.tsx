@@ -2,18 +2,42 @@ import { cn } from "@/lib/utils";
 import { Eyebrow } from "./eyebrow";
 
 /**
+ * Full-width backgrounds a section can sit on (see "bands" in globals.css).
+ *  - surface / tint: white and pale-blue bands in the light theme; clear in
+ *    the dark theme, where the home page's scene shows through instead.
+ *  - navy: the deep-navy brand band, the same in both themes.
+ */
+type Band = "surface" | "tint" | "navy";
+
+const bandClass: Record<Band, string> = {
+  surface: "band--surface",
+  tint: "band--tint",
+  navy: "on-navy",
+};
+
+/**
  * The one section wrapper: the shared `container-fx` width and gutters, and
- * the shared vertical rhythm. Pages should not override the padding.
+ * the shared vertical rhythm. With `band`, the background runs edge to edge
+ * while the content stays on the container.
  */
 export function Section({
   className,
   children,
   id,
+  band,
 }: {
   className?: string;
   children: React.ReactNode;
   id?: string;
+  band?: Band;
 }) {
+  if (band) {
+    return (
+      <section id={id} className={bandClass[band]}>
+        <div className={cn("container-fx py-16 md:py-24", className)}>{children}</div>
+      </section>
+    );
+  }
   return (
     <section id={id} className={cn("container-fx py-16 md:py-24", className)}>
       {children}

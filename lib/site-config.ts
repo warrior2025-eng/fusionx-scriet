@@ -7,6 +7,9 @@
  * or numbers here; see the "no fabrication" note in the README.
  */
 
+/** The official name. Written exactly like this everywhere: no spaces around the @. */
+export const siteName = "FusionX@SCRIET";
+
 export const founders = [
   {
     name: "Pranjal Srivastav",
@@ -123,6 +126,6 @@ export const institution = {
 export const additionalFacultyGuides = [
   {
     name: "Amit Sharma",
-    title: "Faculty Guide, FusionX@SCRIET · HOD, CS, SCRIET",
+    title: `Faculty Guide, ${siteName} · HOD, CS, SCRIET`,
   },
 ] as const;

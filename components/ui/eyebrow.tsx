@@ -16,7 +16,7 @@ export function Eyebrow({
   className?: string;
 }) {
   return (
-    <div className={cn("mb-4 flex items-center gap-3 text-[13px] font-medium tracking-[0.08em] text-ink/70", className)}>
+    <div className={cn("mb-4 flex items-center gap-3 text-[13px] font-medium tracking-[0.08em] text-accent", className)}>
       <span className="flex items-center gap-2">
         <SlashMark />
         {index !== undefined && <span className="tabular-nums text-ink/45">{String(index).padStart(2, "0")}</span>}

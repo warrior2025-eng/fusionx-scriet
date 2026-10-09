@@ -48,7 +48,8 @@ const vec3 = (c: Rgb) => `vec3(${c.map((v) => v.toFixed(4)).join(", ")})`;
 const color = (c: Rgb) => `new THREE.Color(${c.map((v) => v.toFixed(4)).join(", ")})`;
 const array = (c: Rgb) => `[${c.map((v) => v.toFixed(4)).join(", ")}]`;
 
-type Swap = { what: string; find: string; replace: string };
+/** One literal to swap. It must occur exactly `count` times (default 1). */
+type Swap = { what: string; find: string; replace: string; count?: number };
 
 function recolour(p: FusionXScenePalette): Swap[] {
   const b = p.butterfly;
@@ -150,6 +151,14 @@ function recolour(p: FusionXScenePalette): Swap[] {
     },
     { what: "body flecks", find: "vec3(0.46, 0.44, 0.24)", replace: vec3(b.bodyFleck) },
     { what: "antennae", find: "color: 0x171208", replace: `color: ${b.antennae}` },
+
+    /* glow sprites: pollen, cursor trail, survey pulse, back glow */
+    {
+      what: "glow blending",
+      find: "THREE.AdditiveBlending",
+      replace: p.glowBlending === "additive" ? "THREE.AdditiveBlending" : "THREE.NormalBlending",
+      count: 4,
+    },
   ];
 }
 
@@ -242,9 +251,10 @@ export function buildFusionXSceneDocument(
 
   for (const swap of [...recolour(palette), ...density(sceneDensity)]) {
     const parts = source.split(swap.find);
-    if (parts.length !== 2) {
+    const expected = swap.count ?? 1;
+    if (parts.length - 1 !== expected) {
       throw new Error(
-        `FusionX hero: expected exactly one "${swap.what}" in the authored scene, found ${parts.length - 1}.`,
+        `FusionX hero: expected ${expected} "${swap.what}" in the authored scene, found ${parts.length - 1}.`,
       );
     }
     source = parts.join(swap.replace);

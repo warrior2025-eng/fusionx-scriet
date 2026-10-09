@@ -4,10 +4,11 @@ import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { JoinForm } from "@/components/forms/join-form";
 import { createClient } from "@/lib/supabase/server";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { siteName } from "@/lib/site-config";
 
 export const metadata: Metadata = {
   title: "Join FusionX",
-  description: "Apply to join FusionX@SCRIET.",
+  description: `Apply to join ${siteName}.`,
 };
 
 export default async function JoinPage() {

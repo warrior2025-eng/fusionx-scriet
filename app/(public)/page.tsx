@@ -13,7 +13,15 @@ import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { ScrollProgress } from "@/components/ui/scroll-progress";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { FusionXHero } from "@/components/hero/fusionx-hero";
-import { founders, programs, journeyStages, buildPipeline, coreAreas, additionalFacultyGuides } from "@/lib/site-config";
+import {
+  founders,
+  programs,
+  journeyStages,
+  buildPipeline,
+  coreAreas,
+  additionalFacultyGuides,
+  siteName,
+} from "@/lib/site-config";
 import { getOrganizationSettings } from "@/lib/data/organization";
 import { createClient } from "@/lib/supabase/server";
 
@@ -79,16 +87,17 @@ export default async function HomePage() {
           HERO — copy as real HTML over the scene. Each block is a layer
           that floats on the pointer (`hero-float`; --pd = travel in px,
           --pr = turn in degrees — the ThreeUI page's own values). The scene
-          is navy in both themes, so the hero pins the dark tokens.
+          follows the theme (night on navy / daylight on pale blue), and so
+          does the copy, through the ordinary tokens.
           ================================================================ */}
       <section
         id="home-hero"
         data-scene-window
-        className="on-scene relative flex min-h-[calc(100svh-4rem)] items-center"
+        className="relative flex min-h-[calc(100svh-4rem)] items-center"
       >
         {/* Scrim so the copy stays readable where it overlaps the scene */}
         <div
-          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-paper/70 via-paper/35 to-transparent lg:bg-gradient-to-r lg:from-paper/75 lg:via-paper/30 lg:to-transparent"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-paper/80 via-paper/55 to-transparent lg:bg-gradient-to-r lg:from-paper/85 lg:via-paper/45 lg:to-transparent"
           aria-hidden
         />
 
@@ -96,7 +105,7 @@ export default async function HomePage() {
           <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-10">
             <div className="lg:col-span-7">
               <div className="hero-float" style={float(18, 1.2)}>
-                <Eyebrow className="animate-fade text-ink/80">A Student-Led Movement</Eyebrow>
+                <Eyebrow className="animate-fade">A Student-Led Movement</Eyebrow>
                 <h1 className="font-serif text-[clamp(2.75rem,7vw,5.75rem)] leading-[1.02] tracking-tight text-ink animate-reveal">
                   Ideas <span className="accent-large text-accent">Grow</span>
                   <br />
@@ -116,7 +125,7 @@ export default async function HomePage() {
                   <LinkButton href="/programs" size="lg">
                     Explore Programs <ArrowRight size={16} className="arrow-nudge" />
                   </LinkButton>
-                  <LinkButton href="/join" variant="secondary" size="lg" className="border-ink/35 bg-paper/50 hover:border-ink">
+                  <LinkButton href="/join" variant="secondary" size="lg" className="bg-paper/60">
                     Join the Network
                   </LinkButton>
                 </div>
@@ -143,7 +152,7 @@ export default async function HomePage() {
 
             <div className="lg:col-span-5">
               <div className="hero-float" style={float(22, 2.4)}>
-                <CutCard className="bg-surface/85 animate-reveal stagger-3">
+                <CutCard className="animate-reveal stagger-3">
                   <p className="font-serif text-2xl leading-snug text-ink md:text-[1.75rem]">
                     Learn. Build. Research. Impact.
                   </p>
@@ -177,11 +186,11 @@ export default async function HomePage() {
             <SectionHeading index={1} eyebrow="About" title="An ecosystem, not just a club." />
             <CutCard className="p-8 md:p-10">
               <p className="max-w-3xl text-base leading-relaxed text-ink/80 md:text-lg">
-                FusionX@SCRIET exists to help students move beyond attending events — into
+                {siteName} exists to help students move beyond attending events — into
                 actually building projects, conducting research, protecting their ideas, and carrying
                 work forward past a single competition.
               </p>
-              <Link href="/about" className="group mt-6 inline-flex items-center gap-2 text-sm font-medium text-ink">
+              <Link href="/about" className="group mt-6 inline-flex items-center gap-2 text-sm font-medium text-accent">
                 <span className="link-slide">Why FusionX exists</span>
                 <ArrowRight size={14} className="arrow-nudge" />
               </Link>
@@ -190,7 +199,7 @@ export default async function HomePage() {
         </Section>
 
         {/* 02 — Pipeline */}
-        <Section className="pt-0 md:pt-0">
+        <Section band="surface">
           <ScrollReveal>
             <SectionHeading index={2} eyebrow="Idea to impact" title="The full pipeline, not a single weekend." />
           </ScrollReveal>
@@ -213,7 +222,7 @@ export default async function HomePage() {
         </Section>
 
         {/* 03 — Core areas */}
-        <Section className="pt-0 md:pt-0">
+        <Section band="tint">
           <ScrollReveal>
             <SectionHeading index={3} eyebrow="Core areas" title="Five ways to get involved." />
           </ScrollReveal>
@@ -234,7 +243,7 @@ export default async function HomePage() {
         </Section>
 
         {/* 04 — Programs */}
-        <Section className="pt-0 md:pt-0">
+        <Section>
           <ScrollReveal>
             <SectionHeading
               index={4}
@@ -256,7 +265,7 @@ export default async function HomePage() {
                   <p className="mt-3 text-sm leading-relaxed text-ink/75">{p.summary}</p>
                   <Link
                     href={`/programs#${p.slug}`}
-                    className="mt-auto inline-flex items-center gap-2 pt-6 text-sm font-medium text-ink"
+                    className="mt-auto inline-flex items-center gap-2 pt-6 text-sm font-medium text-accent"
                   >
                     <span className="link-slide">Learn more</span>
                     <ArrowRight size={14} className="arrow-nudge" />
@@ -268,7 +277,7 @@ export default async function HomePage() {
         </Section>
 
         {/* 05 — Projects */}
-        <Section className="pt-0 md:pt-0">
+        <Section band="surface">
           <ScrollReveal>
             <SectionHeading
               index={5}
@@ -321,7 +330,7 @@ export default async function HomePage() {
         </Section>
 
         {/* 06 — Events */}
-        <Section className="pt-0 md:pt-0">
+        <Section band="tint">
           <ScrollReveal>
             <SectionHeading
               index={6}
@@ -365,7 +374,7 @@ export default async function HomePage() {
         </Section>
 
         {/* 07 — Founding team */}
-        <Section className="pt-0 md:pt-0">
+        <Section>
           <ScrollReveal>
             <SectionHeading
               index={7}
@@ -394,7 +403,7 @@ export default async function HomePage() {
         </Section>
 
         {/* 08 — Faculty guides */}
-        <Section className="pt-0 md:pt-0">
+        <Section band="surface">
           <ScrollReveal>
             <SectionHeading index={8} eyebrow="Faculty guides" title="Faculty advisory." />
           </ScrollReveal>
@@ -416,10 +425,10 @@ export default async function HomePage() {
           </div>
         </Section>
 
-        {/* Join */}
-        <Section className="pt-0 md:pt-0">
+        {/* Join — the deep-navy brand band, in both themes */}
+        <Section band="navy">
           <ScrollReveal>
-            <CutCard className="p-8 md:p-12">
+            <div>
               <Eyebrow>Join the network</Eyebrow>
               <div className="flex flex-wrap items-end justify-between gap-8">
                 <div className="max-w-xl">
@@ -435,7 +444,7 @@ export default async function HomePage() {
                   Join FusionX <ArrowRight size={16} className="arrow-nudge" />
                 </LinkButton>
               </div>
-            </CutCard>
+            </div>
           </ScrollReveal>
         </Section>
       </div>

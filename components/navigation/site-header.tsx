@@ -103,8 +103,8 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
       className={cn(
         "sticky top-0 z-40 transition-all duration-300",
         scrolled
-          ? "bg-paper border-b border-line"
-          : "bg-paper border-b border-transparent"
+          ? "bg-surface border-b border-line"
+          : "bg-surface border-b border-transparent"
       )}
     >
       <div className="container-fx flex h-16 items-center justify-between">
@@ -139,7 +139,7 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
                 <span className="sm:hidden">FusionX</span>
               </span>
               <span className="hidden sm:block text-[11px] tracking-[0.04em] text-ink/60 leading-tight">
-                Innovation &middot; Research
+                Innovation
               </span>
             </div>
           </Link>

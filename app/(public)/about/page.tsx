@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { Section } from "@/components/ui/section";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
-import { journeyStages } from "@/lib/site-config";
+import { journeyStages, siteName } from "@/lib/site-config";
 import { Eyebrow } from "@/components/ui/eyebrow";
 
 export const metadata: Metadata = {
   title: "About",
-  description: "Mission, vision, and philosophy behind FusionX@SCRIET.",
+  description: `Mission, vision, and philosophy behind ${siteName}.`,
 };
 
 export default function AboutPage() {

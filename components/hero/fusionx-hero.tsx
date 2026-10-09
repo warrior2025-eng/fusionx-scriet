@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
-import { BRAND } from "./fusionx-palette";
+import { FUSIONX_SCENE_PALETTES, type FusionXSceneTheme } from "./fusionx-palette";
 import {
   FUSIONX_SCENE_MESSAGE,
   FUSIONX_SCENE_SOURCE_URL,
@@ -11,17 +11,21 @@ import {
 
 /**
  * The home page's 3D backdrop: ThreeUI's "Living Green" scene, recoloured to
- * the FusionX logo (see fusionx-palette.ts). Mount it once, inside a fixed
- * full-viewport layer — it is one WebGL context and one render loop.
+ * the FusionX logo (see fusionx-palette.ts) — a night scene on navy in the
+ * dark theme, the same world in daylight on pale blue in the light theme.
+ * Mount it once, inside a fixed full-viewport layer: it is one WebGL context
+ * and one render loop.
  *
  * It is a background only. All copy stays real HTML in the page, layered
  * above this; the frame is hidden from assistive tech, taken out of the tab
  * order, and never receives input itself.
  *
- *  - The static poster is what renders on the server, before the scene has
- *    loaded, under prefers-reduced-motion, and if WebGL or the scene fails.
+ *  - The static poster (`.scene-poster` in globals.css, one image per theme)
+ *    is what renders on the server, before the scene has loaded, under
+ *    prefers-reduced-motion, and if WebGL or the scene fails.
  *  - The scene runs in a sandboxed iframe (scripts only, no same-origin
  *    access) and mounts after hydration, so it never blocks first paint.
+ *    Switching theme rebuilds it with the other palette.
  *  - Rendering pauses when the tab is hidden and when nothing shows the scene.
  *    What "shows the scene" is declared by the page: elements marked
  *    `data-scene-window` are see-through to it; `data-scene-window="dark"`
@@ -34,7 +38,6 @@ import {
  *    same scheme, easing and rounding as the authored page.
  */
 
-const POSTER_URL = "/hero/fusionx-hero-poster.webp";
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 
 function subscribeReducedMotion(onChange: () => void) {
@@ -43,27 +46,43 @@ function subscribeReducedMotion(onChange: () => void) {
   return () => media.removeEventListener("change", onChange);
 }
 
-// One fetch + build per page load, shared across remounts.
-let sceneDocument: Promise<string> | null = null;
-function loadSceneDocument() {
-  sceneDocument ??= fetch(FUSIONX_SCENE_SOURCE_URL)
+function subscribeTheme(onChange: () => void) {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  return () => observer.disconnect();
+}
+const currentTheme = (): FusionXSceneTheme =>
+  document.documentElement.dataset.theme === "light" ? "light" : "dark";
+
+// One fetch per page load; one built document per theme.
+let authoredSource: Promise<string> | null = null;
+const sceneDocuments = new Map<FusionXSceneTheme, string>();
+async function loadSceneDocument(theme: FusionXSceneTheme) {
+  const cached = sceneDocuments.get(theme);
+  if (cached) return cached;
+  authoredSource ??= fetch(FUSIONX_SCENE_SOURCE_URL)
     .then((res) => {
       if (!res.ok) throw new Error(`FusionX hero: scene source returned ${res.status}`);
       return res.text();
     })
-    .then((authored) => buildFusionXSceneDocument(authored, window.location.origin))
     .catch((err) => {
-      sceneDocument = null;
+      authoredSource = null;
       throw err;
     });
-  return sceneDocument;
+  const doc = buildFusionXSceneDocument(await authoredSource, window.location.origin, FUSIONX_SCENE_PALETTES[theme]);
+  sceneDocuments.set(theme, doc);
+  return doc;
 }
+
+type SceneStatus = "loading" | "ready" | "failed";
 
 export function FusionXHero({ className, floatTarget }: { className?: string; floatTarget?: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
-  const [srcDoc, setSrcDoc] = useState<string | null>(null);
-  const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
+  // Both are tagged with the theme they belong to, so a theme switch simply
+  // makes them stale (back to "loading") until the new scene reports in.
+  const [scene, setScene] = useState<{ theme: FusionXSceneTheme; doc: string } | null>(null);
+  const [report, setReport] = useState<{ theme: FusionXSceneTheme; status: SceneStatus } | null>(null);
 
   // Treated as reduced on the server so the scene only ever mounts client-side.
   const reducedMotion = useSyncExternalStore(
@@ -71,22 +90,26 @@ export function FusionXHero({ className, floatTarget }: { className?: string; fl
     () => window.matchMedia(REDUCED_MOTION).matches,
     () => true,
   );
-  const showScene = !reducedMotion && state !== "failed" && srcDoc !== null;
+  const theme = useSyncExternalStore(subscribeTheme, currentTheme, (): FusionXSceneTheme => "dark");
+
+  const srcDoc = scene?.theme === theme ? scene.doc : null;
+  const status: SceneStatus = report?.theme === theme ? report.status : "loading";
+  const showScene = !reducedMotion && status !== "failed" && srcDoc !== null;
 
   useEffect(() => {
     if (reducedMotion) return;
     let cancelled = false;
-    loadSceneDocument().then(
-      (doc) => !cancelled && setSrcDoc(doc),
+    loadSceneDocument(theme).then(
+      (doc) => !cancelled && setScene({ theme, doc }),
       (err) => {
         console.warn(err);
-        if (!cancelled) setState("failed");
+        if (!cancelled) setReport({ theme, status: "failed" });
       },
     );
     return () => {
       cancelled = true;
     };
-  }, [reducedMotion]);
+  }, [reducedMotion, theme]);
 
   // Pause / resume, and the scene's ready / failed reports.
   useEffect(() => {
@@ -99,9 +122,8 @@ export function FusionXHero({ className, floatTarget }: { className?: string; fl
     const inView = new Set<Element>(windows);
 
     const sceneShowing = () => {
-      const light = document.documentElement.dataset.theme === "light";
       for (const el of inView) {
-        if (!(light && (el as HTMLElement).dataset.sceneWindow === "dark")) return true;
+        if (!(theme === "light" && (el as HTMLElement).dataset.sceneWindow === "dark")) return true;
       }
       return false;
     };
@@ -115,10 +137,10 @@ export function FusionXHero({ className, floatTarget }: { className?: string; fl
       if (event.source !== frameRef.current?.contentWindow) return;
       if (event.data?.type !== FUSIONX_SCENE_MESSAGE) return;
       if (event.data.state === "ready") {
-        setState("ready");
+        setReport({ theme, status: "ready" });
         post();
       } else if (event.data.state === "failed") {
-        setState("failed");
+        setReport({ theme, status: "failed" });
       }
     };
 
@@ -130,17 +152,14 @@ export function FusionXHero({ className, floatTarget }: { className?: string; fl
       post();
     });
     windows.forEach((el) => observer.observe(el));
-    const themeObserver = new MutationObserver(post);
-    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     window.addEventListener("message", onMessage);
     document.addEventListener("visibilitychange", post);
     return () => {
       observer.disconnect();
-      themeObserver.disconnect();
       window.removeEventListener("message", onMessage);
       document.removeEventListener("visibilitychange", post);
     };
-  }, [showScene]);
+  }, [showScene, theme]);
 
   // Pointer: relay to the scene, and drive the float.
   useEffect(() => {
@@ -206,12 +225,12 @@ export function FusionXHero({ className, floatTarget }: { className?: string; fl
     <div
       ref={hostRef}
       aria-hidden
-      data-state={showScene ? state : "poster"}
-      className={cn("absolute inset-0 overflow-hidden bg-cover bg-center", className)}
-      style={{ backgroundColor: BRAND.navy, backgroundImage: `url(${POSTER_URL})` }}
+      data-state={showScene ? status : "poster"}
+      className={cn("scene-poster absolute inset-0 overflow-hidden bg-cover bg-center", className)}
     >
       {showScene && (
         <iframe
+          key={theme}
           ref={frameRef}
           title="FusionX hero scene"
           srcDoc={srcDoc}
@@ -220,7 +239,7 @@ export function FusionXHero({ className, floatTarget }: { className?: string; fl
           loading="eager"
           className={cn(
             "pointer-events-none absolute inset-0 block h-full w-full border-0 transition-opacity duration-700",
-            state === "ready" ? "opacity-100" : "opacity-0",
+            status === "ready" ? "opacity-100" : "opacity-0",
           )}
         />
       )}

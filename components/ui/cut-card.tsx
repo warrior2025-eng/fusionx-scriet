@@ -21,7 +21,7 @@ export function CutCard({
     <div
       id={id}
       className={cn(
-        "cut-corner h-full border border-line bg-surface/90 p-6 md:p-7",
+        "cut-corner h-full p-6 md:p-7",
         interactive && "cut-corner--interactive group",
         className,
       )}

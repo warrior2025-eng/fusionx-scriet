@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { Section, SectionHeading } from "@/components/ui/section";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
-import { founders, seniorMentor, additionalFacultyGuides } from "@/lib/site-config";
+import { founders, seniorMentor, additionalFacultyGuides, siteName } from "@/lib/site-config";
 import { getOrganizationSettings } from "@/lib/data/organization";
 import { Eyebrow } from "@/components/ui/eyebrow";
 
 export const metadata: Metadata = {
   title: "Founding Team",
-  description: "The founding members, faculty guide, and senior mentor of FusionX@SCRIET.",
+  description: `The founding members, faculty guide, and senior mentor of ${siteName}.`,
 };
 
 export default async function FoundersPage() {

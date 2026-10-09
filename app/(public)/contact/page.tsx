@@ -4,10 +4,11 @@ import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { ContactForm } from "@/components/forms/contact-form";
 import { getOrganizationSettings } from "@/lib/data/organization";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { siteName } from "@/lib/site-config";
 
 export const metadata: Metadata = {
   title: "Contact",
-  description: "Get in touch with FusionX@SCRIET.",
+  description: `Get in touch with ${siteName}.`,
 };
 
 export default async function ContactPage() {

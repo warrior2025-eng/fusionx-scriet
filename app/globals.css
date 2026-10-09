@@ -5,44 +5,57 @@
    (/public/logo-mark.png): the navy disc, the white "X", the blue slash.
    Sampled values: navy #00030D, white #FEFEFE, blue #004DF6.
 
-   The accent is for marks, borders, button fills and large type. On navy it
-   reaches only 3.3:1, so small text is never set in it there — use ink.
+     paper        page background
+     surface      cards and panels
+     ink          headings and body text
+     accent       the logo blue: marks, borders, button fills, large type
+     accent-soft  a wash of the accent: chips, badges, tinted bands, hovers
+     accent-text  the colour for body-size accent text. The logo blue only
+                  reaches 3.3:1 on navy, so on navy grounds this is ink; on
+                  light grounds it is the blue itself (5.7:1 on paper).
+     line         hairlines and card borders
    ========================================================================= */
 :root {
   --color-paper: #00030d;
+  --color-surface: #060b18;
   --color-ink: #fefefe;
   --color-accent: #004df6;
-  --color-surface: #060b18;
+  --color-accent-soft: rgba(0, 77, 246, 0.18);
+  --color-accent-text: var(--color-ink);
   --color-line: rgba(254, 254, 254, 0.09);
 }
 
 :root[data-theme="light"] {
-  --color-paper: #f8f9fc;
+  --color-paper: #f4f6fb;
+  --color-surface: #ffffff;
   --color-ink: #00030d;
   --color-accent: #004df6;
-  --color-surface: #ffffff;
+  --color-accent-soft: #e8eeff;
+  --color-accent-text: var(--color-accent);
   --color-line: rgba(0, 3, 13, 0.1);
 }
 
-/* Pins the dark tokens on a subtree that sits directly on the 3D scene,
-   which is navy in both themes (the home hero). */
-.on-scene {
+/* A deep-navy brand band: pins the dark tokens on its subtree so it reads the
+   same in both themes. */
+.on-navy {
   --color-paper: #00030d;
-  --color-ink: #fefefe;
   --color-surface: #060b18;
+  --color-ink: #fefefe;
+  --color-accent-soft: rgba(0, 77, 246, 0.18);
+  --color-accent-text: #fefefe;
   --color-line: rgba(254, 254, 254, 0.14);
+  background: #00030d;
   color: var(--color-ink);
 }
 
-/* Accent-coloured text on navy. The brand blue only reaches 3.3:1 there, which
-   passes for large type and marks but not for body-size text, so on the dark
-   theme small accent text is set in ink instead (links keep an underline).
-   Opt large type back in with `.accent-large`. */
-:root:not([data-theme="light"])
-  :is(.text-accent, .hover\:text-accent:hover, .group:hover .group-hover\:text-accent):not(.slash-mark, .accent-large) {
-  color: var(--color-ink);
+/* Body-size accent text follows accent-text (see the token note above); links
+   keep an underline where that makes them ink. Opt large type back into the
+   raw accent with `.accent-large`. */
+:is(.text-accent, .hover\:text-accent:hover, .group:hover .group-hover\:text-accent):not(.slash-mark, .accent-large) {
+  color: var(--color-accent-text);
 }
-:root:not([data-theme="light"]) a.text-accent {
+:root:not([data-theme="light"]) a.text-accent,
+.on-navy a.text-accent {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -51,6 +64,7 @@
   --color-paper: var(--color-paper);
   --color-ink: var(--color-ink);
   --color-accent: var(--color-accent);
+  --color-accent-soft: var(--color-accent-soft);
   --color-surface: var(--color-surface);
   --color-line: var(--color-line);
   --font-sans: var(--font-manrope);
@@ -85,6 +99,9 @@ body {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
+.on-navy :where(a, button):focus-visible {
+  outline-color: var(--color-ink);
+}
 
 /* =========================================================================
    LAYOUT — the one container. Sections use <Section> (components/ui/section)
@@ -100,6 +117,17 @@ body {
   .container-fx {
     padding-inline: 2.5rem;
   }
+}
+
+/* Full-width section bands (<Section band="…">). In the dark theme the
+   surface and tint bands stay clear so the home page's scene shows through;
+   in the light theme they alternate white and a pale-blue wash over paper. */
+:root[data-theme="light"] .band--surface {
+  background: var(--color-surface);
+  border-block: 1px solid var(--color-line);
+}
+:root[data-theme="light"] .band--tint {
+  background: var(--color-accent-soft);
 }
 
 .prose-fx :where(p, ul, ol) {
@@ -196,52 +224,67 @@ body {
 
 /* =========================================================================
    CUT CORNER — primary cards and panels get one 45° clipped corner, always
-   top-right, echoing the cut edges of the logo's "X". The clip removes the
-   border along the cut, so ::after redraws it as a hairline.
-   `.card-elevated` (the card used across the inner pages) shares the rule.
+   top-right, echoing the cut edges of the logo's "X". `.card-elevated` (the
+   card used across the inner pages) shares the rule.
+
+   The shape is drawn by two stacked layers behind the content — ::before in
+   the border colour, ::after one pixel inside it in the surface colour — so
+   the border follows the cut, and the element itself is left unclipped. That
+   is what lets the light theme's shadow (a drop-shadow, which traces the
+   painted shape) follow the cut corner too; a clip-path on the element would
+   cut any shadow off.
    ========================================================================= */
 .cut-corner,
 .card-elevated {
   --cut: 16px;
-  --cut-line: var(--color-line);
+  --card-bg: color-mix(in srgb, var(--color-surface) 90%, transparent);
+  --card-line: var(--color-line);
   position: relative;
+  isolation: isolate;
   border-radius: 0;
+  transition: transform 0.15s ease;
+}
+
+.cut-corner::before,
+.card-elevated::before,
+.cut-corner::after,
+.card-elevated::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  transition: background-color 0.15s ease;
+}
+
+.cut-corner::before,
+.card-elevated::before {
+  inset: 0;
+  background: var(--card-line);
   clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
 }
 
 .cut-corner::after,
 .card-elevated::after {
-  content: "";
-  position: absolute;
-  top: -1px;
-  right: -1px;
-  width: var(--cut);
-  height: var(--cut);
-  pointer-events: none;
-  background: linear-gradient(
-    to top right,
-    transparent calc(50% - 1px),
-    var(--cut-line) calc(50% - 1px),
-    var(--cut-line) 50%,
-    transparent 50%
-  );
+  inset: 1px;
+  background: var(--card-bg);
+  clip-path: polygon(0 0, calc(100% - var(--cut) + 0.6px) 0, 100% calc(var(--cut) - 0.6px), 100% 100%, 0 100%);
 }
 
-.card-elevated {
-  background: var(--color-surface);
-  border: 1px solid var(--color-line);
-  transition: border-color 0.15s ease, transform 0.15s ease;
+/* On the dark theme the fill is slightly see-through, so the border layer
+   must not sit under it: there the fill is opaque paper + the tinted surface. */
+:root:not([data-theme="light"]) :is(.cut-corner, .card-elevated)::after {
+  background: linear-gradient(var(--card-bg), var(--card-bg)), var(--color-paper);
 }
 
-.cut-corner--interactive {
-  transition: border-color 0.15s ease, transform 0.15s ease;
+:root[data-theme="light"] :is(.cut-corner, .card-elevated) {
+  --card-bg: var(--color-surface);
+  filter: drop-shadow(0 1px 1px rgba(0, 3, 13, 0.05)) drop-shadow(0 12px 22px rgba(0, 3, 13, 0.07));
 }
 
 .card-elevated:hover,
 .cut-corner--interactive:hover,
 .cut-corner--interactive:focus-within {
-  --cut-line: var(--color-accent);
-  border-color: var(--color-accent);
+  --card-line: var(--color-accent);
   transform: translateY(-2px);
 }
 
@@ -270,8 +313,8 @@ a:hover > .arrow-nudge {
 }
 
 /* =========================================================================
-   STEPPER — numbered nodes joined by a hairline, with a short connector at
-   the logo's 45° on each join. Vertical on small screens, horizontal ≥ lg.
+   STEPPER — numbered nodes joined by a plain hairline. Vertical on small
+   screens, horizontal ≥ lg.
    ========================================================================= */
 .stepper {
   --node: 2.25rem;
@@ -297,11 +340,11 @@ a:hover > .arrow-nudge {
   justify-content: center;
   width: var(--node);
   height: var(--node);
-  border: 1px solid color-mix(in srgb, var(--color-ink) 25%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent-text) 35%, transparent);
   background: var(--color-surface);
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--color-ink);
+  color: var(--color-accent-text);
 }
 
 .stepper__label {
@@ -320,23 +363,6 @@ a:hover > .arrow-nudge {
   bottom: 0;
   width: 1px;
   background: color-mix(in srgb, var(--color-ink) 20%, transparent);
-}
-
-/* the 45° connector, same lean as the logo slash */
-.stepper__step:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  left: calc(var(--node) / 2 - 5px);
-  top: calc(var(--node) + 0.5rem);
-  width: 10px;
-  height: 10px;
-  background: linear-gradient(
-    to bottom right,
-    transparent calc(50% - 1px),
-    var(--color-accent) calc(50% - 1px),
-    var(--color-accent) calc(50% + 1px),
-    transparent calc(50% + 1px)
-  );
 }
 
 @media (min-width: 1024px) {
@@ -360,24 +386,30 @@ a:hover > .arrow-nudge {
     width: auto;
     height: 1px;
   }
-  .stepper__step:not(:last-child)::after {
-    left: calc(var(--node) + 0.625rem);
-    top: calc(var(--node) / 2 - 5px);
-  }
 }
 
 /* =========================================================================
    HOME PAGE — one 3D scene behind the whole page.
-   .home-scene   fixed, full-viewport layer holding the single scene.
-   .home-below   everything after the hero. Dark theme: a navy scrim, so the
-                 scene stays visible but calm behind the sections. Light
-                 theme: opaque paper, so the page below the hero is a normal
-                 light page (the scene is paused while it is covered).
+   .home-scene    fixed, full-viewport layer holding the single scene.
+   .scene-poster  the scene's static frame, one image per theme.
+   .home-below    everything after the hero. Dark theme: a navy scrim, so the
+                  scene stays visible but calm behind the sections. Light
+                  theme: opaque paper, carrying the alternating section bands
+                  (the scene is paused while it is covered).
    ========================================================================= */
 .home-scene {
   position: fixed;
   inset: 0;
   z-index: -10;
+}
+
+.scene-poster {
+  background-color: #00030d;
+  background-image: url("/hero/fusionx-hero-poster.webp");
+}
+:root[data-theme="light"] .scene-poster {
+  background-color: #f4f6fb;
+  background-image: url("/hero/fusionx-hero-poster-light.webp");
 }
 
 .home-below {

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { OrganizationSettings } from "@/types/database";
+import { institution } from "@/lib/site-config";
 
 const columns = [
   {
@@ -47,7 +48,7 @@ export function SiteFooter({ settings }: { settings: OrganizationSettings }) {
             </div>
             <p className="mt-4 text-sm text-ink/50 max-w-sm leading-relaxed">
               {settings.tagline} A student-led innovation and research network at{" "}
-              {settings.chapter_name.replace("FusionX @ ", "")}.
+              {institution.name}.
             </p>
             <p className="mt-6 text-xs font-medium uppercase tracking-[0.14em] text-ink/30">
               From Ideas to Impact.

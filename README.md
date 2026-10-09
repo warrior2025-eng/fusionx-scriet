@@ -1,4 +1,4 @@
-# FusionX @ SCRIET
+# FusionX@SCRIET
 
 Official web platform for FusionX — Student Innovation & Research Network,
 SCRIET, CCS University Meerut.
