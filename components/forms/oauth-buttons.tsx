@@ -22,13 +22,21 @@ export function OAuthButtons({ next }: { next: string }) {
   const [pending, setPending] = useState<Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Coming back with the browser's Back button restores this page as it was
-  // left: clear the spinner so the buttons work again.
+  // The spinner must never get stuck. Someone can come back here without the
+  // page reloading: the browser's Back button, "Back to safety" on Google's
+  // warning screen, or stopping the navigation before it leaves. So the
+  // buttons are released when the page is shown again, and in any case a few
+  // seconds after a click if this page is somehow still the one on screen.
   useEffect(() => {
     const reset = () => setPending(null);
     window.addEventListener("pageshow", reset);
     return () => window.removeEventListener("pageshow", reset);
   }, []);
+  useEffect(() => {
+    if (!pending) return;
+    const timer = window.setTimeout(() => setPending(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [pending]);
 
   async function signIn(provider: Provider) {
     setPending(provider);
