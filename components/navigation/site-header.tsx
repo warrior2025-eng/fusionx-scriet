@@ -103,7 +103,11 @@ export function SiteHeader({
   const pathname = usePathname();
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
+    // Only touch state when the value actually flips.
+    const onScroll = () => {
+      const past = window.scrollY > 20;
+      setScrolled((was) => (was === past ? was : past));
+    };
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
     return () => window.removeEventListener("scroll", onScroll);

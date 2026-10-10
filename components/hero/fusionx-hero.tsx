@@ -26,7 +26,8 @@ import {
  *  - The scene runs in a sandboxed iframe (scripts only, no same-origin
  *    access) and mounts after hydration, so it never blocks first paint.
  *    Switching theme rebuilds it with the other palette.
- *  - Rendering pauses when the tab is hidden and when nothing shows the scene.
+ *  - Rendering pauses when the tab is hidden, while the page is being
+ *    scrolled, and when nothing shows the scene.
  *    What "shows the scene" is declared by the page: elements marked
  *    `data-scene-window` are see-through to it; `data-scene-window="dark"`
  *    marks one that is only see-through in the dark theme (it is opaque in
@@ -127,11 +128,27 @@ export function FusionXHero({ className, floatTarget }: { className?: string; fl
       }
       return false;
     };
+    // Rendering also rests while the page is being scrolled: drawing a
+    // full-screen WebGL frame under moving content is what made scrolling
+    // stutter. It picks up again a moment after the scroll stops.
+    let scrolling = false;
+    let scrollTimer = 0;
     const post = () =>
       frameRef.current?.contentWindow?.postMessage(
-        { type: FUSIONX_SCENE_MESSAGE, paused: document.hidden || !sceneShowing() },
+        { type: FUSIONX_SCENE_MESSAGE, paused: document.hidden || scrolling || !sceneShowing() },
         "*",
       );
+    const onScroll = () => {
+      if (!scrolling) {
+        scrolling = true;
+        post();
+      }
+      window.clearTimeout(scrollTimer);
+      scrollTimer = window.setTimeout(() => {
+        scrolling = false;
+        post();
+      }, 160);
+    };
 
     const onMessage = (event: MessageEvent) => {
       if (event.source !== frameRef.current?.contentWindow) return;
@@ -153,8 +170,11 @@ export function FusionXHero({ className, floatTarget }: { className?: string; fl
     });
     windows.forEach((el) => observer.observe(el));
     window.addEventListener("message", onMessage);
+    window.addEventListener("scroll", onScroll, { passive: true });
     document.addEventListener("visibilitychange", post);
     return () => {
+      window.clearTimeout(scrollTimer);
+      window.removeEventListener("scroll", onScroll);
       observer.disconnect();
       window.removeEventListener("message", onMessage);
       document.removeEventListener("visibilitychange", post);

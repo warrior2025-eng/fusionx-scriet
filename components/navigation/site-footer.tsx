@@ -1,11 +1,22 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { OrganizationSettings } from "@/types/database";
-import { institution } from "@/lib/site-config";
+import { Mail } from "lucide-react";
+import { InstagramIcon, LinkedInIcon } from "@/components/ui/brand-icons";
+import { institution, socialLinks } from "@/lib/site-config";
 
 type FooterColumn = { heading: string; links: { href: string; label: string }[] };
 
 export function SiteFooter({ settings, columns }: { settings: OrganizationSettings; columns: FooterColumn[] }) {
+  // Settings first; the built-in values when a field there is empty.
+  const name = settings.chapter_name;
+  const email = settings.official_email || socialLinks.email;
+  const connect = [
+    { href: settings.instagram_url || socialLinks.instagram, label: `${name} on Instagram`, icon: <InstagramIcon />, external: true },
+    { href: settings.linkedin_url || socialLinks.linkedin, label: `${name} on LinkedIn`, icon: <LinkedInIcon />, external: true },
+    { href: `mailto:${email}`, label: `Email ${name}`, icon: <Mail size={20} aria-hidden />, external: false },
+  ];
+
   return (
     <footer className="border-t border-line mt-auto bg-surface">
       <div className="container-fx py-16 md:py-20">
@@ -29,6 +40,25 @@ export function SiteFooter({ settings, columns }: { settings: OrganizationSettin
             <p className="mt-6 text-xs font-medium uppercase tracking-[0.14em] text-ink/30">
               From Ideas to Impact.
             </p>
+
+            <div className="mt-8">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/35 mb-2">Connect</p>
+              <ul className="-ml-2.5 flex items-center gap-1">
+                {connect.map((link) => (
+                  <li key={link.label}>
+                    <a
+                      href={link.href}
+                      aria-label={link.label}
+                      title={link.label}
+                      {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                      className="flex h-10 w-10 items-center justify-center rounded-sm text-ink/60 transition-colors duration-150 hover:text-accent focus-visible:text-accent"
+                    >
+                      {link.icon}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
 
           {/* Link Columns */}

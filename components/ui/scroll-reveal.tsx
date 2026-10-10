@@ -5,10 +5,33 @@ import { useEffect, useRef, type ReactNode } from "react";
 /**
  * Wraps children in a container that fades/slides into view
  * when it enters the viewport. Uses IntersectionObserver for
- * performance — no scroll listeners, no heavy libraries.
+ * performance: no scroll listeners, no heavy libraries.
+ *
+ * Every instance on the page shares one observer, and an element is
+ * unobserved as soon as it has been revealed.
  *
  * Respects prefers-reduced-motion automatically via CSS.
  */
+
+const delays = new WeakMap<Element, number>();
+let shared: IntersectionObserver | null = null;
+
+function observer(): IntersectionObserver {
+  shared ??= new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const el = entry.target as HTMLElement;
+        el.style.transitionDelay = `${delays.get(el) ?? 0}ms`;
+        el.classList.add("scroll-revealed");
+        shared?.unobserve(el);
+      }
+    },
+    { threshold: 0.12, rootMargin: "0px 0px -40px 0px" },
+  );
+  return shared;
+}
+
 export function ScrollReveal({
   children,
   className,
@@ -25,20 +48,10 @@ export function ScrollReveal({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          el.style.transitionDelay = `${delay}ms`;
-          el.classList.add("scroll-revealed");
-          observer.unobserve(el);
-        }
-      },
-      { threshold: 0.12, rootMargin: "0px 0px -40px 0px" }
-    );
-
-    observer.observe(el);
-    return () => observer.disconnect();
+    delays.set(el, delay);
+    const io = observer();
+    io.observe(el);
+    return () => io.unobserve(el);
   }, [delay]);
 
   const dirClass =

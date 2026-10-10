@@ -5,13 +5,14 @@ import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { ContactForm } from "@/components/forms/contact-form";
 import { getOrganizationSettings } from "@/lib/data/organization";
 import { Eyebrow } from "@/components/ui/eyebrow";
-import { siteName } from "@/lib/site-config";
+import { siteName, socialLinks } from "@/lib/site-config";
 
 export const generateMetadata = (): Promise<Metadata> =>
   pageMetadata("contact", { title: "Contact", description: `Get in touch with ${siteName}.` });
 
 export default async function ContactPage() {
   const settings = await getOrganizationSettings();
+  const email = settings.official_email || socialLinks.email;
 
   return (
     <>
@@ -23,19 +24,13 @@ export default async function ContactPage() {
             <h1 className="text-4xl md:text-5xl font-serif font-normal tracking-tight text-ink mb-4">
               Get in touch.
             </h1>
-            {settings.official_email ? (
-              <p className="text-base text-ink/55 leading-relaxed">
-                Reach us directly at{" "}
-                <a href={`mailto:${settings.official_email}`} className="text-accent hover:underline font-medium">
-                  {settings.official_email}
-                </a>{" "}
-                or use the form below.
-              </p>
-            ) : (
-              <p className="text-base text-ink/55 leading-relaxed">
-                Use the form below and we&rsquo;ll get back to you by email.
-              </p>
-            )}
+            <p className="text-base text-ink/55 leading-relaxed">
+              Reach us directly at{" "}
+              <a href={`mailto:${email}`} className="text-accent hover:underline font-medium">
+                {email}
+              </a>{" "}
+              or use the form below.
+            </p>
           </ScrollReveal>
         </div>
       </section>

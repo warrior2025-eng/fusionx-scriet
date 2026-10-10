@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loginSchema, signUpSchema } from "@/lib/validations";
 import { getOrganizationSettings } from "@/lib/data/organization";
+import { safeNext } from "@/lib/auth/safe-next";
 
 export type AuthActionState = {
   status: "idle" | "error";
@@ -52,7 +53,9 @@ export async function signUpAction(_prev: AuthActionState, formData: FormData): 
     return initialErrorState(error.message);
   }
 
-  redirect("/login?verify=1");
+  // Carry the destination through email verification to the sign-in page.
+  const next = safeNext(formData.get("next")?.toString());
+  redirect(next === "/" ? "/login?verify=1" : `/login?verify=1&next=${encodeURIComponent(next)}`);
 }
 
 export async function loginAction(_prev: AuthActionState, formData: FormData): Promise<AuthActionState> {
@@ -75,9 +78,7 @@ export async function loginAction(_prev: AuthActionState, formData: FormData): P
   }
 
   // Only ever redirect to a path on this site, never to an outside URL.
-  const next = formData.get("next")?.toString() ?? "";
-  const internal = next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\");
-  redirect(internal ? next : "/");
+  redirect(safeNext(formData.get("next")?.toString()));
 }
 
 export async function logoutAction() {
