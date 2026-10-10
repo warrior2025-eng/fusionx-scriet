@@ -10,6 +10,9 @@
 /** The official name. Written exactly like this everywhere: no spaces around the @. */
 export const siteName = "FusionX@SCRIET";
 
+/** The site's one public address (no "www", no trailing slash), for the sitemap and robots.txt. */
+export const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://fxscriet.com").replace(/\/$/, "");
+
 /**
  * Where to find the chapter. The footer, the Contact page and the structured
  * data use what is set in the admin panel (Settings) first, and these when a
