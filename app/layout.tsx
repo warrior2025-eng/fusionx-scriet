@@ -29,6 +29,9 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: seo.defaultTitle, template: seo.titleTemplate },
     description: seo.description,
     metadataBase: process.env.NEXT_PUBLIC_SITE_URL ? new URL(process.env.NEXT_PUBLIC_SITE_URL) : undefined,
+    // Every page names its own address on the one official domain, so search
+    // engines do not pick another copy ("www", a preview link) as the original.
+    alternates: { canonical: "./" },
     // The club logo (public/favicon.ico, icon.png, apple-icon.png, generated
     // from logo-mark.png), unless a favicon was uploaded in the admin panel.
     icons: settings.favicon_path
