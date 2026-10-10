@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/data/seo";
 import { Section } from "@/components/ui/section";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -7,10 +8,8 @@ import { LinkButton } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { Eyebrow } from "@/components/ui/eyebrow";
 
-export const metadata: Metadata = {
-  title: "Projects",
-  description: "Browse published projects being built by FusionX members.",
-};
+export const generateMetadata = (): Promise<Metadata> =>
+  pageMetadata("projects", { title: "Projects", description: "Browse published projects being built by FusionX members." });
 
 const statuses = ["idea", "building", "prototype", "testing", "completed", "continued"] as const;
 

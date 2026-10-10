@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/data/seo";
 import { Section, SectionHeading } from "@/components/ui/section";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -7,10 +8,11 @@ import { LinkButton } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { Eyebrow } from "@/components/ui/eyebrow";
 
-export const metadata: Metadata = {
-  title: "Research & IP",
-  description: "Published research entries from FusionX members, and how FusionX approaches IP awareness.",
-};
+export const generateMetadata = (): Promise<Metadata> =>
+  pageMetadata("research", {
+    title: "Research & IP",
+    description: "Published research entries from FusionX members, and how FusionX approaches IP awareness.",
+  });
 
 export default async function ResearchPage() {
   const supabase = await createClient();

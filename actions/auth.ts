@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loginSchema, signUpSchema } from "@/lib/validations";
+import { getOrganizationSettings } from "@/lib/data/organization";
 
 export type AuthActionState = {
   status: "idle" | "error";
@@ -32,6 +33,12 @@ export async function signUpAction(_prev: AuthActionState, formData: FormData): 
       if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
     }
     return initialErrorState("Please fix the highlighted fields.", fieldErrors);
+  }
+
+  // The database refuses new accounts too while this is off (see
+  // handle_new_user in migration 0008); this just gives a clear message.
+  if (!(await getOrganizationSettings()).signup_enabled) {
+    return initialErrorState("Sign-up is currently closed.");
   }
 
   const supabase = await createClient();
@@ -67,8 +74,10 @@ export async function loginAction(_prev: AuthActionState, formData: FormData): P
     return initialErrorState("Incorrect email or password.");
   }
 
-  const next = formData.get("next")?.toString() || "/";
-  redirect(next);
+  // Only ever redirect to a path on this site, never to an outside URL.
+  const next = formData.get("next")?.toString() ?? "";
+  const internal = next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\");
+  redirect(internal ? next : "/");
 }
 
 export async function logoutAction() {

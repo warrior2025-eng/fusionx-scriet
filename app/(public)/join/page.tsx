@@ -5,17 +5,18 @@ import { JoinForm } from "@/components/forms/join-form";
 import { createClient } from "@/lib/supabase/server";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { siteName } from "@/lib/site-config";
+import { getOrganizationSettings } from "@/lib/data/organization";
+import { pageMetadata } from "@/lib/data/seo";
 
-export const metadata: Metadata = {
-  title: "Join FusionX",
-  description: `Apply to join ${siteName}.`,
-};
+export const generateMetadata = (): Promise<Metadata> =>
+  pageMetadata("join", { title: "Join FusionX", description: `Apply to join ${siteName}.` });
 
 export default async function JoinPage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const settings = await getOrganizationSettings();
 
   return (
     <>
@@ -38,7 +39,17 @@ export default async function JoinPage() {
       <Section className="max-w-3xl">
         <ScrollReveal delay={100}>
           <div className="card-elevated rounded-sm p-8 md:p-10">
-            <JoinForm isSignedIn={!!user} />
+            {settings.join_open ? (
+              <JoinForm isSignedIn={!!user} />
+            ) : (
+              <div>
+                <p className="font-medium text-ink">Applications are closed</p>
+                <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink/70">
+                  {settings.join_closed_message?.trim() ||
+                    "We aren’t taking new applications right now. Please check back later."}
+                </p>
+              </div>
+            )}
           </div>
         </ScrollReveal>
       </Section>

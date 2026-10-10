@@ -1,33 +1,34 @@
 import type { Metadata } from "next";
 import { Section } from "@/components/ui/section";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
-import { programs } from "@/lib/site-config";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { NamedIcon } from "@/components/ui/named-icon";
+import { getPrograms } from "@/lib/data/programs";
+import { pageMetadata } from "@/lib/data/seo";
 
-export const metadata: Metadata = {
-  title: "Programs",
-  description: "Six structured programs covering every stage of the idea-to-impact pipeline.",
-};
+const NUMBER_WORDS = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
+const countWord = (n: number) => NUMBER_WORDS[n] ?? String(n);
 
-const details: Record<string, string[]> = {
-  "build-lab": ["Ideation", "Team formation", "Technical workshops", "Build sessions", "Prototype reviews", "Demonstrations"],
-  "research-forum": ["Research orientation", "Literature review", "Methodology", "Experimentation", "Documentation", "Research collaboration"],
-  "ip-innovation-cell": ["Patent awareness", "Prior-art awareness", "Novelty", "Documentation", "IP education", "TCPO coordination where applicable"],
-  "venture-cell": ["Problem discovery", "Customer discovery", "MVP", "Market research", "Business models", "Pitching", "Incubation/funding awareness"],
-  "competition-support": ["Hackathons", "Innovation competitions", "Preparation", "Mentorship", "Submission support", "Post-competition continuation"],
-  "fusionx-teams": ["Interdisciplinary collaboration", "Skill-based team formation", "Project teams", "Team coordination"],
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const programs = await getPrograms();
+  return pageMetadata("programs", {
+    title: "Programs",
+    description: `${countWord(programs.length)} structured programs covering every stage of the idea-to-impact pipeline.`,
+  });
+}
 
-export default function ProgramsPage() {
+export default async function ProgramsPage() {
+  // Managed from the admin panel (Programs); falls back to the original six.
+  const programs = await getPrograms();
+
   return (
     <>
       <section className="border-b border-line">
-
         <div className="container-fx pt-20 pb-12 md:pt-24 md:pb-16">
           <ScrollReveal>
             <Eyebrow>Programs</Eyebrow>
             <h1 className="text-4xl md:text-5xl font-serif font-normal tracking-tight text-ink max-w-2xl">
-              Six tracks, one pipeline from idea to impact.
+              {countWord(programs.length)} {programs.length === 1 ? "track" : "tracks"}, one pipeline from idea to impact.
             </h1>
           </ScrollReveal>
         </div>
@@ -37,22 +38,30 @@ export default function ProgramsPage() {
         <div className="grid md:grid-cols-2 gap-6">
           {programs.map((p, i) => (
             <ScrollReveal key={p.slug} delay={i * 80}>
-              <div id={p.slug} className="card-elevated rounded-sm p-7 md:p-8 h-full flex flex-col justify-between group">
+              <div id={p.slug} className="card-elevated rounded-sm p-7 md:p-8 h-full flex flex-col justify-between group scroll-mt-24">
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm tabular-nums text-ink/45">0{i + 1}</span>
-                    <span className="h-1.5 w-1.5 rounded-full bg-accent/40 group-hover:bg-accent transition-colors" />
+                    <span className="text-sm tabular-nums text-ink/45">{String(i + 1).padStart(2, "0")}</span>
+                    {p.icon_name ? (
+                      <span className="text-ink/55 transition-colors group-hover:text-accent">
+                        <NamedIcon name={p.icon_name} size={18} />
+                      </span>
+                    ) : (
+                      <span className="h-1.5 w-1.5 rounded-full bg-accent/40 group-hover:bg-accent transition-colors" />
+                    )}
                   </div>
                   <p className="font-serif text-xl font-medium text-ink group-hover:text-accent transition-colors">{p.name}</p>
                   <p className="mt-3 text-sm text-ink/60 leading-relaxed">{p.summary}</p>
                 </div>
-                <ul className="mt-6 pt-5 border-t border-ink/8 flex flex-wrap gap-2">
-                  {details[p.slug]?.map((d) => (
-                    <li key={d} className="text-xs px-2.5 py-1 rounded-full border border-ink/15 text-ink/65 bg-paper/50">
-                      {d}
-                    </li>
-                  ))}
-                </ul>
+                {p.details.length > 0 && (
+                  <ul className="mt-6 pt-5 border-t border-ink/8 flex flex-wrap gap-2">
+                    {p.details.map((d) => (
+                      <li key={d} className="text-xs px-2.5 py-1 rounded-full border border-ink/15 text-ink/65 bg-paper/50">
+                        {d}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </ScrollReveal>
           ))}

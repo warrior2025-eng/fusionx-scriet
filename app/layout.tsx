@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Manrope, Fraunces } from "next/font/google";
 import "./globals.css";
 import { ParticleLogoField } from "@/components/ui/particle-logo-field";
-import { siteName } from "@/lib/site-config";
+import { getOrganizationSettings } from "@/lib/data/organization";
+import { getContent } from "@/lib/data/site-content";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -17,26 +18,32 @@ const fraunces = Fraunces({
   axes: ["opsz", "SOFT", "WONK"],
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: `${siteName} | Student Innovation & Research Network`,
-    template: `%s | ${siteName}`,
-  },
-  description:
-    "A student-led ecosystem at SCRIET, CCS University Meerut for building projects, exploring research, forming interdisciplinary teams, and turning ideas into impact.",
-  metadataBase: process.env.NEXT_PUBLIC_SITE_URL ? new URL(process.env.NEXT_PUBLIC_SITE_URL) : undefined,
-  openGraph: {
-    title: `${siteName} | Student Innovation & Research Network`,
-    description: "From Ideas to Impact.",
-    siteName,
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: siteName,
-    description: "From Ideas to Impact.",
-  },
-};
+// Titles, description, favicon and share image come from the admin panel
+// (Settings), each with the site's built-in value behind it.
+export async function generateMetadata(): Promise<Metadata> {
+  const [settings, seo] = await Promise.all([getOrganizationSettings(), getContent("seo.default")]);
+  const shareImage = settings.og_image_path ? [settings.og_image_path] : undefined;
+
+  return {
+    title: { default: seo.defaultTitle, template: seo.titleTemplate },
+    description: seo.description,
+    metadataBase: process.env.NEXT_PUBLIC_SITE_URL ? new URL(process.env.NEXT_PUBLIC_SITE_URL) : undefined,
+    icons: { icon: settings.favicon_path || "/favicon.ico" },
+    openGraph: {
+      title: seo.defaultTitle,
+      description: settings.tagline,
+      siteName: settings.chapter_name,
+      type: "website",
+      images: shareImage,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: settings.chapter_name,
+      description: settings.tagline,
+      images: shareImage,
+    },
+  };
+}
 
 // Runs before paint so a returning visitor's saved light/dark choice
 // applies immediately — no flash of the default (dark) theme. Dark stays
@@ -54,10 +61,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-     <body className="min-h-full flex flex-col bg-paper text-ink">
-  <ParticleLogoField />
-  {children}
-</body> 
+      <body className="min-h-full flex flex-col bg-paper text-ink">
+        <ParticleLogoField />
+        {children}
+      </body>
     </html>
   );
 }

@@ -1,7 +1,6 @@
 /**
  * Numbered stepper for a fixed list of stage names. Horizontal on desktop,
- * vertical on mobile. Nodes are joined by a 1px line with a short 45°
- * connector at each node — the logo's slash angle.
+ * vertical on mobile. Nodes are joined by a plain 1px line.
  */
 export function Stepper({ steps, label }: { steps: readonly string[]; label: string }) {
   return (

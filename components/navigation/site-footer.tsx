@@ -3,39 +3,9 @@ import Link from "next/link";
 import type { OrganizationSettings } from "@/types/database";
 import { institution } from "@/lib/site-config";
 
-const columns = [
-  {
-    heading: "Explore",
-    links: [
-      { href: "/about", label: "About" },
-      { href: "/programs", label: "Programs" },
-      { href: "/projects", label: "Projects" },
-      { href: "/research", label: "Research & IP" },
-    ],
-  },
-  {
-    heading: "Participate",
-    links: [
-      { href: "/opportunities", label: "Opportunities" },
-      { href: "/events", label: "Events" },
-      { href: "/teams", label: "Teams" },
-      { href: "/mentors", label: "Mentors" },
-      { href: "/join", label: "Join FusionX" },
-    ],
-  },
-  {
-    heading: "Organization",
-    links: [
-      { href: "/founders", label: "Founding Team" },
-      { href: "/resources", label: "Resources" },
-      { href: "/contact", label: "Contact" },
-      { href: "/privacy", label: "Privacy Policy" },
-      { href: "/terms", label: "Terms & Code of Conduct" },
-    ],
-  },
-];
+type FooterColumn = { heading: string; links: { href: string; label: string }[] };
 
-export function SiteFooter({ settings }: { settings: OrganizationSettings }) {
+export function SiteFooter({ settings, columns }: { settings: OrganizationSettings; columns: FooterColumn[] }) {
   return (
     <footer className="border-t border-line mt-auto bg-surface">
       <div className="container-fx py-16 md:py-20">
@@ -43,7 +13,13 @@ export function SiteFooter({ settings }: { settings: OrganizationSettings }) {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-12 md:gap-8">
           <div className="md:col-span-5">
             <div className="flex items-center gap-2.5">
-              <Image src="/logo-mark.png" alt="FusionX logo" width={32} height={32} className="h-8 w-8 rounded-full" />
+              <Image
+                src={settings.logo_path || "/logo-mark.png"}
+                alt={`${settings.chapter_name} logo`}
+                width={32}
+                height={32}
+                className="h-8 w-8 rounded-full object-cover"
+              />
               <span className="font-semibold text-ink tracking-tight">{settings.chapter_name}</span>
             </div>
             <p className="mt-4 text-sm text-ink/50 max-w-sm leading-relaxed">
@@ -64,7 +40,7 @@ export function SiteFooter({ settings }: { settings: OrganizationSettings }) {
                 </p>
                 <ul className="space-y-2.5">
                   {col.links.map((link) => (
-                    <li key={link.href}>
+                    <li key={`${link.href}-${link.label}`}>
                       <Link
                         href={link.href}
                         className="text-sm text-ink/55 hover:text-ink transition-colors duration-200"

@@ -10,6 +10,11 @@
 /** The official name. Written exactly like this everywhere: no spaces around the @. */
 export const siteName = "FusionX@SCRIET";
 
+// The team, programs and lists below are now managed from the admin panel
+// and stored in the database (migrations 0008 and 0010). What is here is the
+// fallback the site shows if that data cannot be read, e.g. before the
+// migrations have run. See lib/data/people.ts, lib/data/programs.ts and
+// lib/site-content/schema.ts.
 export const founders = [
   {
     name: "Pranjal Srivastav",

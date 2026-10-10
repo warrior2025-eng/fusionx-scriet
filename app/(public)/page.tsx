@@ -1,5 +1,7 @@
+import { Fragment } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Hammer, FlaskConical, Users, Trophy, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { LinkButton } from "@/components/ui/button";
 import { Section, SectionHeading } from "@/components/ui/section";
 import { Eyebrow } from "@/components/ui/eyebrow";
@@ -7,52 +9,93 @@ import { CutCard } from "@/components/ui/cut-card";
 import { Stepper } from "@/components/ui/stepper";
 import { Badge } from "@/components/ui/badge";
 import { DateBlock } from "@/components/ui/date-block";
-import { InitialsAvatar } from "@/components/ui/initials-avatar";
+import { NamedIcon } from "@/components/ui/named-icon";
+import { PersonCard } from "@/components/ui/person-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { ScrollProgress } from "@/components/ui/scroll-progress";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { FusionXHero } from "@/components/hero/fusionx-hero";
-import {
-  founders,
-  programs,
-  journeyStages,
-  buildPipeline,
-  coreAreas,
-  additionalFacultyGuides,
-  siteName,
-} from "@/lib/site-config";
 import { getOrganizationSettings } from "@/lib/data/organization";
+import { getPeople, peopleIn } from "@/lib/data/people";
+import { getPrograms } from "@/lib/data/programs";
+import { pageMetadata } from "@/lib/data/seo";
+import { getContent } from "@/lib/data/site-content";
 import { createClient } from "@/lib/supabase/server";
 
-const areaIcons: Record<string, React.ReactNode> = {
-  Build: <Hammer size={18} />,
-  Research: <FlaskConical size={18} />,
-  Connect: <Users size={18} />,
-  Compete: <Trophy size={18} />,
-  Create: <Sparkles size={18} />,
-};
+export const generateMetadata = (): Promise<Metadata> => pageMetadata("home", {});
 
 // A floating hero layer: how far it rides the pointer (px) and how much it turns (deg).
 const float = (pd: number, pr: number) => ({ "--pd": pd, "--pr": pr }) as React.CSSProperties;
 
+const NUMBER_WORDS = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
+const countWord = (n: number) => NUMBER_WORDS[n] ?? String(n);
+
+/** The headline, line by line, with the first occurrence of `highlight` in the accent colour. */
+function Headline({ text, highlight }: { text: string; highlight: string }) {
+  let used = false;
+  return text.split("\n").map((line, i) => {
+    const at = !used && highlight ? line.indexOf(highlight) : -1;
+    if (at >= 0) used = true;
+    return (
+      <Fragment key={i}>
+        {i > 0 && <br />}
+        {at < 0 ? (
+          line
+        ) : (
+          <>
+            {line.slice(0, at)}
+            <span className="accent-large text-accent">{highlight}</span>
+            {line.slice(at + highlight.length)}
+          </>
+        )}
+      </Fragment>
+    );
+  });
+}
+
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+/** Up to three published projects, featured ones first. */
+async function homeProjects(supabase: Supabase) {
+  const published = () =>
+    supabase.from("projects").select("id, title, description, domain, status, technologies").eq("is_published", true);
+  const featuredFirst = await published()
+    .order("is_featured", { ascending: false })
+    .order("updated_at", { ascending: false })
+    .limit(3);
+  if (!featuredFirst.error) return featuredFirst.data;
+  // Before migration 0008 there is no is_featured column: newest first.
+  return (await published().order("updated_at", { ascending: false }).limit(3)).data;
+}
+
 export default async function HomePage() {
-  const settings = await getOrganizationSettings();
   const supabase = await createClient();
 
   const [
-    { data: projects },
+    settings,
+    hero,
+    show,
+    pipeline,
+    journey,
+    coreAreas,
+    people,
+    programs,
+    projects,
     { data: events },
     { data: memberCount, error: memberCountError },
     { count: projectCount },
     { count: eventCount },
   ] = await Promise.all([
-    supabase
-      .from("projects")
-      .select("id, title, description, domain, status, technologies")
-      .eq("is_published", true)
-      .order("updated_at", { ascending: false })
-      .limit(3),
+    getOrganizationSettings(),
+    getContent("home.hero"),
+    getContent("home.sections"),
+    getContent("lists.pipeline"),
+    getContent("lists.journey"),
+    getContent("lists.core_areas"),
+    getPeople(),
+    getPrograms(),
+    homeProjects(supabase),
     supabase
       .from("events")
       .select("id, title, event_date, venue, status")
@@ -77,122 +120,24 @@ export default async function HomePage() {
     { label: "Events", value: eventCount ?? 0 },
   ];
 
-  return (
-    <>
-      <ScrollProgress />
+  const founders = peopleIn(people, "founder");
+  const facultyGuides = peopleIn(people, "faculty_guide");
 
-      {/* The one 3D scene, fixed behind the whole page. The hero shows it
-          directly; everything after sits in .home-below (see globals.css). */}
-      <div className="home-scene">
-        <FusionXHero floatTarget="#home-hero" />
-      </div>
-
-      {/* ================================================================
-          HERO — copy as real HTML over the scene. Each block is a layer
-          that floats on the pointer (`hero-float`; --pd = travel in px,
-          --pr = turn in degrees — the ThreeUI page's own values). The scene
-          follows the theme (night on navy / daylight on pale blue), and so
-          does the copy, through the ordinary tokens.
-          ================================================================ */}
-      <section
-        id="home-hero"
-        data-scene-window
-        className="relative flex min-h-[calc(100svh-4rem)] items-center"
-      >
-        {/* Scrim so the copy stays readable where it overlaps the scene */}
-        <div
-          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-paper/80 via-paper/55 to-transparent lg:bg-gradient-to-r lg:from-paper/85 lg:via-paper/45 lg:to-transparent"
-          aria-hidden
-        />
-
-        <div className="container-fx relative w-full py-16 md:py-20">
-          <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-10">
-            <div className="lg:col-span-7">
-              <div className="hero-float" style={float(18, 1.2)}>
-                <Eyebrow className="animate-fade">A Student-Led Movement</Eyebrow>
-                <h1 className="font-serif text-[clamp(2.75rem,7vw,5.75rem)] leading-[1.02] tracking-tight text-ink animate-reveal">
-                  Ideas <span className="accent-large text-accent">Grow</span>
-                  <br />
-                  Here.
-                </h1>
-              </div>
-
-              <div className="hero-float mt-7" style={float(14, 1)}>
-                <p className="max-w-xl text-base leading-relaxed text-ink/85 md:text-lg animate-reveal stagger-2">
-                  {settings.chapter_name} brings together students, ideas, and opportunities to
-                  build, research, and create real-world impact, together.
-                </p>
-              </div>
-
-              <div className="hero-float mt-9" style={float(15, 1.4)}>
-                <div className="flex flex-col gap-3 sm:flex-row animate-reveal stagger-3">
-                  <LinkButton href="/programs" size="lg">
-                    Explore Programs <ArrowRight size={16} className="arrow-nudge" />
-                  </LinkButton>
-                  <LinkButton href="/join" variant="secondary" size="lg" className="bg-paper/60">
-                    Join the Network
-                  </LinkButton>
-                </div>
-              </div>
-
-              {/* Activity: shown to everyone, zeros included */}
-              <div className="hero-float mt-10 sm:max-w-md" style={float(12, 0)}>
-                <CutCard className="p-5 md:p-6 animate-reveal stagger-4">
-                  <Eyebrow>Activity</Eyebrow>
-                  <dl className="grid grid-cols-3 divide-x divide-line">
-                    {stats.map((s) => (
-                      <div key={s.label} className="flex flex-col-reverse px-4 first:pl-0 last:pr-0 sm:px-5">
-                        <dt className="mt-1 text-sm text-ink/70">{s.label}</dt>
-                        <dd>
-                          <AnimatedCounter
-                            value={s.value}
-                            className="block font-serif text-3xl font-medium tabular-nums text-ink md:text-4xl"
-                          />
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                </CutCard>
-              </div>
-            </div>
-
-            <div className="lg:col-span-5">
-              <div className="hero-float" style={float(22, 2.4)}>
-                <CutCard className="animate-reveal stagger-3">
-                  <p className="font-serif text-2xl leading-snug text-ink md:text-[1.75rem]">
-                    Learn. Build. Research. Impact.
-                  </p>
-                  <p className="mt-4 leading-relaxed text-ink/80">
-                    A network where campus conversations turn into working projects, documented
-                    research, and outcomes that outlast a single event.
-                  </p>
-                  <ul className="mt-6 flex flex-wrap gap-2 border-t border-line pt-5">
-                    {coreAreas.map((area) => (
-                      <li
-                        key={area}
-                        className="flex items-center gap-2 border border-line px-3 py-1.5 text-sm text-ink/85"
-                      >
-                        {areaIcons[area]}
-                        {area}
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="mt-5 text-sm text-ink/65">Student Innovation &amp; Research, SCRIET, CCSU</p>
-                </CutCard>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <div className="home-below" data-scene-window="dark">
-        {/* 01 — About */}
-        <Section>
+  // The sections after the hero, in order. Each can be switched off from the
+  // admin panel (Page content); the numbering and the alternating bands
+  // follow whatever is left.
+  type Band = "surface" | "tint" | undefined;
+  const sections: { key: string; visible: boolean; render: (index: number, band: Band) => React.ReactNode }[] = [
+    {
+      key: "about",
+      visible: true,
+      render: (index, band) => (
+        <Section band={band}>
           <ScrollReveal>
-            <SectionHeading index={1} eyebrow="About" title="An ecosystem, not just a club." />
+            <SectionHeading index={index} eyebrow="About" title="An ecosystem, not just a club." />
             <CutCard className="p-8 md:p-10">
               <p className="max-w-3xl text-base leading-relaxed text-ink/80 md:text-lg">
-                {siteName} exists to help students move beyond attending events and into
+                {settings.chapter_name} exists to help students move beyond attending events and into
                 actually building projects, conducting research, protecting their ideas, and carrying
                 work forward past a single competition.
               </p>
@@ -203,20 +148,24 @@ export default async function HomePage() {
             </CutCard>
           </ScrollReveal>
         </Section>
-
-        {/* 02 — Pipeline */}
-        <Section band="surface">
+      ),
+    },
+    {
+      key: "pipeline",
+      visible: show.pipeline,
+      render: (index, band) => (
+        <Section band={band}>
           <ScrollReveal>
-            <SectionHeading index={2} eyebrow="Idea to impact" title="The full pipeline, not a single weekend." />
+            <SectionHeading index={index} eyebrow="Idea to impact" title="The full pipeline, not a single weekend." />
           </ScrollReveal>
           <ScrollReveal delay={100}>
             <CutCard className="p-8 md:p-10">
-              <Stepper steps={buildPipeline} label="Idea to impact pipeline" />
+              <Stepper steps={pipeline} label="Idea to impact pipeline" />
               <div className="mt-10 border-t border-line pt-6">
                 <p className="text-sm font-medium text-ink/70">The member journey</p>
                 <ol className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink/80">
-                  {journeyStages.map((stage, i) => (
-                    <li key={stage} className="flex items-baseline gap-2">
+                  {journey.map((stage, i) => (
+                    <li key={`${stage}-${i}`} className="flex items-baseline gap-2">
                       <span className="tabular-nums text-ink/45">{String(i + 1).padStart(2, "0")}</span>
                       {stage}
                     </li>
@@ -226,36 +175,48 @@ export default async function HomePage() {
             </CutCard>
           </ScrollReveal>
         </Section>
-
-        {/* 03 — Core areas */}
-        <Section band="tint">
+      ),
+    },
+    {
+      key: "coreAreas",
+      visible: show.coreAreas,
+      render: (index, band) => (
+        <Section band={band}>
           <ScrollReveal>
-            <SectionHeading index={3} eyebrow="Core areas" title="Five ways to get involved." />
+            <SectionHeading
+              index={index}
+              eyebrow="Core areas"
+              title={`${countWord(coreAreas.length)} ways to get involved.`}
+            />
           </ScrollReveal>
           <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             {coreAreas.map((area, i) => (
-              <li key={area}>
+              <li key={`${area.label}-${i}`}>
                 <ScrollReveal delay={i * 60} className="h-full">
                   <div className="group flex h-full items-center gap-3 border border-line bg-surface/90 px-4 py-4 transition-colors duration-150 hover:border-accent">
                     <span className="text-ink/70 transition-colors duration-150 group-hover:text-accent">
-                      {areaIcons[area]}
+                      <NamedIcon name={area.icon} />
                     </span>
-                    <span className="font-medium text-ink">{area}</span>
+                    <span className="font-medium text-ink">{area.label}</span>
                   </div>
                 </ScrollReveal>
               </li>
             ))}
           </ul>
         </Section>
-
-        {/* 04 — Programs */}
-        <Section>
+      ),
+    },
+    {
+      key: "programs",
+      visible: show.programs,
+      render: (index, band) => (
+        <Section band={band}>
           <ScrollReveal>
             <SectionHeading
-              index={4}
+              index={index}
               eyebrow="Programs"
               title="Structured tracks for every stage of the journey."
-              description="Six focused programs, each built around a different part of the idea-to-impact pipeline."
+              description={`${countWord(programs.length)} focused programs, each built around a different part of the idea-to-impact pipeline.`}
               action={
                 <LinkButton href="/programs" variant="secondary" size="sm">
                   View all programs <ArrowRight size={14} className="arrow-nudge" />
@@ -267,6 +228,11 @@ export default async function HomePage() {
             {programs.map((p, i) => (
               <ScrollReveal key={p.slug} delay={i * 60} className="h-full">
                 <CutCard interactive className="flex flex-col">
+                  {p.icon_name && (
+                    <span className="mb-4 text-ink/70">
+                      <NamedIcon name={p.icon_name} size={20} />
+                    </span>
+                  )}
                   <h3 className="font-serif text-xl font-medium text-ink">{p.name}</h3>
                   <p className="mt-3 text-sm leading-relaxed text-ink/75">{p.summary}</p>
                   <Link
@@ -281,12 +247,16 @@ export default async function HomePage() {
             ))}
           </div>
         </Section>
-
-        {/* 05 — Projects */}
-        <Section band="surface">
+      ),
+    },
+    {
+      key: "projects",
+      visible: show.projects,
+      render: (index, band) => (
+        <Section band={band}>
           <ScrollReveal>
             <SectionHeading
-              index={5}
+              index={index}
               eyebrow="Projects"
               title="What students are building right now."
               action={
@@ -334,12 +304,16 @@ export default async function HomePage() {
             </ScrollReveal>
           )}
         </Section>
-
-        {/* 06 — Events */}
-        <Section band="tint">
+      ),
+    },
+    {
+      key: "events",
+      visible: show.events,
+      render: (index, band) => (
+        <Section band={band}>
           <ScrollReveal>
             <SectionHeading
-              index={6}
+              index={index}
               eyebrow="Events"
               title="Upcoming on the calendar."
               action={
@@ -378,12 +352,16 @@ export default async function HomePage() {
             </ScrollReveal>
           )}
         </Section>
-
-        {/* 07 — Founding team */}
-        <Section>
+      ),
+    },
+    {
+      key: "team",
+      visible: show.team && founders.length > 0,
+      render: (index, band) => (
+        <Section band={band}>
           <ScrollReveal>
             <SectionHeading
-              index={7}
+              index={index}
               eyebrow="Founding team"
               title="Built by students, for students."
               action={
@@ -394,65 +372,178 @@ export default async function HomePage() {
             />
           </ScrollReveal>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {founders.map((f, i) => (
-              <ScrollReveal key={f.name} delay={i * 60} className="h-full">
-                <CutCard className="flex items-start gap-4">
-                  <InitialsAvatar name={f.name} />
-                  <div className="min-w-0 pr-2">
-                    <h3 className="font-serif text-lg font-medium text-ink">{f.name}</h3>
-                    <p className="mt-1 text-sm leading-relaxed text-ink/70">{f.role}</p>
-                  </div>
-                </CutCard>
+            {founders.map((person, i) => (
+              <ScrollReveal key={person.id} delay={i * 60} className="h-full">
+                <PersonCard person={person} compact />
               </ScrollReveal>
             ))}
           </div>
         </Section>
-
-        {/* 08 — Faculty guides */}
-        <Section band="surface">
+      ),
+    },
+    {
+      key: "faculty",
+      visible: facultyGuides.length > 0,
+      render: (index, band) => (
+        <Section band={band}>
           <ScrollReveal>
-            <SectionHeading index={8} eyebrow="Faculty guides" title="Faculty advisory." />
+            <SectionHeading index={index} eyebrow="Faculty guides" title="Faculty advisory." />
           </ScrollReveal>
           <div className="grid gap-5 sm:grid-cols-2">
-            <ScrollReveal className="h-full">
-              <CutCard>
-                <h3 className="font-serif text-xl font-medium text-ink">{settings.faculty_guide_name}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink/70">{settings.faculty_guide_title}</p>
-              </CutCard>
-            </ScrollReveal>
-            {additionalFacultyGuides.map((f, i) => (
-              <ScrollReveal key={f.name} delay={(i + 1) * 60} className="h-full">
+            {facultyGuides.map((person, i) => (
+              <ScrollReveal key={person.id} delay={i * 60} className="h-full">
                 <CutCard>
-                  <h3 className="font-serif text-xl font-medium text-ink">{f.name}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-ink/70">{f.title}</p>
+                  <h3 className="font-serif text-xl font-medium text-ink">{person.full_name}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-ink/70">{person.role_title}</p>
                 </CutCard>
               </ScrollReveal>
             ))}
           </div>
         </Section>
+      ),
+    },
+  ];
 
-        {/* Join — the deep-navy brand band, in both themes */}
-        <Section band="navy">
-          <ScrollReveal>
-            <div>
-              <Eyebrow>Join the network</Eyebrow>
-              <div className="flex flex-wrap items-end justify-between gap-8">
-                <div className="max-w-xl">
-                  <h2 className="font-serif text-3xl tracking-tight text-ink md:text-4xl">
-                    Don&rsquo;t just participate. Build.
-                  </h2>
-                  <p className="mt-4 leading-relaxed text-ink/75">
-                    Join FusionX and become part of a network of students building, researching, and
-                    competing together.
-                  </p>
+  const BANDS: Band[] = [undefined, "surface", "tint"];
+  const visibleSections = sections.filter((section) => section.visible);
+
+  return (
+    <>
+      <ScrollProgress />
+
+      {/* The one 3D scene, fixed behind the whole page. The hero shows it
+          directly; everything after sits in .home-below (see globals.css). */}
+      <div className="home-scene">
+        <FusionXHero floatTarget="#home-hero" />
+      </div>
+
+      {/* ================================================================
+          HERO: copy as real HTML over the scene. Each block is a layer
+          that floats on the pointer (`hero-float`; --pd = travel in px,
+          --pr = turn in degrees, the ThreeUI page's own values). The scene
+          follows the theme (night on navy / daylight on pale blue), and so
+          does the copy, through the ordinary tokens. The words come from
+          the admin panel (Page content), with the originals as fallback.
+          ================================================================ */}
+      <section
+        id="home-hero"
+        data-scene-window
+        className="relative flex min-h-[calc(100svh-4rem)] items-center"
+      >
+        {/* Scrim so the copy stays readable where it overlaps the scene */}
+        <div
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-paper/80 via-paper/55 to-transparent lg:bg-gradient-to-r lg:from-paper/85 lg:via-paper/45 lg:to-transparent"
+          aria-hidden
+        />
+
+        <div className="container-fx relative w-full py-16 md:py-20">
+          <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-10">
+            <div className="lg:col-span-7">
+              <div className="hero-float" style={float(18, 1.2)}>
+                <Eyebrow className="animate-fade">{hero.eyebrow}</Eyebrow>
+                <h1 className="font-serif text-[clamp(2.75rem,7vw,5.75rem)] leading-[1.02] tracking-tight text-ink animate-reveal">
+                  <Headline text={hero.headline} highlight={hero.highlight} />
+                </h1>
+              </div>
+
+              <div className="hero-float mt-7" style={float(14, 1)}>
+                <p className="max-w-xl text-base leading-relaxed text-ink/85 md:text-lg animate-reveal stagger-2">
+                  {hero.description.replaceAll("{name}", settings.chapter_name)}
+                </p>
+              </div>
+
+              <div className="hero-float mt-9" style={float(15, 1.4)}>
+                <div className="flex flex-col gap-3 sm:flex-row animate-reveal stagger-3">
+                  <LinkButton href={hero.primaryCta.href} size="lg">
+                    {hero.primaryCta.label} <ArrowRight size={16} className="arrow-nudge" />
+                  </LinkButton>
+                  <LinkButton href={hero.secondaryCta.href} variant="secondary" size="lg" className="bg-paper/60">
+                    {hero.secondaryCta.label}
+                  </LinkButton>
                 </div>
-                <LinkButton href="/join" size="lg">
-                  Join FusionX <ArrowRight size={16} className="arrow-nudge" />
-                </LinkButton>
+              </div>
+
+              {/* Activity: shown to everyone, zeros included */}
+              {show.activity && (
+                <div className="hero-float mt-10 sm:max-w-md" style={float(12, 0)}>
+                  <CutCard className="p-5 md:p-6 animate-reveal stagger-4">
+                    <Eyebrow>Activity</Eyebrow>
+                    <dl className="grid grid-cols-3 divide-x divide-line">
+                      {stats.map((s) => (
+                        <div key={s.label} className="flex flex-col-reverse px-4 first:pl-0 last:pr-0 sm:px-5">
+                          <dt className="mt-1 text-sm text-ink/70">{s.label}</dt>
+                          <dd>
+                            <AnimatedCounter
+                              value={s.value}
+                              className="block font-serif text-3xl font-medium tabular-nums text-ink md:text-4xl"
+                            />
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </CutCard>
+                </div>
+              )}
+            </div>
+
+            <div className="lg:col-span-5">
+              <div className="hero-float" style={float(22, 2.4)}>
+                <CutCard className="animate-reveal stagger-3">
+                  <p className="font-serif text-2xl leading-snug text-ink md:text-[1.75rem]">
+                    Learn. Build. Research. Impact.
+                  </p>
+                  <p className="mt-4 leading-relaxed text-ink/80">
+                    A network where campus conversations turn into working projects, documented
+                    research, and outcomes that outlast a single event.
+                  </p>
+                  <ul className="mt-6 flex flex-wrap gap-2 border-t border-line pt-5">
+                    {coreAreas.map((area, i) => (
+                      <li
+                        key={`${area.label}-${i}`}
+                        className="flex items-center gap-2 border border-line px-3 py-1.5 text-sm text-ink/85"
+                      >
+                        <NamedIcon name={area.icon} />
+                        {area.label}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-5 text-sm text-ink/65">Student Innovation &amp; Research, SCRIET, CCSU</p>
+                </CutCard>
               </div>
             </div>
-          </ScrollReveal>
-        </Section>
+          </div>
+        </div>
+      </section>
+
+      <div className="home-below" data-scene-window="dark">
+        {visibleSections.map((section, i) => (
+          <Fragment key={section.key}>{section.render(i + 1, BANDS[i % BANDS.length])}</Fragment>
+        ))}
+
+        {/* Join: the deep-navy brand band, in both themes */}
+        {show.join && (
+          <Section band="navy">
+            <ScrollReveal>
+              <div>
+                <Eyebrow>Join the network</Eyebrow>
+                <div className="flex flex-wrap items-end justify-between gap-8">
+                  <div className="max-w-xl">
+                    <h2 className="font-serif text-3xl tracking-tight text-ink md:text-4xl">
+                      Don&rsquo;t just participate. Build.
+                    </h2>
+                    <p className="mt-4 leading-relaxed text-ink/75">
+                      Join FusionX and become part of a network of students building, researching, and
+                      competing together.
+                    </p>
+                  </div>
+                  <LinkButton href="/join" size="lg">
+                    Join FusionX <ArrowRight size={16} className="arrow-nudge" />
+                  </LinkButton>
+                </div>
+              </div>
+            </ScrollReveal>
+          </Section>
+        )}
       </div>
     </>
   );

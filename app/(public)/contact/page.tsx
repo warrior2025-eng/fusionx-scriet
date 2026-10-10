@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/data/seo";
 import { Section } from "@/components/ui/section";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { ContactForm } from "@/components/forms/contact-form";
@@ -6,10 +7,8 @@ import { getOrganizationSettings } from "@/lib/data/organization";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { siteName } from "@/lib/site-config";
 
-export const metadata: Metadata = {
-  title: "Contact",
-  description: `Get in touch with ${siteName}.`,
-};
+export const generateMetadata = (): Promise<Metadata> =>
+  pageMetadata("contact", { title: "Contact", description: `Get in touch with ${siteName}.` });
 
 export default async function ContactPage() {
   const settings = await getOrganizationSettings();

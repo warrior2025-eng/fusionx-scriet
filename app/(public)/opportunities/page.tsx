@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/data/seo";
 import { Section } from "@/components/ui/section";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -7,10 +8,11 @@ import { createClient } from "@/lib/supabase/server";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { ArrowRight } from "lucide-react";
 
-export const metadata: Metadata = {
-  title: "Opportunities",
-  description: "Hackathons, competitions, internships, and other opportunities shared by FusionX.",
-};
+export const generateMetadata = (): Promise<Metadata> =>
+  pageMetadata("opportunities", {
+    title: "Opportunities",
+    description: "Hackathons, competitions, internships, and other opportunities shared by FusionX.",
+  });
 
 export default async function OpportunitiesPage() {
   const supabase = await createClient();
