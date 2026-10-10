@@ -170,7 +170,7 @@ function density(d: FusionXSceneDensity): Swap[] {
     {
       what: "pixel ratio",
       find: "renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, small ? 1.6 : 2));",
-      replace: `renderer.setPixelRatio(small ? Math.min(window.devicePixelRatio || 1, 1.6) : Math.min((window.devicePixelRatio || 1) * ${d.renderScale}, ${d.maxPixelRatio}));`,
+      replace: `renderer.setPixelRatio(small ? Math.min(window.devicePixelRatio || 1, 1.5) : Math.min((window.devicePixelRatio || 1) * ${d.renderScale}, ${d.maxPixelRatio}));`,
     },
   ];
 }

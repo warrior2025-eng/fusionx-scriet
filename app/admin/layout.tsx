@@ -1,55 +1,78 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { isStaff, getCurrentUser } from "@/lib/permissions";
-import { logoutAction } from "@/actions/auth";
+import { AdminShell, type AdminNavGroup, type AdminNavItem } from "@/components/admin/admin-shell";
+import { getAdminContext } from "@/lib/admin/guard";
+import { getOrganizationSettings } from "@/lib/data/organization";
+import { ROLE_LABELS, type Capability } from "@/lib/permissions/capabilities";
+import type { AppRole } from "@/types/database";
 
-const navItems = [
-  { href: "/admin", label: "Overview" },
-  { href: "/admin/applications", label: "Applications" },
-  { href: "/admin/projects", label: "Projects" },
-  { href: "/admin/events", label: "Events" },
-  { href: "/admin/opportunities", label: "Opportunities" },
-  { href: "/admin/announcements", label: "Announcements" },
-  { href: "/admin/mentors", label: "Mentors" },
-  { href: "/admin/audit-logs", label: "Audit Logs" },
-  { href: "/admin/settings", label: "Settings" },
+// Every section, with the capability it needs. The sidebar shows only what
+// the current role can use; each page and action checks again on its own.
+const NAV: { heading: string; items: (AdminNavItem & { cap: Capability })[] }[] = [
+  {
+    heading: "Overview",
+    items: [{ href: "/admin", label: "Dashboard", icon: "overview", cap: "admin.access" }],
+  },
+  {
+    heading: "Website",
+    items: [
+      { href: "/admin/content", label: "Page content", icon: "content", cap: "content" },
+      { href: "/admin/team", label: "Team", icon: "team", cap: "team" },
+      { href: "/admin/programs", label: "Programs", icon: "programs", cap: "content" },
+      { href: "/admin/events", label: "Events", icon: "events", cap: "content" },
+      { href: "/admin/opportunities", label: "Opportunities", icon: "opportunities", cap: "content" },
+      { href: "/admin/resources", label: "Resources", icon: "resources", cap: "content" },
+      { href: "/admin/announcements", label: "Announcements", icon: "announcements", cap: "content" },
+      { href: "/admin/mentors", label: "Mentors", icon: "mentors", cap: "content" },
+    ],
+  },
+  {
+    heading: "Community",
+    items: [
+      { href: "/admin/applications", label: "Applications", icon: "applications", cap: "applications" },
+      { href: "/admin/users", label: "Users & roles", icon: "users", cap: "users" },
+      { href: "/admin/projects", label: "Projects", icon: "projects", cap: "moderation" },
+      { href: "/admin/research", label: "Research", icon: "research", cap: "moderation" },
+      { href: "/admin/teams", label: "Project teams", icon: "teams", cap: "moderation" },
+      { href: "/admin/messages", label: "Messages", icon: "messages", cap: "messages" },
+      { href: "/admin/notifications", label: "Broadcast", icon: "notifications", cap: "broadcast" },
+    ],
+  },
+  {
+    heading: "System",
+    items: [
+      { href: "/admin/media", label: "Media library", icon: "media", cap: "media" },
+      { href: "/admin/audit-logs", label: "Audit log", icon: "audit", cap: "audit" },
+      { href: "/admin/settings", label: "Settings", icon: "settings", cap: "settings" },
+      { href: "/admin/danger", label: "Danger zone", icon: "danger", cap: "danger" },
+    ],
+  },
 ];
 
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login?next=/admin");
+const RANK: AppRole[] = ["super_admin", "admin", "editor"];
 
-  const authorized = await isStaff();
-  if (!authorized) redirect("/");
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const ctx = await getAdminContext();
+  if (!ctx.user) redirect("/login?next=/admin");
+  if (!ctx.caps.includes("admin.access")) redirect("/");
+
+  const settings = await getOrganizationSettings();
+  const groups: AdminNavGroup[] = NAV.map((group) => ({
+    heading: group.heading,
+    items: group.items
+      .filter((item) => ctx.caps.includes(item.cap))
+      .map(({ href, label, icon }) => ({ href, label, icon })),
+  })).filter((group) => group.items.length > 0);
+
+  const topRole = RANK.find((role) => ctx.roles.includes(role)) ?? "editor";
 
   return (
-    <div className="min-h-screen flex bg-paper">
-      <aside className="w-56 shrink-0 border-r border-ink/10 hidden md:flex flex-col">
-        <div className="h-16 flex items-center px-6 border-b border-ink/10 font-semibold text-sm">
-          FusionX Admin
-        </div>
-        <nav className="flex-1 px-3 py-4 space-y-0.5">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="block rounded-sm px-3 py-2 text-sm text-ink/65 hover:text-ink hover:bg-ink/5 transition-colors"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="p-3 border-t border-ink/10">
-          <form action={logoutAction}>
-            <button className="w-full text-left rounded-sm px-3 py-2 text-sm text-ink/55 hover:text-ink hover:bg-ink/5">
-              Sign out
-            </button>
-          </form>
-        </div>
-      </aside>
-      <div className="flex-1 min-w-0">
-        <div className="max-w-5xl mx-auto px-6 py-10">{children}</div>
-      </div>
-    </div>
+    <AdminShell
+      groups={groups}
+      userName={ctx.fullName}
+      roleLabel={ROLE_LABELS[topRole]}
+      siteName={settings.chapter_name}
+    >
+      {children}
+    </AdminShell>
   );
 }

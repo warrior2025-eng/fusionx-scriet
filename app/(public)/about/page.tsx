@@ -1,15 +1,20 @@
 import type { Metadata } from "next";
 import { Section } from "@/components/ui/section";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
-import { journeyStages, siteName } from "@/lib/site-config";
+import { siteName } from "@/lib/site-config";
+import { pageMetadata } from "@/lib/data/seo";
+import { getContent } from "@/lib/data/site-content";
 import { Eyebrow } from "@/components/ui/eyebrow";
 
-export const metadata: Metadata = {
-  title: "About",
-  description: `Mission, vision, and philosophy behind ${siteName}.`,
-};
+export const generateMetadata = (): Promise<Metadata> =>
+  pageMetadata("about", { title: "About", description: `Mission, vision, and philosophy behind ${siteName}.` });
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  // Mission, vision and "why" are edited in the admin panel (Page content),
+  // with the original text as the fallback. The journey is the same list the
+  // home page shows.
+  const [about, journeyStages] = await Promise.all([getContent("about.page"), getContent("lists.journey")]);
+
   return (
     <>
       <section className="border-b border-line">
@@ -28,34 +33,17 @@ export default function AboutPage() {
         <div className="prose-fx max-w-2xl">
           <ScrollReveal delay={50}>
             <h2>Mission</h2>
-            <p>
-              To give students at SCRIET a structured path from an early idea to a real outcome:
-              a working project, a piece of research, a protected innovation, or a competition
-              result. It does this by connecting them with the right people, programs, and resources at each
-              stage.
-            </p>
+            <p className="whitespace-pre-line">{about.mission}</p>
           </ScrollReveal>
 
           <ScrollReveal delay={100}>
             <h2>Vision</h2>
-            <p>
-              A student-led network where building, researching, and collaborating across
-              disciplines is the norm, not the exception, starting at SCRIET and, over time,
-              extending into an inter-college network of FusionX chapters.
-            </p>
+            <p className="whitespace-pre-line">{about.vision}</p>
           </ScrollReveal>
 
           <ScrollReveal delay={150}>
             <h2>Why FusionX exists</h2>
-            <p>
-              SCRIET already has student clubs focused on events, competitions, and engagement.
-              FusionX doesn&rsquo;t aim to replace them. It exists to fill the gap between those
-              events and long-term outcomes. That gap is the idea-to-impact pipeline: idea, learning, project,
-              research, prototype, publication or patent, competition, and onward into incubation
-              or continued development. FusionX works as a complementary layer that can connect
-              students, projects, research, competitions, and mentorship across whichever clubs and
-              departments they&rsquo;re already part of.
-            </p>
+            <p className="whitespace-pre-line">{about.why}</p>
           </ScrollReveal>
 
           <ScrollReveal delay={200}>
@@ -71,8 +59,8 @@ export default function AboutPage() {
           <ScrollReveal delay={250}>
             <h2>The Student Journey</h2>
             <ul className="space-y-1">
-              {journeyStages.map((stage) => (
-                <li key={stage}>{stage}</li>
+              {journeyStages.map((stage, i) => (
+                <li key={`${stage}-${i}`}>{stage}</li>
               ))}
             </ul>
           </ScrollReveal>

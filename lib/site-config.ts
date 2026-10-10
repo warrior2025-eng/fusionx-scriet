@@ -10,6 +10,22 @@
 /** The official name. Written exactly like this everywhere: no spaces around the @. */
 export const siteName = "FusionX@SCRIET";
 
+/**
+ * Where to find the chapter. The footer, the Contact page and the structured
+ * data use what is set in the admin panel (Settings) first, and these when a
+ * field there is empty.
+ */
+export const socialLinks = {
+  instagram: "https://www.instagram.com/fx.scriet/",
+  linkedin: "https://www.linkedin.com/company/fxscriet",
+  email: "network@fxscriet.com",
+} as const;
+
+// The team, programs and lists below are now managed from the admin panel
+// and stored in the database (migrations 0008 and 0010). What is here is the
+// fallback the site shows if that data cannot be read, e.g. before the
+// migrations have run. See lib/data/people.ts, lib/data/programs.ts and
+// lib/site-content/schema.ts.
 export const founders = [
   {
     name: "Pranjal Srivastav",

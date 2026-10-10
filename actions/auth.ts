@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loginSchema, signUpSchema } from "@/lib/validations";
+import { getOrganizationSettings } from "@/lib/data/organization";
+import { safeNext } from "@/lib/auth/safe-next";
 
 export type AuthActionState = {
   status: "idle" | "error";
@@ -34,6 +36,12 @@ export async function signUpAction(_prev: AuthActionState, formData: FormData): 
     return initialErrorState("Please fix the highlighted fields.", fieldErrors);
   }
 
+  // The database refuses new accounts too while this is off (see
+  // handle_new_user in migration 0008); this just gives a clear message.
+  if (!(await getOrganizationSettings()).signup_enabled) {
+    return initialErrorState("Sign-up is currently closed.");
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.auth.signUp({
     email: parsed.data.email,
@@ -45,7 +53,9 @@ export async function signUpAction(_prev: AuthActionState, formData: FormData): 
     return initialErrorState(error.message);
   }
 
-  redirect("/login?verify=1");
+  // Carry the destination through email verification to the sign-in page.
+  const next = safeNext(formData.get("next")?.toString());
+  redirect(next === "/" ? "/login?verify=1" : `/login?verify=1&next=${encodeURIComponent(next)}`);
 }
 
 export async function loginAction(_prev: AuthActionState, formData: FormData): Promise<AuthActionState> {
@@ -67,8 +77,8 @@ export async function loginAction(_prev: AuthActionState, formData: FormData): P
     return initialErrorState("Incorrect email or password.");
   }
 
-  const next = formData.get("next")?.toString() || "/";
-  redirect(next);
+  // Only ever redirect to a path on this site, never to an outside URL.
+  redirect(safeNext(formData.get("next")?.toString()));
 }
 
 export async function logoutAction() {

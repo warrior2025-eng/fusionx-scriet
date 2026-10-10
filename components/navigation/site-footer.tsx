@@ -1,41 +1,22 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { OrganizationSettings } from "@/types/database";
-import { institution } from "@/lib/site-config";
+import { Mail } from "lucide-react";
+import { InstagramIcon, LinkedInIcon } from "@/components/ui/brand-icons";
+import { institution, socialLinks } from "@/lib/site-config";
 
-const columns = [
-  {
-    heading: "Explore",
-    links: [
-      { href: "/about", label: "About" },
-      { href: "/programs", label: "Programs" },
-      { href: "/projects", label: "Projects" },
-      { href: "/research", label: "Research & IP" },
-    ],
-  },
-  {
-    heading: "Participate",
-    links: [
-      { href: "/opportunities", label: "Opportunities" },
-      { href: "/events", label: "Events" },
-      { href: "/teams", label: "Teams" },
-      { href: "/mentors", label: "Mentors" },
-      { href: "/join", label: "Join FusionX" },
-    ],
-  },
-  {
-    heading: "Organization",
-    links: [
-      { href: "/founders", label: "Founding Team" },
-      { href: "/resources", label: "Resources" },
-      { href: "/contact", label: "Contact" },
-      { href: "/privacy", label: "Privacy Policy" },
-      { href: "/terms", label: "Terms & Code of Conduct" },
-    ],
-  },
-];
+type FooterColumn = { heading: string; links: { href: string; label: string }[] };
 
-export function SiteFooter({ settings }: { settings: OrganizationSettings }) {
+export function SiteFooter({ settings, columns }: { settings: OrganizationSettings; columns: FooterColumn[] }) {
+  // Settings first; the built-in values when a field there is empty.
+  const name = settings.chapter_name;
+  const email = settings.official_email || socialLinks.email;
+  const connect = [
+    { href: settings.instagram_url || socialLinks.instagram, label: `${name} on Instagram`, icon: <InstagramIcon />, external: true },
+    { href: settings.linkedin_url || socialLinks.linkedin, label: `${name} on LinkedIn`, icon: <LinkedInIcon />, external: true },
+    { href: `mailto:${email}`, label: `Email ${name}`, icon: <Mail size={20} aria-hidden />, external: false },
+  ];
+
   return (
     <footer className="border-t border-line mt-auto bg-surface">
       <div className="container-fx py-16 md:py-20">
@@ -43,7 +24,13 @@ export function SiteFooter({ settings }: { settings: OrganizationSettings }) {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-12 md:gap-8">
           <div className="md:col-span-5">
             <div className="flex items-center gap-2.5">
-              <Image src="/logo-mark.png" alt="FusionX logo" width={32} height={32} className="h-8 w-8 rounded-full" />
+              <Image
+                src={settings.logo_path || "/logo-mark.png"}
+                alt={`${settings.chapter_name} logo`}
+                width={32}
+                height={32}
+                className="h-8 w-8 rounded-full object-cover"
+              />
               <span className="font-semibold text-ink tracking-tight">{settings.chapter_name}</span>
             </div>
             <p className="mt-4 text-sm text-ink/50 max-w-sm leading-relaxed">
@@ -53,6 +40,25 @@ export function SiteFooter({ settings }: { settings: OrganizationSettings }) {
             <p className="mt-6 text-xs font-medium uppercase tracking-[0.14em] text-ink/30">
               From Ideas to Impact.
             </p>
+
+            <div className="mt-8">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/35 mb-2">Connect</p>
+              <ul className="-ml-2.5 flex items-center gap-1">
+                {connect.map((link) => (
+                  <li key={link.label}>
+                    <a
+                      href={link.href}
+                      aria-label={link.label}
+                      title={link.label}
+                      {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                      className="flex h-10 w-10 items-center justify-center rounded-sm text-ink/60 transition-colors duration-150 hover:text-accent focus-visible:text-accent"
+                    >
+                      {link.icon}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
 
           {/* Link Columns */}
@@ -64,7 +70,7 @@ export function SiteFooter({ settings }: { settings: OrganizationSettings }) {
                 </p>
                 <ul className="space-y-2.5">
                   {col.links.map((link) => (
-                    <li key={link.href}>
+                    <li key={`${link.href}-${link.label}`}>
                       <Link
                         href={link.href}
                         className="text-sm text-ink/55 hover:text-ink transition-colors duration-200"

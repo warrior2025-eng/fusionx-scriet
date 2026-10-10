@@ -68,7 +68,9 @@ const SAMPLE_SIZE = 288;
  */
 async function sampleLogo(maxPoints: number): Promise<LogoSample | null> {
   const img = new Image();
-  img.src = "/logo-mark.png";
+  // The mark at the size it is sampled (generated from logo-mark.png), not
+  // the full-size original.
+  img.src = "/logo-sample.png";
   try {
     await img.decode();
   } catch {
@@ -143,7 +145,17 @@ function ParticleLogoFieldCanvas() {
     if (!ctx) return;
 
     const isSmall = window.matchMedia("(max-width: 768px)").matches;
-    const MAX_POINTS = isSmall ? 1000 : 2400;
+    const MAX_POINTS = isSmall ? 600 : 1600;
+    // Phones draw every other frame: the drift is slow, and it halves the work.
+    const FRAME_GAP = isSmall ? 30 : 0;
+    let lastDraw = 0;
+    // How far the page can scroll, measured when its size changes rather than
+    // every frame (reading scrollHeight in the loop forces a layout).
+    let scrollMax = 0;
+    const measureScroll = () => {
+      scrollMax = document.documentElement.scrollHeight - window.innerHeight;
+    };
+    const sizes = new ResizeObserver(measureScroll);
 
     let disposed = false;
     let particles: Particle[] = [];
@@ -198,6 +210,7 @@ function ParticleLogoFieldCanvas() {
         p.ay *= scaleY;
       }
       placeLogo();
+      measureScroll();
     }
 
     function onMouseMove(e: MouseEvent) {
@@ -210,12 +223,16 @@ function ParticleLogoFieldCanvas() {
     }
 
     function scrollProgress() {
-      const max = document.documentElement.scrollHeight - window.innerHeight;
-      if (max <= 0) return 0;
-      return Math.min(Math.max(window.scrollY / max, 0), 1);
+      if (scrollMax <= 0) return 0;
+      return Math.min(Math.max(window.scrollY / scrollMax, 0), 1);
     }
 
     function loop(time: number) {
+      if (time - lastDraw < FRAME_GAP) {
+        rafId = requestAnimationFrame(loop);
+        return;
+      }
+      lastDraw = time;
       const progress = scrollProgress();
       ctx!.clearRect(0, 0, width, height);
 
@@ -298,6 +315,8 @@ function ParticleLogoFieldCanvas() {
         slash: lp.slash,
       }));
       resize();
+      measureScroll();
+      sizes.observe(document.body);
 
       if (!window.matchMedia("(pointer: coarse)").matches) {
         window.addEventListener("mousemove", onMouseMove, { passive: true });
@@ -312,6 +331,7 @@ function ParticleLogoFieldCanvas() {
     return () => {
       disposed = true;
       stop();
+      sizes.disconnect();
       themeObserver.disconnect();
       window.removeEventListener("resize", resize);
       window.removeEventListener("mousemove", onMouseMove);

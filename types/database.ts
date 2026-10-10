@@ -3,7 +3,8 @@
 // file instead: `supabase gen types typescript --linked > types/database.ts`
 //
 // RPC functions (not typed through the client, which has no Database generic):
-//   get_member_count(): integer   -- supabase/migrations/0006_public_member_count.sql
+//   get_member_count(): integer            -- migrations 0006, 0008
+//   admin_revoke_sessions(target): integer -- migration 0008 (super_admin only)
 
 export type AppRole = "super_admin" | "admin" | "editor" | "faculty" | "mentor" | "member";
 
@@ -29,7 +30,7 @@ export type OpportunityCategory =
 
 export type OpportunityStatus = "open" | "closing_soon" | "closed";
 
-export type EventStatus = "upcoming" | "live" | "completed";
+export type EventStatus = "upcoming" | "live" | "completed" | "cancelled";
 
 export type ApplicationStatus = "submitted" | "under_review" | "shortlisted" | "selected" | "rejected" | "archived";
 
@@ -55,6 +56,20 @@ export interface OrganizationSettings {
   github_url: string | null;
   announcement_banner: string | null;
   announcement_banner_active: boolean;
+  // Added by migration 0008. Until it has run these come from the fallback
+  // in lib/data/organization.ts.
+  subtitle: string;
+  logo_path: string | null;
+  favicon_path: string | null;
+  og_image_path: string | null;
+  announcement_banner_link: string | null;
+  announcement_banner_starts_at: string | null;
+  announcement_banner_ends_at: string | null;
+  join_open: boolean;
+  join_closed_message: string | null;
+  signup_enabled: boolean;
+  maintenance_mode: boolean;
+  maintenance_message: string | null;
   updated_at: string;
   updated_by: string | null;
 }
@@ -74,6 +89,9 @@ export interface Profile {
   membership_type: MembershipType;
   is_profile_public: boolean;
   is_contact_public: boolean;
+  is_active: boolean;
+  deactivated_at: string | null;
+  deactivated_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -93,6 +111,7 @@ export interface Project {
   research_status_note: string | null;
   ip_status: IpStatus;
   is_published: boolean;
+  is_featured: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -150,6 +169,7 @@ export interface FusionEvent {
   organizer: string | null;
   registration_url: string | null;
   registration_capacity: number | null;
+  registration_open: boolean;
   status: EventStatus;
   poster_path: string | null;
   is_published: boolean;
@@ -221,3 +241,57 @@ export interface Resource {
   created_at: string;
 }
 
+export type OrgPersonCategory = "founder" | "faculty_guide" | "senior_mentor" | "core_team" | "advisor";
+
+/** One of the organization's people (not a project-team member). */
+export interface OrgPerson {
+  id: string;
+  full_name: string;
+  role_title: string;
+  category: OrgPersonCategory;
+  about: string | null;
+  photo_path: string | null;
+  email: string | null;
+  linkedin_url: string | null;
+  github_url: string | null;
+  portfolio_url: string | null;
+  display_order: number;
+  is_visible: boolean;
+  linked_profile_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Program {
+  id: string;
+  slug: string;
+  name: string;
+  summary: string;
+  details: string[];
+  icon_name: string | null;
+  display_order: number;
+  is_visible: boolean;
+}
+
+export interface ContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  is_reviewed: boolean;
+  is_resolved: boolean;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  created_at: string;
+}
+
+export interface AuditLog {
+  id: string;
+  user_id: string | null;
+  action: string;
+  resource_type: string;
+  resource_id: string | null;
+  metadata: { before?: Record<string, unknown>; after?: Record<string, unknown>; note?: string } | null;
+  created_at: string;
+}

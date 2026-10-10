@@ -86,13 +86,28 @@ function ProfileMenu({ user }: { user: SiteUser }) {
   );
 }
 
-export function SiteHeader({ chapterName, user }: { chapterName: string; user: SiteUser | null }) {
+export function SiteHeader({
+  chapterName,
+  subtitle,
+  logoUrl,
+  user,
+}: {
+  chapterName: string;
+  subtitle: string;
+  /** Uploaded logo; the built-in mark is used when this is empty. */
+  logoUrl?: string | null;
+  user: SiteUser | null;
+}) {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
+    // Only touch state when the value actually flips.
+    const onScroll = () => {
+      const past = window.scrollY > 20;
+      setScrolled((was) => (was === past ? was : past));
+    };
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
     return () => window.removeEventListener("scroll", onScroll);
@@ -127,8 +142,8 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
           {/* FusionX Official Logo & Name */}
           <Link href="/" className="flex items-center gap-2.5 group" onClick={() => setOpen(false)}>
             <Image
-              src="/logo-mark.png"
-              alt="FusionX logo"
+              src={logoUrl || "/logo-mark.png"}
+              alt={`${chapterName} logo`}
               width={32}
               height={32}
               className="h-8 w-8 shrink-0 rounded-full object-cover"
@@ -139,7 +154,7 @@ export function SiteHeader({ chapterName, user }: { chapterName: string; user: S
                 {chapterName}
               </span>
               <span className="mt-0.5 max-w-[8.5rem] text-balance text-[10.5px] leading-[1.2] text-ink/65 sm:max-w-none sm:whitespace-nowrap sm:text-[11px]">
-                Student Innovation &amp; Research Network
+                {subtitle}
               </span>
             </div>
           </Link>

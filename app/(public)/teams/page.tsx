@@ -97,7 +97,11 @@ export default async function TeamsPage() {
                     </div>
                   </div>
                   <div className="pt-4 border-t border-ink/8">
-                    <TeamJoinButton teamId={t.id} isMember={myTeamIds.has(t.id)} />
+                    <TeamJoinButton
+                      teamId={t.id}
+                      isMember={myTeamIds.has(t.id)}
+                      isOpen={t.status === "forming" || t.status === "active"}
+                    />
                   </div>
                 </div>
               </ScrollReveal>

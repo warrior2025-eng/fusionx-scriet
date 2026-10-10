@@ -67,22 +67,27 @@ export async function createTeam(
   redirect("/teams");
 }
 
-export async function joinTeam(teamId: string) {
+export type TeamActionResult = { error?: string };
+
+export async function joinTeam(teamId: string): Promise<TeamActionResult> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("FORBIDDEN");
+  if (!user) return { error: "Please sign in to join a team." };
 
   const { error } = await supabase
     .from("team_members")
     .insert({ team_id: teamId, user_id: user.id, role: "member" });
 
   // Unique constraint on (team_id, user_id) means a duplicate join is a
-  // harmless no-op from the user's point of view — skip the notification
+  // harmless no-op from the user's point of view. Skip the notification
   // in that case too, since nothing actually changed.
   if (error) {
-    if (error.code !== "23505") throw new Error(error.message);
+    // 42501: row level security refused it. Members may only add themselves
+    // to a team that is still forming or active (migration 0008).
+    if (error.code === "42501") return { error: "This team isn't taking new members." };
+    if (error.code !== "23505") return { error: "Could not join this team. Please try again." };
   } else {
     const { data: team } = await supabase.from("teams").select("name, created_by").eq("id", teamId).single();
     if (team && team.created_by !== user.id) {
@@ -97,14 +102,15 @@ export async function joinTeam(teamId: string) {
   }
 
   revalidatePath("/teams");
+  return {};
 }
 
-export async function leaveTeam(teamId: string) {
+export async function leaveTeam(teamId: string): Promise<TeamActionResult> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("FORBIDDEN");
+  if (!user) return { error: "Please sign in." };
 
   const { error } = await supabase
     .from("team_members")
@@ -112,7 +118,8 @@ export async function leaveTeam(teamId: string) {
     .eq("team_id", teamId)
     .eq("user_id", user.id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: "Could not leave this team. Please try again." };
 
   revalidatePath("/teams");
+  return {};
 }

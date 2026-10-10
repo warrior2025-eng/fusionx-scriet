@@ -12,22 +12,31 @@ export function ScrollProgress() {
 
   useEffect(() => {
     let raf = 0;
+    // The scrollable distance is measured when the page's size changes, not
+    // on every scroll frame (reading scrollHeight there forces a layout).
+    let max = 0;
+    const measure = () => {
+      max = document.documentElement.scrollHeight - window.innerHeight;
+      onScroll();
+    };
     const update = () => {
       raf = 0;
-      const max = document.documentElement.scrollHeight - window.innerHeight;
       const progress = max > 0 ? Math.min(window.scrollY / max, 1) : 0;
       if (barRef.current) barRef.current.style.transform = `scaleX(${progress})`;
     };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(update);
     };
-    update();
+    measure();
+    const sizes = new ResizeObserver(measure);
+    sizes.observe(document.body);
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
+    window.addEventListener("resize", measure);
     return () => {
       cancelAnimationFrame(raf);
+      sizes.disconnect();
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("resize", measure);
     };
   }, []);
 

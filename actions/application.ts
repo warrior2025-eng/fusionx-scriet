@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { joinApplicationSchema } from "@/lib/validations";
+import { getOrganizationSettings } from "@/lib/data/organization";
 
 export type ApplicationActionState = {
   status: "idle" | "success" | "error";
@@ -29,6 +30,11 @@ export async function submitApplication(
     motivation: formData.get("motivation"),
     website: formData.get("website") || "", // honeypot
   };
+
+  // Also enforced by a trigger on the applications table.
+  if (!(await getOrganizationSettings()).join_open) {
+    return { status: "error", message: "Applications are currently closed." };
+  }
 
   const parsed = joinApplicationSchema.safeParse(raw);
 

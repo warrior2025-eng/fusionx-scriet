@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/data/seo";
 import { Section } from "@/components/ui/section";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -9,10 +10,8 @@ import { getCurrentUser } from "@/lib/permissions";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { ArrowRight } from "lucide-react";
 
-export const metadata: Metadata = {
-  title: "Events",
-  description: "Upcoming and past FusionX events.",
-};
+export const generateMetadata = (): Promise<Metadata> =>
+  pageMetadata("events", { title: "Events", description: "Upcoming and past FusionX events." });
 
 export default async function EventsPage() {
   const supabase = await createClient();
@@ -21,7 +20,8 @@ export default async function EventsPage() {
   const [{ data: events }, { data: myRegistrations }] = await Promise.all([
     supabase
       .from("events")
-      .select("id, title, description, event_date, event_time, venue, status, registration_url")
+      // "*" so the registration switch is read once its column exists.
+      .select("*")
       .eq("is_published", true)
       .order("event_date", { ascending: true }),
     user
@@ -63,8 +63,11 @@ export default async function EventsPage() {
                     {e.venue && <p className="text-xs text-ink/45 mt-1">{e.venue}</p>}
                     <p className="mt-3 text-sm text-ink/55 leading-relaxed">{e.description}</p>
                   </div>
-                  {e.status !== "completed" &&
-                    (e.registration_url ? (
+                  {e.status === "cancelled" ? (
+                    <span className="shrink-0 text-sm text-ink/60">Cancelled</span>
+                  ) : e.status === "completed" ? null : e.registration_open === false ? (
+                    <span className="shrink-0 text-sm text-ink/60">Registration closed</span>
+                  ) : e.registration_url ? (
                       <a
                         href={e.registration_url}
                         target="_blank"
@@ -81,7 +84,7 @@ export default async function EventsPage() {
                           isSignedIn={!!user}
                         />
                       </div>
-                    ))}
+                    )}
                 </div>
               </ScrollReveal>
             ))}

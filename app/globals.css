@@ -187,8 +187,12 @@ body {
 .stagger-6 { animation-delay: 0.3s; }
 
 /* Scroll reveal — IntersectionObserver-driven (components/ui/scroll-reveal) */
-.scroll-reveal {
+/* will-change only while an element is still waiting to be revealed: left on
+   for good, every revealed block keeps its own compositor layer. */
+.scroll-reveal:not(.scroll-revealed) {
   will-change: opacity, transform;
+}
+.scroll-reveal {
   transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
               transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
 }
