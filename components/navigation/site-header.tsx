@@ -20,7 +20,13 @@ const nav = [
   { href: "/founders", label: "Team" },
 ];
 
-type SiteUser = { email: string; fullName: string; avatarUrl: string | null };
+type SiteUser = {
+  email: string;
+  fullName: string;
+  avatarUrl: string | null;
+  /** Staff and faculty panels this person may open. Empty for members. */
+  panels: { href: string; label: string }[];
+};
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -66,6 +72,11 @@ function ProfileMenu({ user }: { user: SiteUser }) {
             <p className="text-sm font-medium text-ink truncate">{user.fullName}</p>
             <p className="text-xs text-ink/45 truncate">{user.email}</p>
           </div>
+          {user.panels.map((panel) => (
+            <Link key={panel.href} href={panel.href} onClick={() => setOpen(false)} className="block px-3.5 py-2 text-sm font-medium text-ink hover:bg-ink/5">
+              {panel.label}
+            </Link>
+          ))}
           <Link href="/profile" onClick={() => setOpen(false)} className="block px-3.5 py-2 text-sm text-ink/70 hover:bg-ink/5 hover:text-ink">
             My Profile
           </Link>
@@ -261,6 +272,11 @@ export function SiteHeader({
           ))}
           {user && (
             <>
+              {user.panels.map((panel) => (
+                <Link key={panel.href} href={panel.href} onClick={() => setOpen(false)} className="py-2.5 text-sm font-medium text-ink border-b border-ink/5">
+                  {panel.label}
+                </Link>
+              ))}
               <Link href="/profile" onClick={() => setOpen(false)} className="py-2.5 text-sm text-ink/75 hover:text-ink border-b border-ink/5">
                 My Profile
               </Link>
