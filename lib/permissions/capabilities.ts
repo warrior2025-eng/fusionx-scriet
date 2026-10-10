@@ -23,6 +23,8 @@ export type Capability =
   | "moderation.delete"
   /** Team profiles (org_people). */
   | "team"
+  /** Issue event certificates, manage signatures and check-in volunteers. */
+  | "certificates"
   /** View users, deactivate / reactivate accounts, export. */
   | "users"
   | "applications"
@@ -44,6 +46,7 @@ const ADMIN: readonly Capability[] = [
   "content.delete_published",
   "moderation.delete",
   "team",
+  "certificates",
   "users",
   "applications",
   "messages",

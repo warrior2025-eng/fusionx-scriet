@@ -3,6 +3,9 @@
 // file instead: `supabase gen types typescript --linked > types/database.ts`
 //
 // RPC functions (not typed through the client, which has no Database generic):
+//   register_for_event, cancel_registration, check_in, set_attendance,
+//   check_in_roster, issue_certificates, verify_certificate, event_seats,
+//   my_waitlist_position, is_event_checker -- migration 0012
 //   get_member_count(): integer            -- migrations 0006, 0008
 //   admin_revoke_sessions(target): integer -- migration 0008 (super_admin only)
 
@@ -170,6 +173,18 @@ export interface FusionEvent {
   registration_url: string | null;
   registration_capacity: number | null;
   registration_open: boolean;
+  // Added by migration 0012.
+  registration_deadline: string | null;
+  waitlist_enabled: boolean;
+  end_date: string | null;
+  certificate_enabled: boolean;
+  certificate_title: string;
+  signatory_1_name: string | null;
+  signatory_1_title: string | null;
+  signatory_1_signature_path: string | null;
+  signatory_2_name: string | null;
+  signatory_2_title: string | null;
+  signatory_2_signature_path: string | null;
   status: EventStatus;
   poster_path: string | null;
   is_published: boolean;

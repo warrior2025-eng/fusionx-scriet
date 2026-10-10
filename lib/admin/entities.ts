@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { Capability } from "@/lib/permissions/capabilities";
 import { ICON_NAMES } from "@/lib/site-content/schema";
+import type { createClient } from "@/lib/supabase/server";
+import { fromIstInput } from "@/lib/events/format";
 import type { BucketId } from "./storage";
 
 /**
@@ -23,6 +25,8 @@ export type FieldDef = {
     | "email"
     | "date"
     | "time"
+    /** Date and time, entered and shown as Indian Standard Time. */
+    | "datetime"
     | "number"
     | "select"
     | "checkbox"
@@ -84,6 +88,12 @@ export type EntityDef = {
   viewHref: (row: Row) => string;
   /** Last-minute adjustments to the row before it is written. */
   prepare?: (values: Row, existing: Row | null) => void;
+  /** Checks that span several fields, or need the database. Returns errors by field name. */
+  validate?: (
+    values: Row,
+    existing: Row | null,
+    supabase: Awaited<ReturnType<typeof createClient>>,
+  ) => Promise<Record<string, string> | null>;
 };
 
 const date = (value: unknown) =>
@@ -242,12 +252,51 @@ export const ENTITIES = {
         hint: "Leave empty for no limit.",
       },
       {
+        name: "end_date",
+        label: "Ends (IST)",
+        type: "datetime",
+        half: true,
+        hint: "Used for the calendar entry.",
+      },
+      {
+        name: "registration_deadline",
+        label: "Registration closes (IST)",
+        type: "datetime",
+        half: true,
+        hint: "Leave empty to keep registration open until you close it.",
+      },
+      {
         name: "registration_url",
         label: "External registration link",
         type: "url",
         hint: "Leave empty to take registrations on this site.",
       },
-      { name: "registration_open", label: "Registration open", type: "checkbox", initial: true },
+      { name: "registration_open", label: "Registration open", type: "checkbox", initial: true, half: true },
+      {
+        name: "waitlist_enabled",
+        label: "Waitlist when full",
+        type: "checkbox",
+        half: true,
+        hint: "People who register after the last seat wait in line for a cancellation.",
+      },
+      {
+        name: "certificate_enabled",
+        label: "Certificates for this event",
+        type: "checkbox",
+        hint: "Lets an admin issue a certificate to everyone who was checked in.",
+      },
+      {
+        name: "certificate_title",
+        label: "Certificate title",
+        type: "text",
+        required: true,
+        max: 80,
+        initial: "Certificate of Participation",
+      },
+      { name: "signatory_1_name", label: "Signatory 1 name", type: "text", max: 80, half: true },
+      { name: "signatory_1_title", label: "Signatory 1 title", type: "text", max: 120, half: true },
+      { name: "signatory_2_name", label: "Signatory 2 name", type: "text", max: 80, half: true },
+      { name: "signatory_2_title", label: "Signatory 2 title", type: "text", max: 120, half: true },
       {
         name: "poster",
         column: "poster_path",
@@ -259,7 +308,33 @@ export const ENTITIES = {
       PUBLISH_FIELD,
     ],
     publicPaths: ["/events", "/"],
-    viewHref: () => "/events",
+    viewHref: (r) => `/events/${r.id}`,
+    validate: async (values, existing, supabase) => {
+      const errors: Record<string, string> = {};
+      const start = new Date(`${values.event_date}T${String(values.event_time ?? "23:59").slice(0, 5)}:00+05:30`).getTime();
+      const deadline = values.registration_deadline ? new Date(String(values.registration_deadline)).getTime() : null;
+      const end = values.end_date ? new Date(String(values.end_date)).getTime() : null;
+      if (deadline !== null && deadline > start) {
+        errors.registration_deadline = "Registration has to close before the event starts.";
+      }
+      if (end !== null && end <= start) errors.end_date = "The event has to end after it starts.";
+      if (values.signatory_1_title && !values.signatory_1_name) errors.signatory_1_name = "Add a name for this title.";
+      if (values.signatory_2_title && !values.signatory_2_name) errors.signatory_2_name = "Add a name for this title.";
+
+      // Capacity can't drop below the seats already taken.
+      const capacity = values.registration_capacity as number | null;
+      if (existing && capacity !== null && capacity !== undefined) {
+        const { count } = await supabase
+          .from("event_registrations")
+          .select("*", { count: "exact", head: true })
+          .eq("event_id", existing.id as string)
+          .in("status", ["registered", "attended"]);
+        if ((count ?? 0) > capacity) {
+          errors.registration_capacity = `${count} people are already registered. Capacity can't be lower than that.`;
+        }
+      }
+      return Object.keys(errors).length ? errors : null;
+    },
   },
 
   opportunities: {
@@ -494,6 +569,14 @@ function fieldSchema(f: FieldDef): z.ZodType {
         .string()
         .trim()
         .refine((v) => (v === "" ? !f.required : /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v))), f.required ? "Pick a date" : "Enter a valid date");
+    case "datetime":
+      return z
+        .string()
+        .trim()
+        .refine(
+          (v) => (v === "" ? !f.required : /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v) && !Number.isNaN(Date.parse(v))),
+          "Pick a date and time",
+        );
     case "time":
       return z
         .string()
@@ -558,6 +641,7 @@ export function parseEntityForm(
     const value = (parsed.data as Row)[f.name];
     const column = f.column ?? f.name;
     if (f.type === "number") values[column] = value === "" ? null : Number(value);
+    else if (f.type === "datetime") values[column] = value === "" ? null : fromIstInput(String(value));
     else if (typeof value === "string" && value === "" && !f.required) values[column] = null;
     else values[column] = value;
   }

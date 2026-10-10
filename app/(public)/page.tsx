@@ -331,7 +331,11 @@ export default async function HomePage() {
                     <DateBlock date={e.event_date} />
                     <div className="min-w-0 pr-2">
                       <Badge className="rounded-none capitalize">{e.status}</Badge>
-                      <h3 className="mt-3 font-serif text-lg font-medium text-ink">{e.title}</h3>
+                      <h3 className="mt-3 font-serif text-lg font-medium text-ink">
+                        <Link href={`/events/${e.id}`} className="hover:underline">
+                          {e.title}
+                        </Link>
+                      </h3>
                       {e.venue && <p className="mt-1 text-sm text-ink/70">{e.venue}</p>}
                     </div>
                   </CutCard>
