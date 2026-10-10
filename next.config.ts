@@ -21,6 +21,18 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/certificates/*": ["./assets/fonts/*.ttf", "./public/icon.png"],
   },
+  // One address for the site. "www" used to serve the same pages a second
+  // time, which search engines treat as a duplicate site.
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.fxscriet.com" }],
+        destination: "https://fxscriet.com/:path*",
+        permanent: true,
+      },
+    ];
+  },
   images: {
     remotePatterns: supabaseHost
       ? [{ protocol: "https", hostname: supabaseHost, pathname: "/storage/v1/object/public/**" }]
