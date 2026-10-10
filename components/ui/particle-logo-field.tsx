@@ -129,7 +129,9 @@ async function sampleLogo(maxPoints: number): Promise<LogoSample | null> {
 
 export function ParticleLogoField() {
   const pathname = usePathname();
-  if (pathname === "/") return null;
+  // Not on the home page (it has its own scene) or the check-in scanner (the
+  // camera needs the phone to itself).
+  if (pathname === "/" || pathname.startsWith("/check-in")) return null;
   return <ParticleLogoFieldCanvas />;
 }
 

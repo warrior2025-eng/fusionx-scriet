@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea, FieldError, FieldHint } from "@/components/ui/field";
 import { IDLE, type ActionState } from "@/lib/admin/action-state";
 import type { FieldDef } from "@/lib/admin/entities";
+import { toIstInput } from "@/lib/events/format";
 import { cn } from "@/lib/utils";
 import { ImageField } from "./image-field";
 import { toastResult } from "./toast";
@@ -336,11 +337,13 @@ export function EntityFields({ fields, values }: { fields: FieldDef[]; values: R
                 hint={f.hint}
                 placeholder={f.placeholder}
                 type={
-                  f.type === "date" ? "date" : f.type === "time" ? "time" : f.type === "number" ? "number" : f.type === "email" ? "email" : f.type === "url" ? "url" : "text"
+                  f.type === "date" ? "date" : f.type === "datetime" ? "datetime-local" : f.type === "time" ? "time" : f.type === "number" ? "number" : f.type === "email" ? "email" : f.type === "url" ? "url" : "text"
                 }
                 min={f.type === "number" ? 0 : undefined}
                 maxLength={f.max}
-                defaultValue={f.type === "time" ? String(value).slice(0, 5) : String(value)}
+                defaultValue={
+                  f.type === "time" ? String(value).slice(0, 5) : f.type === "datetime" ? toIstInput(String(value)) : String(value)
+                }
                 className={span}
               />
             );

@@ -56,6 +56,9 @@ export async function saveEntity(
     existing = data as Row;
   }
 
+  const invalid = await def.validate?.(values, existing, ctx.supabase);
+  if (invalid) return fail("Please fix the highlighted fields.", invalid);
+
   // Images: upload the new file first; the old one is removed only after the
   // row has been saved, and the new one is removed again if the save fails.
   const uploaded: { bucket: BucketId; url: string }[] = [];

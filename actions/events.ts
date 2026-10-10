@@ -2,50 +2,60 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import type { RegistrationStatus } from "@/lib/events/format";
 
-export type EventActionResult = { error?: string };
+export type EventActionResult = {
+  error?: string;
+  status?: RegistrationStatus;
+  /** Place in the waitlist, when waitlisted. */
+  position?: number | null;
+};
 
-// The messages the database raises when a registration is refused (see
-// guard_event_registration in migration 0008). They are safe to show as is.
-const REFUSALS = ["Registration for this event is closed", "This event is full", "Event not found"];
+// What register_for_event / cancel_registration (migration 0012) raise when
+// they refuse. These are written for people and safe to show as they are.
+const REFUSALS = [
+  "Please sign in to register",
+  "This account is deactivated",
+  "Event not found",
+  "Registration for this event is handled on another site",
+  "Registration for this event is closed",
+  "This event is full",
+  "You have already attended this event",
+];
 
-export async function registerForEvent(eventId: string): Promise<EventActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Please sign in to register." };
-
-  const { error } = await supabase
-    .from("event_registrations")
-    .insert({ event_id: eventId, user_id: user.id });
-
-  // Unique constraint on (event_id, user_id): a duplicate click is a
-  // harmless no-op.
-  if (error && error.code !== "23505") {
-    const refusal = REFUSALS.find((message) => error.message.includes(message));
-    return { error: refusal ? `${refusal}.` : "Could not register. Please try again." };
-  }
-
-  revalidatePath("/events");
-  return {};
+function refusal(message: string | undefined, fallback: string): string {
+  const known = REFUSALS.find((text) => message?.includes(text));
+  return known ? `${known}.` : fallback;
 }
 
-export async function unregisterFromEvent(eventId: string): Promise<EventActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Please sign in." };
-
-  const { error } = await supabase
-    .from("event_registrations")
-    .delete()
-    .eq("event_id", eventId)
-    .eq("user_id", user.id);
-
-  if (error) return { error: "Could not cancel your registration. Please try again." };
-
+function revalidate(eventId: string) {
   revalidatePath("/events");
-  return {};
+  revalidatePath(`/events/${eventId}`);
+  revalidatePath("/profile/events");
+  revalidatePath("/");
+}
+
+/**
+ * Registers the signed-in user. The database function does everything in one
+ * step under a lock on the event: it checks the event is open, counts the
+ * seats, and registers or waitlists. Two people can never take the last seat.
+ */
+export async function registerForEvent(eventId: string): Promise<EventActionResult> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("register_for_event", { p_event: eventId });
+  if (error) return { error: refusal(error.message, "Could not register. Please try again.") };
+
+  revalidate(eventId);
+  const result = (data ?? {}) as { status?: RegistrationStatus; position?: number | null };
+  return { status: result.status, position: result.position ?? null };
+}
+
+/** Cancels the user's own registration; a freed seat goes to the waitlist. */
+export async function cancelRegistration(eventId: string): Promise<EventActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("cancel_registration", { p_event: eventId });
+  if (error) return { error: refusal(error.message, "Could not cancel your registration. Please try again.") };
+
+  revalidate(eventId);
+  return { status: "cancelled" };
 }

@@ -4,11 +4,12 @@ import { Section } from "@/components/ui/section";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
-import { EventRegisterButton } from "@/components/forms/event-register-button";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/permissions";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { ArrowRight } from "lucide-react";
+import { STATUS_LABELS, eventWhen, type RegistrationStatus } from "@/lib/events/format";
+import Link from "next/link";
 
 export const generateMetadata = (): Promise<Metadata> =>
   pageMetadata("events", { title: "Events", description: "Upcoming and past FusionX events." });
@@ -25,11 +26,13 @@ export default async function EventsPage() {
       .eq("is_published", true)
       .order("event_date", { ascending: true }),
     user
-      ? supabase.from("event_registrations").select("event_id").eq("user_id", user.id)
-      : Promise.resolve({ data: [] as { event_id: string }[] }),
+      ? supabase.from("event_registrations").select("event_id, status").eq("user_id", user.id).neq("status", "cancelled")
+      : Promise.resolve({ data: [] as { event_id: string; status: RegistrationStatus }[] }),
   ]);
 
-  const myEventIds = new Set((myRegistrations ?? []).map((r) => r.event_id));
+  const myStatus = new Map(
+    (myRegistrations ?? []).map((r) => [r.event_id as string, r.status as RegistrationStatus]),
+  );
 
   return (
     <>
@@ -55,36 +58,33 @@ export default async function EventsPage() {
                     <div className="flex items-center gap-2.5 mb-2">
                       <Badge>{e.status}</Badge>
                       <span className="text-xs text-ink/45 font-medium">
-                        {new Date(e.event_date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
-                        {e.event_time ? `, ${e.event_time}` : ""}
+                        {eventWhen(e.event_date, e.event_time)}
                       </span>
                     </div>
-                    <p className="font-serif text-xl font-medium text-ink group-hover:text-accent transition-colors">{e.title}</p>
+                    <p className="font-serif text-xl font-medium text-ink group-hover:text-accent transition-colors">
+                      <Link href={`/events/${e.id}`} className="hover:underline">
+                        {e.title}
+                      </Link>
+                    </p>
                     {e.venue && <p className="text-xs text-ink/45 mt-1">{e.venue}</p>}
-                    <p className="mt-3 text-sm text-ink/55 leading-relaxed">{e.description}</p>
+                    <p className="mt-3 line-clamp-3 text-sm text-ink/55 leading-relaxed">{e.description}</p>
                   </div>
-                  {e.status === "cancelled" ? (
-                    <span className="shrink-0 text-sm text-ink/60">Cancelled</span>
-                  ) : e.status === "completed" ? null : e.registration_open === false ? (
-                    <span className="shrink-0 text-sm text-ink/60">Registration closed</span>
-                  ) : e.registration_url ? (
-                      <a
-                        href={e.registration_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-accent hover:underline"
-                      >
-                        Register <ArrowRight size={14} className="arrow-nudge" aria-hidden />
-                      </a>
-                    ) : (
-                      <div className="shrink-0">
-                        <EventRegisterButton
-                          eventId={e.id}
-                          isRegistered={myEventIds.has(e.id)}
-                          isSignedIn={!!user}
-                        />
-                      </div>
+                  <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
+                    {myStatus.get(e.id) && (
+                      <span className="text-sm font-medium text-ink">{STATUS_LABELS[myStatus.get(e.id)!]}</span>
                     )}
+                    <Link
+                      href={`/events/${e.id}`}
+                      className="group inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:underline"
+                    >
+                      {e.status === "cancelled"
+                        ? "Cancelled. View details"
+                        : e.status === "completed"
+                          ? "View details"
+                          : "Details and registration"}
+                      <ArrowRight size={14} className="arrow-nudge" aria-hidden />
+                    </Link>
+                  </div>
                 </div>
               </ScrollReveal>
             ))}

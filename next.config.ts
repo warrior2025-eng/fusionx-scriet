@@ -16,6 +16,11 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "5mb",
     },
   },
+  // The certificate PDF reads its fonts and the logo from disk at run time,
+  // so they have to be shipped with that route's server function.
+  outputFileTracingIncludes: {
+    "/api/certificates/*": ["./assets/fonts/*.ttf", "./public/icon.png"],
+  },
   images: {
     remotePatterns: supabaseHost
       ? [{ protocol: "https", hostname: supabaseHost, pathname: "/storage/v1/object/public/**" }]

@@ -457,3 +457,18 @@ a:hover > .arrow-nudge {
 @media (prefers-reduced-motion: reduce) {
   .hero-float { transform: none; }
 }
+
+/* =========================================================================
+   PRINT — tickets (and anything else) print without the site's chrome.
+   ========================================================================= */
+@media print {
+  body > header,
+  body > footer,
+  body > canvas,
+  .home-scene {
+    display: none !important;
+  }
+  body {
+    background: #ffffff !important;
+  }
+}

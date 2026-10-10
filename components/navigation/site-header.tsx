@@ -69,6 +69,9 @@ function ProfileMenu({ user }: { user: SiteUser }) {
           <Link href="/profile" onClick={() => setOpen(false)} className="block px-3.5 py-2 text-sm text-ink/70 hover:bg-ink/5 hover:text-ink">
             My Profile
           </Link>
+          <Link href="/profile/events" onClick={() => setOpen(false)} className="block px-3.5 py-2 text-sm text-ink/70 hover:bg-ink/5 hover:text-ink">
+            My Events
+          </Link>
           <Link href="/projects/mine" onClick={() => setOpen(false)} className="block px-3.5 py-2 text-sm text-ink/70 hover:bg-ink/5 hover:text-ink">
             My Projects
           </Link>
@@ -263,6 +266,9 @@ export function SiteHeader({
               </Link>
               <Link href="/notifications" onClick={() => setOpen(false)} className="py-2.5 text-sm text-ink/75 hover:text-ink border-b border-ink/5">
                 Notifications
+              </Link>
+              <Link href="/profile/events" onClick={() => setOpen(false)} className="py-2.5 text-sm text-ink/75 hover:text-ink border-b border-ink/5">
+                My Events
               </Link>
               <Link href="/projects/mine" onClick={() => setOpen(false)} className="py-2.5 text-sm text-ink/75 hover:text-ink border-b border-ink/5">
                 My Projects
