@@ -470,7 +470,7 @@ export default async function HomePage() {
               {/* Activity: shown to everyone, zeros included */}
               {show.activity && (
                 <div className="hero-float mt-10 sm:max-w-md" style={float(12, 0)}>
-                  <CutCard className="p-5 md:p-6 animate-reveal stagger-4">
+                  <CutCard className="hero-activity p-5 md:p-6 animate-reveal stagger-4">
                     <Eyebrow>Activity</Eyebrow>
                     <dl className="grid grid-cols-3 divide-x divide-line">
                       {stats.map((s) => (

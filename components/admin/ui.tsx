@@ -194,7 +194,7 @@ export function Toolbar({
 
 export function Table({ children, label }: { children: React.ReactNode; label: string }) {
   return (
-    <div className="overflow-x-auto border border-line bg-surface">
+    <div className="admin-table overflow-x-auto border border-line bg-surface">
       <table aria-label={label} className="w-full min-w-[36rem] border-collapse text-left text-sm">
         {children}
       </table>
