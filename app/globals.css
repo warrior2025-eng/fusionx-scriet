@@ -25,14 +25,30 @@
   --color-line: rgba(254, 254, 254, 0.09);
 }
 
+/* The light theme ("Airy White"): white paper, navy ink, the logo blue. Its
+   rules are gathered under LIGHT THEME near the end of this file. The extra
+   tokens below exist only here; nothing in the dark theme reads them.
+
+     surface-2      a pale blue wash: tinted bands, the footer, table heads
+     ink-muted      descriptions and labels   (7.3:1 on white)
+     ink-subtle     hints, the faintest step  (5.4:1 on white)
+     accent-hover   one step darker than the logo blue
+     danger         error text                (5.6:1 on white)
+     line-strong    form field borders */
 :root[data-theme="light"] {
-  --color-paper: #f4f6fb;
+  --color-paper: #ffffff;
   --color-surface: #ffffff;
-  --color-ink: #00030d;
+  --color-surface-2: #f1f5ff;
+  --color-ink: #0a1230;
+  --color-ink-muted: #4a5578;
+  --color-ink-subtle: #5e6a8c;
   --color-accent: #004df6;
-  --color-accent-soft: #e8eeff;
+  --color-accent-hover: #003dd1;
+  --color-accent-soft: #e3ebff;
   --color-accent-text: var(--color-accent);
-  --color-line: rgba(0, 3, 13, 0.1);
+  --color-danger: #c62828;
+  --color-line: rgba(10, 18, 48, 0.14);
+  --color-line-strong: rgba(10, 18, 48, 0.3);
 }
 
 /* A deep-navy brand band: pins the dark tokens on its subtree so it reads the
@@ -127,7 +143,7 @@ body {
   border-block: 1px solid var(--color-line);
 }
 :root[data-theme="light"] .band--tint {
-  background: var(--color-accent-soft);
+  background: var(--color-surface-2);
 }
 
 .prose-fx :where(p, ul, ol) {
@@ -280,9 +296,14 @@ body {
   background: linear-gradient(var(--card-bg), var(--card-bg)), var(--color-paper);
 }
 
+/* Light theme: flat, outlined cards. No shadow; the outline carries the cut
+   corner, and turns blue (with the 2px lift below) on hover. */
 :root[data-theme="light"] :is(.cut-corner, .card-elevated) {
   --card-bg: var(--color-surface);
-  filter: drop-shadow(0 1px 1px rgba(0, 3, 13, 0.05)) drop-shadow(0 12px 22px rgba(0, 3, 13, 0.07));
+  --card-line: rgba(10, 18, 48, 0.18);
+}
+:root[data-theme="light"] :is(.card-elevated, .cut-corner--interactive):is(:hover, :focus-within) {
+  --card-line: var(--color-accent);
 }
 
 .card-elevated:hover,
@@ -412,7 +433,7 @@ a:hover > .arrow-nudge {
   background-image: url("/hero/fusionx-hero-poster.webp");
 }
 :root[data-theme="light"] .scene-poster {
-  background-color: #f4f6fb;
+  background-color: #ffffff;
   background-image: url("/hero/fusionx-hero-poster-light.webp");
 }
 
@@ -456,6 +477,122 @@ a:hover > .arrow-nudge {
 
 @media (prefers-reduced-motion: reduce) {
   .hero-float { transform: none; }
+}
+
+/* =========================================================================
+   LIGHT THEME — "Airy White". Every rule here is under
+   :root[data-theme="light"], so none of it can apply in the dark theme.
+   Tokens are at the top of the file; the bands and the card outline are with
+   their own sections above.
+   ========================================================================= */
+
+/* Faint text → readable. Muted text is written across the site as ink at an
+   opacity (text-ink/55 …), which on white drops as low as 2.1:1. Here those
+   map onto two solid steps. They sit in the utilities layer at utility weight
+   so that hover: and other state colours on the same element still win. */
+@layer utilities {
+  :where(:root[data-theme="light"]) :is(.text-ink\/55, .text-ink\/60, .text-ink\/65, .text-ink\/70, .text-ink\/75) {
+    color: var(--color-ink-muted);
+  }
+  :where(:root[data-theme="light"]) :is(.text-ink\/30, .text-ink\/35, .text-ink\/40, .text-ink\/45, .text-ink\/50) {
+    color: var(--color-ink-subtle);
+  }
+  /* status text: the stock red, green and amber are too light for white */
+  :where(:root[data-theme="light"]) :is(.text-red-500, .text-red-600) {
+    color: var(--color-danger);
+  }
+  :where(:root[data-theme="light"]) .text-green-600 {
+    color: #0b6b3a;
+  }
+  :where(:root[data-theme="light"]) .text-amber-500 {
+    color: #8a5200;
+  }
+  /* hairlines written as ink at 8–10% all but vanish on white */
+  :where(:root[data-theme="light"]) :is(.border-ink\/8, .border-ink\/10) {
+    border-color: var(--color-line);
+  }
+}
+
+:root[data-theme="light"] {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(10, 18, 48, 0.2) transparent;
+
+  & ::-webkit-scrollbar { width: 10px; height: 10px; }
+  & ::-webkit-scrollbar-thumb { background: rgba(10, 18, 48, 0.2); border: 2px solid transparent; background-clip: content-box; }
+
+  /* The brand band (Join) is pale blue with navy text here: no dark surfaces. */
+  & .on-navy {
+    --color-paper: #f1f5ff;
+    --color-surface: #ffffff;
+    --color-ink: #0a1230;
+    --color-accent-soft: #e3ebff;
+    --color-accent-text: var(--color-accent);
+    --color-line: rgba(10, 18, 48, 0.14);
+    border-block: 1px solid var(--color-line);
+    background: linear-gradient(135deg, #e3ebff, #f1f5ff 60%);
+    color: var(--color-ink);
+  }
+  & .on-navy a.text-accent { text-decoration: none; }
+  & .on-navy :where(a, button):focus-visible { outline-color: var(--color-accent); }
+
+  /* Header: a constant hairline. Footer: the pale wash. */
+  & .site-header { border-bottom: 1px solid var(--color-line); }
+  & .site-footer { background: var(--color-surface-2); }
+  & .site-footer a:is(:hover, :focus-visible) { color: var(--color-accent); }
+
+  /* Inner pages: a soft wash of the logo blue behind the page heading. */
+  & main > section.border-b.border-line:first-child {
+    background: linear-gradient(180deg, rgba(0, 77, 246, 0.07), rgba(0, 77, 246, 0) 90%);
+  }
+
+  /* Eyebrow: blue slash, blue number, navy-muted label */
+  & .eyebrow .eyebrow__label { color: var(--color-ink-muted); }
+  & .eyebrow .eyebrow__index { color: var(--color-accent); font-weight: 600; }
+
+  /* Buttons (the red "danger" ones keep their own colours) */
+  & .btn--primary:not([class*="bg-red"]):hover { background: var(--color-accent-hover); }
+  & .btn--secondary:not([class*="border-red"]) { border-color: color-mix(in srgb, var(--color-ink) 55%, transparent); }
+  & .btn--secondary:not([class*="border-red"]):hover { border-color: var(--color-ink); background: var(--color-accent-soft); }
+  & .btn--ghost:not([class*="text-red"]) { color: var(--color-accent); }
+  & .btn--ghost:not([class*="text-red"]):hover { background: var(--color-accent-soft); }
+
+  /* Badges and status pills: tinted grounds, AA text */
+  & .badge { border-color: transparent; background: var(--color-accent-soft); color: var(--color-accent); font-weight: 600; }
+  & .pill { border-color: transparent; font-weight: 600; }
+  & .pill--neutral { background: var(--color-surface-2); color: var(--color-ink-muted); }
+  & .pill--good { background: #dcf5e7; color: #0b6b3a; }
+  & .pill--warn { background: #fff0cf; color: #8a5200; }
+  & .pill--bad { background: #fde5e5; color: #b42318; }
+
+  /* Forms: white fields, a clear border, a blue 2px focus ring */
+  & :where(input:not([type="checkbox"], [type="radio"], [type="file"]), textarea, select):not([class*="border-red"]) {
+    border-color: var(--color-line-strong);
+    background-color: var(--color-surface);
+  }
+  & :where(input:not([type="checkbox"], [type="radio"], [type="file"]), textarea, select):focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 2px rgba(0, 77, 246, 0.28);
+    outline: none;
+  }
+  & ::placeholder { color: var(--color-ink-subtle); opacity: 1; }
+
+  /* Links: blue, underline on hover */
+  & a.text-accent:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+  /* Stepper: blue nodes, a quiet navy joining line */
+  & .stepper__node { border-color: var(--color-accent); color: var(--color-accent); font-weight: 700; }
+  & .stepper__step:not(:last-child)::before { background: color-mix(in srgb, var(--color-ink) 15%, transparent); }
+
+  /* Date block and the hero's Activity numbers pick up the blue */
+  & .date-block { border-color: transparent; background: var(--color-accent-soft); }
+  & .date-block > :first-child { color: var(--color-accent); }
+  & .hero-activity dd > * { color: var(--color-accent); }
+
+  /* Admin panel: washed sidebar, blue active item, striped tables */
+  & .admin-sidebar { background: var(--color-surface-2); }
+  & nav[aria-label="Admin"] a[aria-current="page"] { background: var(--color-accent-soft); color: var(--color-accent); }
+  & .admin-table thead { background: var(--color-surface-2); }
+  & .admin-table tbody tr:nth-child(even) { background: #f8faff; }
 }
 
 /* =========================================================================

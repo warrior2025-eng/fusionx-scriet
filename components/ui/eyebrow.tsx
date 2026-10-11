@@ -16,11 +16,11 @@ export function Eyebrow({
   className?: string;
 }) {
   return (
-    <div className={cn("mb-4 flex items-center gap-3 text-[13px] font-medium tracking-[0.08em] text-accent", className)}>
+    <div className={cn("eyebrow mb-4 flex items-center gap-3 text-[13px] font-medium tracking-[0.08em] text-accent", className)}>
       <span className="flex items-center gap-2">
         <SlashMark />
-        {index !== undefined && <span className="tabular-nums text-ink/45">{String(index).padStart(2, "0")}</span>}
-        <span>{children}</span>
+        {index !== undefined && <span className="eyebrow__index tabular-nums text-ink/45">{String(index).padStart(2, "0")}</span>}
+        <span className="eyebrow__label">{children}</span>
       </span>
       {index !== undefined && <span className="h-px flex-1 bg-line" aria-hidden />}
     </div>

@@ -6,9 +6,9 @@ type Variant = "primary" | "secondary" | "ghost";
 type Size = "sm" | "md" | "lg";
 
 const variantStyles: Record<Variant, string> = {
-  primary: "bg-accent text-white hover:bg-accent/90 disabled:bg-accent/40",
-  secondary: "bg-transparent text-ink border border-ink/40 hover:border-ink hover:bg-ink/5",
-  ghost: "bg-transparent text-ink hover:bg-ink/5",
+  primary: "btn--primary bg-accent text-white hover:bg-accent/90 disabled:bg-accent/40",
+  secondary: "btn--secondary bg-transparent text-ink border border-ink/40 hover:border-ink hover:bg-ink/5",
+  ghost: "btn--ghost bg-transparent text-ink hover:bg-ink/5",
 };
 
 const sizeStyles: Record<Size, string> = {
@@ -18,7 +18,7 @@ const sizeStyles: Record<Size, string> = {
 };
 
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-sm font-medium transition-[color,background-color,border-color,transform] duration-150 active:translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60";
+  "btn inline-flex items-center justify-center gap-2 rounded-sm font-medium transition-[color,background-color,border-color,transform] duration-150 active:translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;

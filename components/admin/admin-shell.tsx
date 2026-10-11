@@ -204,7 +204,7 @@ export function AdminShell({
       {/* Desktop sidebar */}
       <aside
         className={cn(
-          "sticky top-0 hidden h-screen shrink-0 flex-col border-r border-line bg-surface transition-[width] duration-200 lg:flex",
+          "admin-sidebar sticky top-0 hidden h-screen shrink-0 flex-col border-r border-line bg-surface transition-[width] duration-200 lg:flex",
           collapsed ? "w-[4.25rem]" : "w-60",
         )}
       >
@@ -255,7 +255,7 @@ export function AdminShell({
             className="absolute inset-0 bg-black/60"
             onClick={() => setMenuOpen(false)}
           />
-          <div className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col border-r border-line bg-surface">
+          <div className="admin-sidebar absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col border-r border-line bg-surface">
             <div className="flex h-16 items-center justify-between border-b border-line px-4">
               {brand()}
               <button type="button" aria-label="Close menu" className="p-2 text-ink" onClick={() => setMenuOpen(false)}>
