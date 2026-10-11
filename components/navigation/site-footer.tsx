@@ -18,7 +18,7 @@ export function SiteFooter({ settings, columns }: { settings: OrganizationSettin
   ];
 
   return (
-    <footer className="border-t border-line mt-auto bg-surface">
+    <footer className="site-footer border-t border-line mt-auto bg-surface">
       <div className="container-fx py-16 md:py-20">
         {/* Top: Brand + Tagline */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-12 md:gap-8">

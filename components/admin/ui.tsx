@@ -300,15 +300,15 @@ export function Pagination({
 }
 
 const TONES = {
-  neutral: "border-ink/25 text-ink/75",
-  good: "border-accent/45 bg-accent-soft text-ink",
-  warn: "border-amber-500/50 bg-amber-500/10 text-ink",
-  bad: "border-red-500/50 bg-red-500/10 text-ink",
+  neutral: "pill--neutral border-ink/25 text-ink/75",
+  good: "pill--good border-accent/45 bg-accent-soft text-ink",
+  warn: "pill--warn border-amber-500/50 bg-amber-500/10 text-ink",
+  bad: "pill--bad border-red-500/50 bg-red-500/10 text-ink",
 } as const;
 
 export function Pill({ children, tone = "neutral" }: { children: React.ReactNode; tone?: keyof typeof TONES }) {
   return (
-    <span className={cn("inline-flex items-center whitespace-nowrap border px-2 py-0.5 text-xs font-medium capitalize", TONES[tone])}>
+    <span className={cn("pill inline-flex items-center whitespace-nowrap border px-2 py-0.5 text-xs font-medium capitalize", TONES[tone])}>
       {children}
     </span>
   );

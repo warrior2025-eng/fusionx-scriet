@@ -9,7 +9,7 @@ export function DateBlock({ date }: { date: string }) {
   return (
     <time
       dateTime={date}
-      className="flex h-14 w-14 shrink-0 flex-col items-center justify-center border border-line bg-paper/60 leading-none"
+      className="date-block flex h-14 w-14 shrink-0 flex-col items-center justify-center border border-line bg-paper/60 leading-none"
     >
       <span className="font-serif text-xl font-medium tabular-nums text-ink">{d.getUTCDate()}</span>
       <span className="mt-1 text-[11px] font-medium tracking-[0.08em] text-ink/60">{monthLabel}</span>

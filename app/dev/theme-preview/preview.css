@@ -1,0 +1,209 @@
+/* =========================================================================
+   LIGHT THEME PREVIEW — two candidate light themes, only for
+   /dev/theme-preview. Every rule sits under [data-lt], which only the preview
+   page sets, so nothing here reaches the real site or the dark theme.
+
+     [data-lt="a"]  Crisp Blue   blue-white canvas, white cards, navy band
+     [data-lt="b"]  Ink & Blue   navy header / hero / footer around white
+   ========================================================================= */
+
+/* ── Tokens ─────────────────────────────────────────────────────────────── */
+:root[data-theme="light"][data-lt] {
+  --color-surface: #ffffff;
+  --color-accent: #004df6; /* the logo blue, sampled from logo-mark.png */
+  --color-accent-hover: #003dd1;
+  --color-accent-soft: #e3ebff;
+  --color-accent-text: var(--color-accent);
+  --color-danger: #c62828;
+  --navy: #0a1230;
+  --shadow-sm: 0 1px 2px rgba(10, 18, 48, 0.06);
+  --shadow-md: 0 8px 24px -10px rgba(10, 18, 48, 0.12);
+  --shadow-hover: 0 16px 36px -14px rgba(0, 77, 246, 0.22);
+}
+:root[data-theme="light"][data-lt="a"] {
+  --color-paper: #f3f6fc;
+  --color-surface-2: #eaf0ff;
+  --color-ink: #0a1230;
+  --color-ink-muted: #4a5578;
+  --color-ink-subtle: #5e6a8c;
+  --color-line: rgba(10, 18, 48, 0.1);
+  --color-line-strong: rgba(10, 18, 48, 0.2);
+  --brand-band: linear-gradient(135deg, #0a1230, #0f2a7a);
+}
+:root[data-theme="light"][data-lt="b"] {
+  --color-paper: #fbfcfe;
+  --color-surface-2: #eef2fb;
+  --color-ink: #060d28;
+  --color-ink-muted: #434d6e;
+  --color-ink-subtle: #58638a;
+  --color-line: rgba(6, 13, 40, 0.11);
+  --color-line-strong: rgba(6, 13, 40, 0.22);
+  --brand-band: linear-gradient(135deg, #004df6, #0a3fd0);
+}
+
+/* Navy grounds inside the light theme (brand bands; in B also the header,
+   hero and footer): white text, and the muted steps in white. */
+:root[data-theme="light"][data-lt] .on-navy,
+:root[data-theme="light"][data-lt="b"] :is(.site-header, .site-footer) {
+  --color-paper: var(--navy);
+  --color-surface: #101a3f;
+  --color-ink: #fefefe;
+  --color-ink-muted: rgba(254, 254, 254, 0.8);
+  --color-ink-subtle: rgba(254, 254, 254, 0.64);
+  --color-accent-text: #fefefe;
+  --color-accent-soft: rgba(0, 77, 246, 0.3);
+  --color-line: rgba(254, 254, 254, 0.14);
+  --color-line-strong: rgba(254, 254, 254, 0.3);
+  background: var(--navy);
+  color: var(--color-ink);
+}
+/* A white card standing on a navy ground: back to the light tokens. */
+:root[data-theme="light"][data-lt="b"] .lt-island {
+  --color-paper: #fbfcfe;
+  --color-surface: #ffffff;
+  --color-ink: #060d28;
+  --color-ink-muted: #434d6e;
+  --color-ink-subtle: #58638a;
+  --color-accent-text: var(--color-accent);
+  --color-accent-soft: #e3ebff;
+  --color-line: rgba(6, 13, 40, 0.11);
+  color: var(--color-ink);
+}
+
+/* ── Faint text → readable. The site writes muted text as ink at an opacity
+   (text-ink/55 …); here those map onto two solid, AA-checked steps. In the
+   utilities layer and at utility weight, so hover: colours still win. ───── */
+@layer utilities {
+  :where(:root[data-theme="light"][data-lt]) :is(.text-ink\/55, .text-ink\/60, .text-ink\/65, .text-ink\/70, .text-ink\/75) {
+    color: var(--color-ink-muted);
+  }
+  :where(:root[data-theme="light"][data-lt]) :is(.text-ink\/30, .text-ink\/35, .text-ink\/40, .text-ink\/45, .text-ink\/50) {
+    color: var(--color-ink-subtle);
+  }
+  :where(:root[data-theme="light"][data-lt]) .text-red-600 {
+    color: var(--color-danger);
+  }
+}
+
+:root[data-theme="light"][data-lt] {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(10, 18, 48, 0.2) transparent;
+
+  & ::-webkit-scrollbar { width: 10px; height: 10px; }
+  & ::-webkit-scrollbar-thumb { background: rgba(10, 18, 48, 0.2); border: 2px solid transparent; background-clip: content-box; }
+
+  /* ── Header: white, a constant hairline, the subtitle at full strength ── */
+  & .site-header { border-bottom: 1px solid var(--color-line); }
+
+  /* ── Eyebrow: blue slash, blue number, navy-muted label ── */
+  & .eyebrow .eyebrow__label { color: var(--color-ink-muted); }
+  & .eyebrow .eyebrow__index { color: var(--color-accent-text); font-weight: 600; }
+
+  /* ── Cards: white, hairline, navy-tinted shadow; blue lift on hover ── */
+  & :is(.cut-corner, .card-elevated) {
+    --card-bg: var(--color-surface);
+    filter: drop-shadow(0 1px 2px rgba(10, 18, 48, 0.06)) drop-shadow(0 8px 12px rgba(10, 18, 48, 0.07));
+    transition: transform 0.15s ease, filter 0.2s ease;
+  }
+  & :is(.card-elevated, .cut-corner--interactive):is(:hover, :focus-within) {
+    filter: drop-shadow(0 1px 2px rgba(10, 18, 48, 0.06)) drop-shadow(0 14px 18px rgba(0, 77, 246, 0.2));
+  }
+
+  /* ── Buttons ── */
+  & .btn--primary { box-shadow: 0 8px 18px -10px rgba(0, 77, 246, 0.7); }
+  & .btn--primary:hover { background: var(--color-accent-hover); }
+  & .btn--secondary { border-color: color-mix(in srgb, var(--color-ink) 55%, transparent); }
+  & .btn--secondary:hover { border-color: var(--color-ink); background: var(--color-accent-soft); }
+  & .btn--ghost { color: var(--color-accent-text); }
+  & .btn--ghost:hover { background: var(--color-accent-soft); }
+
+  /* ── Badges and status pills: tinted grounds, AA text ── */
+  & .badge { border-color: transparent; background: var(--color-accent-soft); color: var(--color-accent-text); font-weight: 600; }
+  & .pill { border-color: transparent; font-weight: 600; }
+  & .pill--neutral { background: var(--color-surface-2); color: var(--color-ink-muted); }
+  & .pill--good { background: #dcf5e7; color: #0b6b3a; }
+  & .pill--warn { background: #fff0cf; color: #8a5200; }
+  & .pill--bad { background: #fde5e5; color: #b42318; }
+
+  /* ── Forms: white fields, a clear border, a blue 2px focus ring ── */
+  & :where(input:not([type="checkbox"], [type="radio"], [type="file"]), textarea, select):not([class*="border-red"]) {
+    border-color: var(--color-line-strong);
+    background: var(--color-surface);
+  }
+  & :where(input, textarea, select):focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 2px rgba(0, 77, 246, 0.28);
+    outline: none;
+  }
+  /* the hint step, not "muted at 70%": that only reaches 3.5:1 on white */
+  & ::placeholder { color: var(--color-ink-subtle); opacity: 1; }
+
+  /* ── Links: blue, underline on hover ── */
+  & a.text-accent:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+  /* ── Stepper: blue nodes, a quiet navy joining line ── */
+  & .stepper__node { border-color: var(--color-accent); color: var(--color-accent); font-weight: 700; }
+  & .stepper__step:not(:last-child)::before { background: color-mix(in srgb, var(--color-ink) 15%, transparent); }
+
+  /* ── Date block and Activity numbers pick up the blue ── */
+  & .date-block { border-color: transparent; background: var(--color-accent-soft); }
+  & .date-block > :first-child { color: var(--color-accent); }
+  & .lt-activity dd > * { color: var(--color-accent); }
+
+  /* ── Brand band (Join) ── */
+  & #lt-join { background: var(--brand-band); }
+
+  /* ── Footer social icons: navy → blue ── */
+  & .site-footer a:is(:hover, :focus-visible) { color: var(--color-accent-text); }
+}
+
+/* ── Option A: Crisp Blue ───────────────────────────────────────────────── */
+:root[data-theme="light"][data-lt="a"] {
+  & body {
+    background:
+      radial-gradient(1100px 520px at 50% -140px, rgba(0, 77, 246, 0.08), transparent 70%) no-repeat,
+      var(--color-paper);
+  }
+  & .band--surface { background: var(--color-surface); border-block: 1px solid var(--color-line); }
+  & .band--tint { background: var(--color-surface-2); }
+  /* hero: the daylight scene, eased into a white → blue-wash ground */
+  & .lt-hero { background: linear-gradient(180deg, #ffffff, var(--color-surface-2)); }
+  & .site-footer { border-top: 2px solid var(--color-accent); }
+}
+
+/* ── Option B: Ink & Blue ───────────────────────────────────────────────── */
+:root[data-theme="light"][data-lt="b"] {
+  & .band--surface { background: var(--color-surface); border-block: 1px solid var(--color-line); }
+  & .band--tint { background: var(--color-surface-2); }
+  /* heavier, larger headings in deep navy */
+  & :is(h1, h2, h3).font-serif { font-weight: 600; letter-spacing: -0.022em; }
+  /* navy header: the logo disc needs an edge; nav text in white */
+  & .site-header { border-bottom-color: transparent; }
+  & .site-header img.rounded-full { box-shadow: 0 0 0 1.5px rgba(254, 254, 254, 0.45); }
+  /* the hero keeps the night scene, unchanged */
+  & .scene-poster[data-scene-theme="dark"] {
+    background-color: #00030d;
+    background-image: url("/hero/fusionx-hero-poster.webp");
+  }
+  & .lt-hero { --color-paper: #00030d; background: #00030d; }
+  & #lt-join { --color-ink-muted: rgba(254, 254, 254, 0.92); }
+  & .site-footer { border-top-color: transparent; }
+  & .site-footer a:is(:hover, :focus-visible) { color: #8fb0ff; }
+  /* accent on navy: body-size blue fails AA there, so links go a lighter blue */
+  & .on-navy .eyebrow .eyebrow__label { color: var(--color-ink-muted); }
+}
+
+/* ── The comparison page itself ─────────────────────────────────────────── */
+.lt-compare {
+  min-height: 100vh;
+  background: #1a1f2e;
+  color: #e8ecf5;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+.lt-compare a { color: #9db8ff; }
+.lt-compare__frame {
+  border: 0;
+  display: block;
+  transform-origin: 0 0;
+  background: #fff;
+}
