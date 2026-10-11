@@ -38,7 +38,8 @@ export default async function ThemeSpecimenPage({ params }: { params: Promise<{ 
   const { option } = await params;
   if (!previewAllowed() || !(option in OPTIONS)) notFound();
   const key = option as OptionKey;
-  const navyHero = key === "b";
+  const { hero, join } = OPTIONS[key];
+  const navyHero = hero === "night";
 
   const supabase = await createClient();
   const [settings, footerColumns, { data: memberCount }, { count: projectCount }, { count: eventCount }] = await Promise.all([
@@ -248,7 +249,7 @@ export default async function ThemeSpecimenPage({ params }: { params: Promise<{ 
         </Section>
 
         {/* ── Brand band ── */}
-        <Section band="navy" id="lt-join">
+        <Section band={join} id="lt-join">
           <Eyebrow>Join the network</Eyebrow>
           <div className="flex flex-wrap items-end justify-between gap-8">
             <div className="max-w-xl">
@@ -257,7 +258,7 @@ export default async function ThemeSpecimenPage({ params }: { params: Promise<{ 
                 Join FusionX and become part of a network of students building, researching, and competing together.
               </p>
             </div>
-            <LinkButton href="/join" size="lg" variant={key === "b" ? "secondary" : "primary"}>
+            <LinkButton href="/join" size="lg" variant={key === "b" || key === "c" ? "secondary" : "primary"}>
               Join FusionX <ArrowRight size={16} className="arrow-nudge" />
             </LinkButton>
           </div>
