@@ -104,3 +104,8 @@ export function seatsLine(event: EventForSeats, seats: SeatInfo | null): string 
   if (left > 0) return `${left} of ${seats.capacity} seats left`;
   return event.waitlist_enabled ? "All seats taken. Waitlist open" : "Event full";
 }
+
+/** Whether a moment (an ISO string) has passed. Empty means "no deadline": never past. */
+export function isPast(instant: string | null | undefined): boolean {
+  return instant ? Date.now() >= new Date(instant).getTime() : false;
+}

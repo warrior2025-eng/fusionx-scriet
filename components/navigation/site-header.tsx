@@ -105,13 +105,19 @@ export function SiteHeader({
   subtitle,
   logoUrl,
   user,
+  recruitment,
 }: {
   chapterName: string;
   subtitle: string;
   /** Uploaded logo; the built-in mark is used when this is empty. */
   logoUrl?: string | null;
   user: SiteUser | null;
+  /** Adds the Recruitment link (decided in the admin panel), with an "Open" badge when asked. */
+  recruitment?: { badge: boolean } | null;
 }) {
+  const links: { href: string; label: string; badge?: string }[] = recruitment
+    ? [...nav, { href: "/recruitment", label: "Recruitment", badge: recruitment.badge ? "Open" : undefined }]
+    : nav;
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
@@ -176,7 +182,7 @@ export function SiteHeader({
 
         {/* Desktop Nav */}
         <nav className="hidden xl:flex items-center gap-0.5">
-          {nav.map((item) => (
+          {links.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -188,6 +194,7 @@ export function SiteHeader({
               )}
             >
               {item.label}
+              {item.badge && <span className="ml-1.5 bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-white">{item.badge}</span>}
               {pathname?.startsWith(item.href) && (
                 <span className="absolute bottom-0 left-2 right-2 h-[2px] bg-accent" />
               )}

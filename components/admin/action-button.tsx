@@ -57,7 +57,9 @@ export function ActionButton({
     startTransition(async () => {
       const result = await action();
       toastResult(result);
-      if (result.status === "success") router.refresh();
+      if (result.status !== "success") return;
+      if (result.redirectTo) router.push(result.redirectTo);
+      else router.refresh();
     });
   }
 

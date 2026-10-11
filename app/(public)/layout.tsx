@@ -6,6 +6,7 @@ import { bannerIsLive, getOrganizationSettings } from "@/lib/data/organization";
 import { getContent } from "@/lib/data/site-content";
 import { getCurrentRoles, getCurrentUser } from "@/lib/permissions";
 import { capabilitiesFor } from "@/lib/permissions/capabilities";
+import { cycleState, getCurrentCycle } from "@/lib/recruitment/data";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
@@ -39,7 +40,27 @@ export default async function PublicLayout({ children }: { children: React.React
       : { full_name: user.email ?? "Member", avatar_url: null };
   }
 
-  const footerColumns = await getContent("footer.columns");
+  // Recruitment in the header: while a cycle is open ("auto"), always, or never.
+  const [navLinks, cycle, storedColumns] = await Promise.all([getContent("nav.links"), getCurrentCycle(), getContent("footer.columns")]);
+  const recruitmentOpen = cycleState(cycle) === "open";
+  const showRecruitment = navLinks.recruitment === "on" || (navLinks.recruitment === "auto" && recruitmentOpen);
+
+  // A team reviewer gets a link to their applications in the account menu.
+  if (user) {
+    const { count } = await (await createClient())
+      .from("recruitment_team_reviewers")
+      .select("team_id", { count: "exact", head: true })
+      .eq("user_id", user.id);
+    if (count) panels.push({ href: "/review", label: "Review applications" });
+  }
+
+  // Footer: Recruitment and Teams links can be switched off; Recruitment is added to the second column when on.
+  const hidden = new Set([...(navLinks.footerRecruitment ? [] : ["/recruitment"]), ...(navLinks.footerTeams ? [] : ["/teams"])]);
+  const footerColumns = storedColumns.map((column, i) => {
+    const links = column.links.filter((l) => !hidden.has(l.href));
+    const add = navLinks.footerRecruitment && i === Math.min(1, storedColumns.length - 1) && !storedColumns.some((c) => c.links.some((l) => l.href === "/recruitment"));
+    return { ...column, links: add ? [...links, { href: "/recruitment", label: "Recruitment" }] : links };
+  });
   const bannerClass = "block bg-accent text-white text-center text-sm px-4 py-2";
 
   return (
@@ -61,6 +82,7 @@ export default async function PublicLayout({ children }: { children: React.React
         chapterName={settings.chapter_name}
         subtitle={settings.subtitle}
         logoUrl={settings.logo_path}
+        recruitment={showRecruitment ? { badge: navLinks.recruitmentBadge && recruitmentOpen } : null}
         user={user ? { email: user.email ?? "", fullName: profile?.full_name ?? "Member", avatarUrl: profile?.avatar_url ?? null, panels } : null}
       />
       <main className="flex-1">{children}</main>

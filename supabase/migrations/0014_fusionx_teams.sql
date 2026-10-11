@@ -425,6 +425,16 @@ begin
           '/teams/' || t.id);
 end $$;
 
+-- The waiting requests for a team, with each requester's name, for its leader and staff.
+create or replace function team_join_requests_for(p_team uuid)
+returns table (id uuid, user_id uuid, full_name text, department text, year text, message text, created_at timestamptz)
+language sql security definer stable set search_path = public as $$
+  select r.id, r.user_id, p.full_name, p.department, p.year, r.message, r.created_at
+  from team_join_requests r join profiles p on p.id = r.user_id
+  where r.team_id = p_team and r.status = 'pending' and (is_team_leader(p_team) or is_staff())
+  order by r.created_at;
+$$;
+
 -- ── members ────────────────────────────────────────────────────────────
 create or replace function remove_member(p_team uuid, p_user uuid)
 returns void language plpgsql security definer set search_path = public as $$
@@ -551,14 +561,14 @@ revoke all on function
   team_invite_info(text), accept_team_invite(text), decline_team_invite(text), revoke_team_invite(uuid),
   request_to_join(uuid, text), respond_join_request(uuid, boolean), remove_member(uuid, uuid), leave_team(uuid),
   transfer_leadership(uuid, uuid), admin_add_team_member(uuid, text), team_roster(uuid),
-  verify_team(uuid, team_verification, text), fusionx_teams_whatsapp(uuid)
+  verify_team(uuid, team_verification, text), fusionx_teams_whatsapp(uuid), team_join_requests_for(uuid)
   from public, anon, authenticated;
 grant execute on function
   register_team(jsonb), update_team(uuid, jsonb), invite_to_team(uuid, text[]), accept_team_invite(text),
   decline_team_invite(text), revoke_team_invite(uuid), request_to_join(uuid, text), respond_join_request(uuid, boolean),
   remove_member(uuid, uuid), leave_team(uuid), transfer_leadership(uuid, uuid), admin_add_team_member(uuid, text),
   team_roster(uuid), verify_team(uuid, team_verification, text), fusionx_teams_whatsapp(uuid),
-  team_setting_int(text, integer), team_capacity(uuid)
+  team_join_requests_for(uuid), team_setting_int(text, integer), team_capacity(uuid)
   to authenticated;
 grant execute on function team_invite_info(text), teams_registration_open(),
   is_team_member(uuid), is_team_leader(uuid), can_see_team(uuid)
