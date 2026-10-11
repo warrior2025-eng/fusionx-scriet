@@ -77,16 +77,7 @@ async function loadSceneDocument(theme: FusionXSceneTheme) {
 
 type SceneStatus = "loading" | "ready" | "failed";
 
-export function FusionXHero({
-  className,
-  floatTarget,
-  theme: forcedTheme,
-}: {
-  className?: string;
-  floatTarget?: string;
-  /** Pin the scene to one palette whatever the page theme (a navy hero band on a light page). */
-  theme?: FusionXSceneTheme;
-}) {
+export function FusionXHero({ className, floatTarget }: { className?: string; floatTarget?: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   // Both are tagged with the theme they belong to, so a theme switch simply
@@ -100,8 +91,7 @@ export function FusionXHero({
     () => window.matchMedia(REDUCED_MOTION).matches,
     () => true,
   );
-  const pageTheme = useSyncExternalStore(subscribeTheme, currentTheme, (): FusionXSceneTheme => "dark");
-  const theme = forcedTheme ?? pageTheme;
+  const theme = useSyncExternalStore(subscribeTheme, currentTheme, (): FusionXSceneTheme => "dark");
 
   const srcDoc = scene?.theme === theme ? scene.doc : null;
   const status: SceneStatus = report?.theme === theme ? report.status : "loading";
@@ -256,7 +246,6 @@ export function FusionXHero({
       ref={hostRef}
       aria-hidden
       data-state={showScene ? status : "poster"}
-      data-scene-theme={forcedTheme}
       className={cn("scene-poster absolute inset-0 overflow-hidden bg-cover bg-center", className)}
     >
       {showScene && (
