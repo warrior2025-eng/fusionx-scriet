@@ -5,6 +5,7 @@ import { authorize, FORBIDDEN } from "@/lib/admin/guard";
 import { logAudit } from "@/lib/admin/audit";
 import { fail, ok, zodFieldErrors, type ActionState } from "@/lib/admin/action-state";
 import { isUpload, removeByUrl, uploadImage } from "@/lib/admin/storage";
+import { fromIstInput } from "@/lib/events/format";
 import { CONTENT, HOME_SECTIONS, SEO_PAGES, withFallback, type ContentKey } from "@/lib/site-content/schema";
 
 const text = (formData: FormData, name: string) => {
@@ -19,6 +20,13 @@ function json(formData: FormData, name: string): unknown {
     return null;
   }
 }
+
+/** A datetime-local value typed as IST, as an ISO string; empty stays empty. */
+const instant = (formData: FormData, name: string) => {
+  const value = text(formData, name).trim();
+  return value ? fromIstInput(value) : "";
+};
+const pick = (formData: FormData, names: string[]) => Object.fromEntries(names.map((n) => [n, text(formData, n)]));
 
 /** Builds each key's value from its form. Field names are the value's own paths. */
 const READERS: { [K in ContentKey]: (formData: FormData, existing: unknown) => unknown } = {
@@ -42,6 +50,27 @@ const READERS: { [K in ContentKey]: (formData: FormData, existing: unknown) => u
     titleTemplate: text(f, "titleTemplate"),
     description: text(f, "description"),
   }),
+  "recruitment.page": (f) => pick(f, ["heading", "intro", "difference"]),
+  "teams.page": (f) => pick(f, ["heading", "intro"]),
+  "teams.register": (f) => pick(f, ["heading", "intro", "difference"]),
+  "join.page": (f) => pick(f, ["heading", "intro"]),
+  "join.templates": (f) => pick(f, ["approved", "rejected"]),
+  "join.settings": (f) => ({ deadline: instant(f, "deadline") }),
+  "teams.settings": (f) => ({
+    registrationOpen: f.get("registrationOpen") === "on",
+    deadline: instant(f, "deadline"),
+    closedMessage: text(f, "closedMessage"),
+    minSize: text(f, "minSize"),
+    maxSize: text(f, "maxSize"),
+    maxTeamsPerUser: text(f, "maxTeamsPerUser"),
+    inviteExpiryDays: text(f, "inviteExpiryDays"),
+  }),
+  "nav.links": (f) => ({
+    recruitment: text(f, "recruitment"),
+    recruitmentBadge: f.get("recruitmentBadge") === "on",
+    footerRecruitment: f.get("footerRecruitment") === "on",
+    footerTeams: f.get("footerTeams") === "on",
+  }),
   "seo.pages": (f, existing) => {
     const previous = (existing ?? {}) as Record<string, { ogImage?: string }>;
     return Object.fromEntries(
@@ -58,7 +87,17 @@ const READERS: { [K in ContentKey]: (formData: FormData, existing: unknown) => u
   },
 };
 
-const VIEW: Partial<Record<ContentKey, string>> = { "about.page": "/about" };
+const VIEW: Partial<Record<ContentKey, string>> = {
+  "about.page": "/about",
+  "recruitment.page": "/recruitment",
+  "teams.page": "/teams",
+  "teams.register": "/teams/register",
+  "teams.settings": "/teams/register",
+  "join.page": "/join",
+  "join.settings": "/join",
+};
+/** Keys whose empty fields mean "empty", not "use the original". */
+const EXACT_KEYS: ContentKey[] = ["join.settings", "teams.settings", "nav.links"];
 const LIST_KEYS: ContentKey[] = ["lists.pipeline", "lists.journey", "lists.core_areas", "footer.columns"];
 
 /**
@@ -102,7 +141,8 @@ export async function saveContent(key: ContentKey, _prev: ActionState, formData:
 
   // A cleared text field means "use the original": fill it from the default
   // before validating. Lists and per-page SEO are taken exactly as submitted.
-  const candidate = LIST_KEYS.includes(key) || key === "seo.pages" ? value : withFallback(entry.fallback, value);
+  const candidate =
+    LIST_KEYS.includes(key) || EXACT_KEYS.includes(key) || key === "seo.pages" ? value : withFallback(entry.fallback, value);
   const parsed = entry.schema.safeParse(candidate);
   if (!parsed.success) {
     for (const url of uploaded) await removeByUrl(ctx.supabase, "site-assets", url);
