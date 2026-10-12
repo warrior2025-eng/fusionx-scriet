@@ -6,7 +6,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, FileText, X } from "l
 import { saveRecruitmentDraft, submitRecruitmentApplication, uploadRecruitmentFile } from "@/actions/recruitment";
 import { Button } from "@/components/ui/button";
 import { FieldHint, Input, Label, Textarea } from "@/components/ui/field";
-import { questionsFor, type Answer, type Question } from "@/lib/recruitment/data";
+import { questionsFor, type Answer, type Question } from "@/lib/recruitment/shared";
 import { cn } from "@/lib/utils";
 
 export type ApplyDraft = {
