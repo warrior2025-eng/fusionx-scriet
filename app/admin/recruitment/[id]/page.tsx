@@ -96,6 +96,15 @@ export default async function CyclePage({ params }: { params: Promise<{ id: stri
                 Publish results
               </ActionButton>
             )}
+            {cycle.status === "closed" && (
+              <ActionButton
+                variant="ghost"
+                action={setCycleStatus.bind(null, id, "draft")}
+                confirm={{ title: "Put this cycle back to draft?", body: "It disappears from the site. Applications already sent are kept. A draft can be opened again, or deleted.", confirmLabel: "Back to draft" }}
+              >
+                Back to draft
+              </ActionButton>
+            )}
             <ActionButton variant="ghost" action={duplicateCycle.bind(null, id)}>
               Duplicate
             </ActionButton>
