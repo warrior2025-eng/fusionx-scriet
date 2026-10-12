@@ -9,6 +9,7 @@ import { isUpload, removeByUrl, uploadImage } from "@/lib/admin/storage";
 import { listUsers } from "@/lib/admin/users";
 import { fromIstInput } from "@/lib/events/format";
 import { STAGES, friendlyDbError } from "@/lib/recruitment/data";
+import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
 
 /**
  * Recruitment, from the admin panel.
@@ -32,6 +33,8 @@ const slugify = (value: string) =>
   value.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "team";
 
 function touched(cycleId?: string) {
+  // Notifications written by this action also go out as email, after the response.
+  deliverEmailsAfterResponse();
   revalidatePath("/recruitment");
   revalidatePath("/recruitment/apply");
   revalidatePath("/", "layout");
@@ -421,6 +424,7 @@ export async function addReviewer(cycleId: string, teamId: string, _prev: Action
   if (error && error.code !== "23505") return fail("Could not add this reviewer.");
   await ctx.supabase.from("notifications").insert({ user_id: person.id, title: "You are a recruitment reviewer", body: "You can now review applications for a team.", link: "/review" });
   await logAudit(ctx, { action: "added_reviewer", table: "recruitment_teams", id: teamId, after: { reviewer: person.fullName } });
+  deliverEmailsAfterResponse();
   revalidatePath(`/admin/recruitment/${cycleId}`, "layout");
   return ok(`${person.fullName} can now review this team's applications.`);
 }
@@ -457,6 +461,7 @@ export async function bulkStage(cycleId: string, _prev: ActionState, formData: F
   }
   revalidatePath(`/admin/recruitment/${cycleId}`, "layout");
   revalidatePath("/review");
+  deliverEmailsAfterResponse();
   return ok(`${moved} moved${skipped ? `, ${skipped} skipped (they did not apply to that team)` : ""}.`);
 }
 

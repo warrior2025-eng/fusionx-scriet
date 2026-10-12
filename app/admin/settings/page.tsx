@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { saveContent } from "@/actions/admin-content";
+import { sendTestEmailToMe, sendWaitingEmails } from "@/actions/admin-email";
 import { saveBanner, saveIdentity, saveRegistration } from "@/actions/admin-settings";
+import { ActionButton } from "@/components/admin/action-button";
 import { AdminForm, CheckboxField, SelectField, TextField, TextareaField } from "@/components/admin/admin-form";
 import { ImageField } from "@/components/admin/image-field";
 import { AdminPage, Panel } from "@/components/admin/ui";
 import { requireCapability } from "@/lib/admin/guard";
 import { getOrganizationSettings } from "@/lib/data/organization";
+import { emailStatus } from "@/lib/email/outbox";
 
 export const metadata: Metadata = { title: "Admin: Settings" };
 
@@ -17,7 +21,11 @@ function toLocalInput(iso: string | null): string {
 }
 
 export default async function SettingsPage() {
-  await requireCapability("settings", "/admin/settings");
+  const ctx = await requireCapability("settings", "/admin/settings");
+  const email = await emailStatus();
+  // Counts only. Null until migration 0015 has been run.
+  const { data: queue } = await ctx.supabase.rpc("notification_email_stats");
+  const emailQueue = queue as { waiting: number; gave_up: number; sent_today: number } | null;
   const settings = await getOrganizationSettings();
 
   return (
@@ -145,6 +153,42 @@ export default async function SettingsPage() {
               defaultChecked={settings.signup_enabled}
             />
           </AdminForm>
+        </Panel>
+
+        <Panel
+          title="Email notifications"
+          description="Every notification a member gets on the site (recruitment, teams, events, Join) is also sent to their email address."
+        >
+          <p className="mb-5 border border-line bg-paper px-3.5 py-2.5 text-sm text-ink">
+            {!email.configured
+              ? "Not set up yet: add RESEND_API_KEY and EMAIL_FROM to the server's environment variables, then redeploy. Until then nothing is emailed."
+              : email.enabled
+                ? "Email is set up and switched on."
+                : "Email is set up but switched off."}
+            {emailQueue && (
+              <span className="mt-1 block text-ink/70">
+                Sent in the last 24 hours: {emailQueue.sent_today}. Waiting: {emailQueue.waiting}.
+                {emailQueue.gave_up > 0 && ` Not delivered after five tries: ${emailQueue.gave_up}.`}
+              </span>
+            )}
+            {!emailQueue && <span className="mt-1 block text-ink/70">The email queue is not in the database yet (migration 0015).</span>}
+          </p>
+          <AdminForm action={saveContent.bind(null, "email.settings")}>
+            <CheckboxField
+              name="enabled"
+              label="Send notifications by email"
+              hint="When off, notifications stay on the site only. Ones created while it is off are not emailed later if they are more than three days old."
+              defaultChecked={email.enabled}
+            />
+          </AdminForm>
+          <div className="mt-5 flex flex-wrap gap-3 border-t border-line pt-5">
+            <ActionButton action={sendTestEmailToMe} disabled={!email.configured}>
+              Send a test email to me
+            </ActionButton>
+            <ActionButton action={sendWaitingEmails} disabled={!email.configured || !email.enabled}>
+              Send waiting emails now
+            </ActionButton>
+          </div>
         </Panel>
       </div>
     </AdminPage>

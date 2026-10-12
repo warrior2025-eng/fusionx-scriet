@@ -6,6 +6,7 @@ import { fail, ok, zodFieldErrors, type ActionState } from "@/lib/admin/action-s
 import { friendlyDbError } from "@/lib/recruitment/data";
 import { createClient } from "@/lib/supabase/server";
 import { parseEmails } from "@/lib/teams/data";
+import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
 
 /**
  * FusionX Teams, from a student's side. Every action validates its input and
@@ -68,6 +69,8 @@ async function signedIn() {
 }
 
 function touched(teamId?: string) {
+  // Notifications written by this action also go out as email, after the response.
+  deliverEmailsAfterResponse();
   revalidatePath("/teams");
   if (teamId) revalidatePath(`/teams/${teamId}`);
   revalidatePath("/admin/teams");

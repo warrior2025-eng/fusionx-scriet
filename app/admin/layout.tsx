@@ -4,6 +4,7 @@ import { getAdminContext } from "@/lib/admin/guard";
 import { getOrganizationSettings } from "@/lib/data/organization";
 import { ROLE_LABELS, type Capability } from "@/lib/permissions/capabilities";
 import type { AppRole } from "@/types/database";
+import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
 
 // Every section, with the capability it needs. The sidebar shows only what
 // the current role can use; each page and action checks again on its own.
@@ -55,6 +56,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const ctx = await getAdminContext();
   if (!ctx.user) redirect("/login?next=/admin");
   if (!ctx.caps.includes("admin.access")) redirect("/");
+
+  deliverEmailsAfterResponse();
 
   const settings = await getOrganizationSettings();
   const groups: AdminNavGroup[] = NAV.map((group) => ({

@@ -312,6 +312,12 @@ export const CONTENT = {
       inviteExpiryDays: 7,
     },
   },
+  /** Notifications also go out as email (needs RESEND_API_KEY and EMAIL_FROM on the server). */
+  "email.settings": {
+    scope: "settings",
+    schema: z.object({ enabled: z.boolean() }),
+    fallback: { enabled: true },
+  },
   "nav.links": {
     scope: "settings",
     schema: z.object({

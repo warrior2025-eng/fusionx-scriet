@@ -6,6 +6,7 @@ import { logAudit } from "@/lib/admin/audit";
 import { fail, ok, type ActionState } from "@/lib/admin/action-state";
 import { getEntity, isPublished, parseEntityForm, type EntityDef } from "@/lib/admin/entities";
 import { isUpload, removeByUrl, uploadImage, type BucketId } from "@/lib/admin/storage";
+import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
 
 /**
  * Create / update / delete / publish / reorder for every content type in
@@ -17,6 +18,8 @@ import { isUpload, removeByUrl, uploadImage, type BucketId } from "@/lib/admin/s
 type Row = Record<string, unknown>;
 
 function revalidate(def: EntityDef) {
+  // Notifications written by this action also go out as email, after the response.
+  deliverEmailsAfterResponse();
   revalidatePath(def.adminPath);
   for (const path of def.publicPaths) revalidatePath(path);
 }

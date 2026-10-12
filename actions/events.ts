@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { RegistrationStatus } from "@/lib/events/format";
+import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
 
 export type EventActionResult = {
   error?: string;
@@ -29,6 +30,8 @@ function refusal(message: string | undefined, fallback: string): string {
 }
 
 function revalidate(eventId: string) {
+  // Notifications written by this action also go out as email, after the response.
+  deliverEmailsAfterResponse();
   revalidatePath("/events");
   revalidatePath(`/events/${eventId}`);
   revalidatePath("/profile/events");
