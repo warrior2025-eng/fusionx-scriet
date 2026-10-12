@@ -1,5 +1,6 @@
 import { after } from "next/server";
 import { getOrganizationSettings } from "@/lib/data/organization";
+import { siteName as defaultSiteName } from "@/lib/site-config";
 import { getContent } from "@/lib/data/site-content";
 import { createAdminClient } from "@/lib/supabase/server";
 import { BATCH_LIMIT, emailConfig, sendBatch } from "./resend";
@@ -31,10 +32,16 @@ export async function emailStatus(): Promise<{ configured: boolean; enabled: boo
 export async function deliverPendingEmails(): Promise<DeliveryReport> {
   const config = emailConfig();
   if (!config || !process.env.SUPABASE_SERVICE_ROLE_KEY) return { state: "not_configured", sent: 0 };
-  if (!(await getContent("email.settings")).enabled) return { state: "off", sent: 0 };
 
+  // The switch and the site's name, read with the service client: this runs
+  // after the response and must not depend on the request that caused it.
   const supabase = createAdminClient();
-  const { chapter_name: siteName } = await getOrganizationSettings();
+  const [{ data: stored }, { data: organization }] = await Promise.all([
+    supabase.from("site_content").select("value").eq("key", "email.settings").maybeSingle(),
+    supabase.from("organization_settings").select("chapter_name").maybeSingle(),
+  ]);
+  if ((stored?.value as { enabled?: boolean } | undefined)?.enabled === false) return { state: "off", sent: 0 };
+  const siteName = (organization?.chapter_name as string | undefined) || defaultSiteName;
   let sent = 0;
 
   for (let round = 0; round < 3; round++) {
