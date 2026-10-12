@@ -28,7 +28,7 @@ export async function sendTestEmailToMe(): Promise<ActionState> {
 export async function sendWaitingEmails(): Promise<ActionState> {
   const ctx = await authorize("settings");
   if (!ctx) return FORBIDDEN;
-  const report = await deliverPendingEmails();
+  const report = await deliverPendingEmails({ force: true });
   revalidatePath("/admin/settings");
   if (report.state !== "sent") return fail(explain(report));
   return ok(report.sent === 0 ? "Nothing was waiting." : `${report.sent} email${report.sent === 1 ? "" : "s"} sent.`);

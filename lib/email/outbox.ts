@@ -28,8 +28,12 @@ export async function emailStatus(): Promise<{ configured: boolean; enabled: boo
   return { configured: emailConfig() !== null && Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY), enabled: settings.enabled };
 }
 
-/** Sends what is waiting, a batch at a time (at most three batches per call). */
-export async function deliverPendingEmails(): Promise<DeliveryReport> {
+/**
+ * Sends what is waiting, a batch at a time (at most three batches per call).
+ * A notification whose last send failed is left until its wait is over
+ * (15 minutes, 6 hours, then a day at a time); `force` tries it now.
+ */
+export async function deliverPendingEmails({ force = false }: { force?: boolean } = {}): Promise<DeliveryReport> {
   const config = emailConfig();
   if (!config || !process.env.SUPABASE_SERVICE_ROLE_KEY) return { state: "not_configured", sent: 0 };
 
@@ -45,7 +49,7 @@ export async function deliverPendingEmails(): Promise<DeliveryReport> {
   let sent = 0;
 
   for (let round = 0; round < 3; round++) {
-    const { data, error } = await supabase.rpc("claim_notification_emails", { p_limit: BATCH_LIMIT });
+    const { data, error } = await supabase.rpc("claim_notification_emails", { p_limit: BATCH_LIMIT, p_force: force });
     if (error) return { state: "failed", sent, error: "The email queue could not be read. Has migration 0015 been run?" };
     const claimed = (data ?? []) as Claimed[];
     if (claimed.length === 0) break;
@@ -56,7 +60,7 @@ export async function deliverPendingEmails(): Promise<DeliveryReport> {
       claimed.map((n) => n.id).sort().join(","),
     );
     if (!result.ok) {
-      // Back in the queue; each notification is tried at most five times.
+      // Back in the queue; each is tried at most five times, with a growing wait between tries.
       await supabase.rpc("release_notification_emails", { p_ids: claimed.map((n) => n.id) });
       console.error("email delivery failed:", result.error);
       return { state: "failed", sent, error: result.error };

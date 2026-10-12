@@ -18,7 +18,8 @@ begin;
 
 alter table notifications
   add column emailed_at timestamptz,
-  add column email_attempts smallint not null default 0;
+  add column email_attempts smallint not null default 0,
+  add column email_tried_at timestamptz;
 
 -- What already exists counts as handled: no old notification is emailed.
 update notifications set emailed_at = created_at;
@@ -33,6 +34,7 @@ begin
   if auth.uid() is not null then
     new.emailed_at := old.emailed_at;
     new.email_attempts := old.email_attempts;
+    new.email_tried_at := old.email_tried_at;
   end if;
   return new;
 end $$;
@@ -44,7 +46,12 @@ create trigger trg_guard_notification_email_columns before update on notificatio
 -- address to send to. Two calls at the same moment never get the same row.
 -- Rows for people with no email, or a deactivated account, are marked and
 -- left out.
-create or replace function claim_notification_emails(p_limit integer default 50)
+--
+-- A notification whose send failed waits before its next try: 15 minutes,
+-- then 6 hours, then a day, then another day. That way a provider's daily
+-- limit does not use up all five tries within a few minutes. p_force skips
+-- the wait (the admin panel's "send waiting emails now").
+create or replace function claim_notification_emails(p_limit integer default 50, p_force boolean default false)
 returns table (id uuid, email text, full_name text, title text, body text, link text)
 language plpgsql security definer set search_path = public as $$
 #variable_conflict use_column
@@ -54,12 +61,15 @@ begin
     select n.id
     from notifications n
     where n.emailed_at is null and n.email_attempts < 5 and n.created_at > now() - interval '3 days'
+      and (coalesce(p_force, false) or n.email_tried_at is null
+           or n.email_tried_at < now() - case n.email_attempts
+                when 1 then interval '15 minutes' when 2 then interval '6 hours' else interval '24 hours' end)
     order by n.created_at
     limit least(greatest(coalesce(p_limit, 50), 1), 100)
     for update skip locked
   ), claimed as (
     update notifications n
-    set emailed_at = now(), email_attempts = n.email_attempts + 1
+    set emailed_at = now(), email_tried_at = now(), email_attempts = n.email_attempts + 1
     from picked
     where n.id = picked.id
     returning n.id, n.user_id, n.title, n.body, n.link
@@ -92,10 +102,10 @@ begin
 end $$;
 
 revoke all on function
-  claim_notification_emails(integer), release_notification_emails(uuid[]),
+  claim_notification_emails(integer, boolean), release_notification_emails(uuid[]),
   notification_email_stats(), guard_notification_email_columns()
   from public, anon, authenticated;
-grant execute on function claim_notification_emails(integer), release_notification_emails(uuid[]) to service_role;
+grant execute on function claim_notification_emails(integer, boolean), release_notification_emails(uuid[]) to service_role;
 grant execute on function notification_email_stats() to authenticated;
 
 -- Direct inserts: staff only (see the note at the top).
