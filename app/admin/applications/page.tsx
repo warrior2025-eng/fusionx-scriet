@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { JoinControls } from "@/components/admin/site-controls";
 import Link from "next/link";
 import { Download } from "lucide-react";
 import { bulkReviewApplications } from "@/actions/admin-applications";
@@ -137,6 +138,7 @@ export default async function ApplicationsPage({ searchParams }: { searchParams:
       </AdminForm>
 
       <Pagination base="/admin/applications" params={params} page={page} pageSize={PAGE_SIZE} total={count ?? 0} />
+      <JoinControls />
     </AdminPage>
   );
 }

@@ -23,6 +23,12 @@ export type Capability =
   | "moderation.delete"
   /** Team profiles (org_people). */
   | "team"
+  /** Recruitment: cycles, WhatsApp links, reviewers, applications, publishing results. */
+  | "recruitment"
+  /** Recruitment text only: descriptions, questions, message templates. */
+  | "recruitment.content"
+  /** FusionX Teams: verify, feature, delete, members, settings. */
+  | "teams.manage"
   /** Issue event certificates, manage signatures and check-in volunteers. */
   | "certificates"
   /** View users, deactivate / reactivate accounts, export. */
@@ -39,13 +45,16 @@ export type Capability =
   /** Maintenance mode and the danger zone. */
   | "danger";
 
-const EDITOR: readonly Capability[] = ["admin.access", "content", "moderation"];
+const EDITOR: readonly Capability[] = ["admin.access", "content", "moderation", "recruitment.content"];
 
 const ADMIN: readonly Capability[] = [
   ...EDITOR,
   "content.delete_published",
   "moderation.delete",
   "team",
+  "recruitment",
+  "recruitment.content",
+  "teams.manage",
   "certificates",
   "users",
   "applications",

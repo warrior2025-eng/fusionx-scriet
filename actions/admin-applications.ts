@@ -1,5 +1,6 @@
 "use server";
 
+import { getContent } from "@/lib/data/site-content";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { authorize, FORBIDDEN, type AdminContext } from "@/lib/admin/guard";
@@ -25,7 +26,8 @@ const reviewSchema = z.object({
 
 /** Applies a status (and optional note) to a set of applications, one audit entry each. */
 async function review(ctx: AdminContext, ids: string[], status: ApplicationStatus, note: string): Promise<number> {
-  const { data: before } = await ctx.supabase.from("applications").select("id, status, review_notes, user_id").in("id", ids);
+  const { data: before } = await ctx.supabase.from("applications").select("id, status, review_notes, user_id, full_name").in("id", ids);
+  const templates = await getContent("join.templates");
   const rows = before ?? [];
   if (rows.length === 0) return 0;
 
@@ -56,7 +58,16 @@ async function review(ctx: AdminContext, ids: string[], status: ApplicationStatu
   // Tell applicants whose status actually changed.
   const notices = rows
     .filter((r) => done.has(r.id) && r.user_id && r.status !== status)
-    .map((r) => ({ user_id: r.user_id, title: "Application update", body: STATUS_MESSAGES[status], link: "/join" }));
+    .map((r) => ({
+      user_id: r.user_id,
+      title: "Application update",
+      // Approved and rejected use the wording set in the admin panel; {name} is the applicant.
+      body:
+        status === "selected" || status === "rejected"
+          ? templates[status === "selected" ? "approved" : "rejected"].replaceAll("{name}", String(r.full_name ?? "").trim() || "there")
+          : STATUS_MESSAGES[status],
+      link: "/join",
+    }));
   if (notices.length) await ctx.supabase.from("notifications").insert(notices);
 
   revalidatePath("/admin/applications");

@@ -76,6 +76,16 @@ const href = z
 
 const link = z.object({ label: text(60), href });
 
+/** A date and time as an ISO string, or empty for "none". */
+const optionalInstant = z
+  .string()
+  .trim()
+  .max(40)
+  .refine((v) => v === "" || !Number.isNaN(Date.parse(v)), "Enter a valid date and time");
+
+const wholeNumber = (min: number, max: number) =>
+  z.coerce.number({ message: "Enter a number" }).int("Enter a whole number").min(min, `At least ${min}`).max(max, `At most ${max}`);
+
 export const CONTENT = {
   "home.hero": {
     scope: "content",
@@ -222,6 +232,97 @@ export const CONTENT = {
       }),
     ),
     fallback: {} as Record<string, { title?: string; description?: string; ogImage?: string }>,
+  },
+
+  // ── Recruitment, FusionX Teams and Join ──────────────────────────────
+  "recruitment.page": {
+    scope: "content",
+    schema: z.object({
+      heading: text(120),
+      intro: optionalText(600),
+      /** One or two lines on how this differs from Join and FusionX Teams. */
+      difference: optionalText(400),
+    }),
+    fallback: {
+      heading: "Recruitment",
+      intro: "",
+      difference:
+        "Recruitment is how you apply to work in one of FusionX's own teams. To become a member, use Join. To register your own project team, use FusionX Teams.",
+    },
+  },
+  "teams.page": {
+    scope: "content",
+    schema: z.object({ heading: text(120), intro: optionalText(600) }),
+    fallback: { heading: "FusionX Teams", intro: "" },
+  },
+  "teams.register": {
+    scope: "content",
+    schema: z.object({ heading: text(120), intro: optionalText(600), difference: optionalText(400) }),
+    fallback: {
+      heading: "Register a team",
+      intro: "",
+      difference:
+        "This registers your own student team with FusionX. To apply to one of FusionX's own teams, use Recruitment.",
+    },
+  },
+  "join.page": {
+    scope: "content",
+    schema: z.object({ heading: text(120), intro: optionalText(600) }),
+    fallback: {
+      heading: "Don't just participate. Build.",
+      intro:
+        "Tell us where your interests lie and how you'd like to contribute. We review applications on a rolling basis.",
+    },
+  },
+  /** {name} is the applicant's name. */
+  "join.templates": {
+    scope: "settings",
+    schema: z.object({ approved: text(600), rejected: text(600) }),
+    fallback: {
+      approved: "Hi {name}, your application to join was approved.",
+      rejected: "Hi {name}, your application to join was not approved this time.",
+    },
+  },
+  "join.settings": {
+    scope: "settings",
+    schema: z.object({ deadline: optionalInstant }),
+    fallback: { deadline: "" },
+  },
+  /** Read by the database too (migration 0014): keep the field names. */
+  "teams.settings": {
+    scope: "settings",
+    schema: z
+      .object({
+        registrationOpen: z.boolean(),
+        deadline: optionalInstant,
+        closedMessage: optionalText(300),
+        minSize: wholeNumber(1, 20),
+        maxSize: wholeNumber(2, 50),
+        maxTeamsPerUser: wholeNumber(1, 10),
+        inviteExpiryDays: wholeNumber(1, 60),
+      })
+      .refine((v) => v.minSize <= v.maxSize, { path: ["minSize"], message: "The minimum can't be above the maximum" }),
+    fallback: {
+      registrationOpen: true,
+      deadline: "",
+      closedMessage: "",
+      minSize: 2,
+      maxSize: 6,
+      maxTeamsPerUser: 2,
+      inviteExpiryDays: 7,
+    },
+  },
+  "nav.links": {
+    scope: "settings",
+    schema: z.object({
+      /** Header link: shown while a cycle is open, always, or never. */
+      recruitment: z.enum(["auto", "on", "off"]),
+      recruitmentBadge: z.boolean(),
+      footerRecruitment: z.boolean(),
+      footerTeams: z.boolean(),
+    }),
+    // The footer link starts off: until a cycle is set up it would lead to an empty page.
+    fallback: { recruitment: "auto", recruitmentBadge: true, footerRecruitment: false, footerTeams: true },
   },
 } as const;
 
