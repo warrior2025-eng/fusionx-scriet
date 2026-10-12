@@ -321,7 +321,8 @@ export const CONTENT = {
       footerRecruitment: z.boolean(),
       footerTeams: z.boolean(),
     }),
-    fallback: { recruitment: "auto", recruitmentBadge: true, footerRecruitment: true, footerTeams: true },
+    // The footer link starts off: until a cycle is set up it would lead to an empty page.
+    fallback: { recruitment: "auto", recruitmentBadge: true, footerRecruitment: false, footerTeams: true },
   },
 } as const;
 

@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { CutCard } from "@/components/ui/cut-card";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Section } from "@/components/ui/section";
+import { getCurrentRoles } from "@/lib/permissions";
 import { siteUrl } from "@/lib/site-config";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -55,8 +56,10 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
   const { data: rosterRows } = await supabase.rpc("team_roster", { p_team: id });
   const roster = (rosterRows ?? []) as RosterMember[];
-  const isLeader = team.leader_id === user.id;
   const isMember = roster.some((m) => m.user_id === user.id);
+  // Staff get the leader's tools too (the database functions allow them the same things).
+  const staff = (await getCurrentRoles()).some((role) => role === "super_admin" || role === "admin" || role === "editor");
+  const isLeader = team.leader_id === user.id || staff;
   const open = team.status === "forming" || team.status === "active";
   const verified = team.verification_status === "verified";
 
@@ -164,7 +167,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                   {m.user_id === team.leader_id && <span className="ml-2 text-xs font-semibold text-accent">Leader</span>}
                   {(m.department || m.year) && <span className="block text-ink/65">{[m.department, m.year].filter(Boolean).join(", ")}</span>}
                 </span>
-                {isLeader && m.user_id !== user.id && (
+                {isLeader && m.user_id !== team.leader_id && (
                   <span className="flex flex-wrap gap-2">
                     <ActionButton
                       variant="ghost"
@@ -194,7 +197,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                 action={leaveTeam.bind(null, id)}
                 confirm={{
                   title: "Leave this team?",
-                  body: isLeader ? "If other members remain, hand the team over first. If you are the last member, the team is archived." : "You will be taken off the team.",
+                  body: team.leader_id === user.id ? "If other members remain, hand the team over first. If you are the last member, the team is archived." : "You will be taken off the team.",
                   confirmLabel: "Leave",
                 }}
               >

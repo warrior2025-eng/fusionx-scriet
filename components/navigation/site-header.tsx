@@ -187,7 +187,9 @@ export function SiteHeader({
               key={item.href}
               href={item.href}
               className={cn(
-                "relative whitespace-nowrap px-2 py-1.5 text-[13px] font-medium rounded-sm transition-colors duration-150",
+                "relative whitespace-nowrap py-1.5 text-[13px] font-medium rounded-sm transition-colors duration-150",
+                // One more link in the row: a little less padding so it still fits at 1280px.
+                recruitment ? "px-1.5" : "px-2",
                 pathname?.startsWith(item.href)
                   ? "text-ink font-semibold"
                   : "text-ink/65 hover:text-ink hover:bg-ink/5"
