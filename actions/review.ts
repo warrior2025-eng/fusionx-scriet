@@ -6,6 +6,7 @@ import { fail, ok, zodFieldErrors, type ActionState } from "@/lib/admin/action-s
 import { fromIstInput } from "@/lib/events/format";
 import { STAGES, friendlyDbError } from "@/lib/recruitment/data";
 import { createClient } from "@/lib/supabase/server";
+import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
 
 /**
  * What a team's reviewers (and admins) do to an application: score it, keep
@@ -77,5 +78,6 @@ export async function setApplicationStage(applicationId: string, teamId: string,
   if (error) return fail(friendlyDbError(error.message, "Could not update the stage."));
   revalidatePath("/review");
   revalidatePath("/recruitment/status");
+  deliverEmailsAfterResponse();
   return ok("Stage updated.");
 }

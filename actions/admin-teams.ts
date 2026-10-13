@@ -6,6 +6,7 @@ import { fail, ok, zodFieldErrors, type ActionState } from "@/lib/admin/action-s
 import { logAudit } from "@/lib/admin/audit";
 import { authorize, FORBIDDEN } from "@/lib/admin/guard";
 import { friendlyDbError } from "@/lib/recruitment/data";
+import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
 
 /**
  * FusionX Teams, from the admin panel.
@@ -22,6 +23,8 @@ const text = (formData: FormData, name: string) => {
 };
 
 function touched(teamId?: string) {
+  // Notifications written by this action also go out as email, after the response.
+  deliverEmailsAfterResponse();
   revalidatePath("/teams");
   revalidatePath("/admin/teams");
   if (teamId) {

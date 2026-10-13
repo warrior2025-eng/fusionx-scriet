@@ -7,6 +7,7 @@ import { authorize, FORBIDDEN, type AdminContext } from "@/lib/admin/guard";
 import { logAudit } from "@/lib/admin/audit";
 import { fail, ok, type ActionState } from "@/lib/admin/action-state";
 import type { ApplicationStatus } from "@/types/database";
+import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
 
 const STATUSES = ["submitted", "under_review", "shortlisted", "selected", "rejected", "archived"] as const;
 
@@ -68,7 +69,10 @@ async function review(ctx: AdminContext, ids: string[], status: ApplicationStatu
           : STATUS_MESSAGES[status],
       link: "/join",
     }));
-  if (notices.length) await ctx.supabase.from("notifications").insert(notices);
+  if (notices.length) {
+    await ctx.supabase.from("notifications").insert(notices);
+    deliverEmailsAfterResponse();
+  }
 
   revalidatePath("/admin/applications");
   revalidatePath("/admin");

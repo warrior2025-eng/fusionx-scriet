@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/admin/audit";
 import { authorize, FORBIDDEN } from "@/lib/admin/guard";
 import { isUpload } from "@/lib/admin/storage";
 import { listUsers } from "@/lib/admin/users";
+import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
 
 /**
  * Admin actions for one event's registrations: issuing certificates, check-in
@@ -19,6 +20,8 @@ const SIGNATURE_BUCKET = "certificate-assets";
 const SIGNATURE_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg" };
 
 function revalidate(eventId: string) {
+  // Notifications written by this action also go out as email, after the response.
+  deliverEmailsAfterResponse();
   revalidatePath(`/admin/events/${eventId}/registrations`);
   revalidatePath(`/admin/events/${eventId}`);
   revalidatePath("/profile/events");

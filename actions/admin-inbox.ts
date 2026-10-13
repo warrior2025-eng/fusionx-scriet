@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/admin/audit";
 import { fail, ok, zodFieldErrors, type ActionState } from "@/lib/admin/action-state";
 import { ALL_ROLES, ROLE_LABELS } from "@/lib/permissions/capabilities";
 import type { AppRole } from "@/types/database";
+import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
 
 const uuid = z.uuid();
 
@@ -131,6 +132,7 @@ export async function sendBroadcast(_prev: ActionState, formData: FormData): Pro
     after: { audience, title, recipients: recipients.length },
   });
   revalidatePath("/admin/notifications");
+  deliverEmailsAfterResponse();
   return ok(`Sent to ${recipients.length} ${recipients.length === 1 ? "person" : "people"} (${label}).`, {
     redirectTo: "/admin/notifications",
   });

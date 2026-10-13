@@ -5,6 +5,7 @@ import { z } from "zod";
 import { fail, ok, type ActionState } from "@/lib/admin/action-state";
 import { friendlyDbError } from "@/lib/recruitment/data";
 import { createClient } from "@/lib/supabase/server";
+import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
 
 /**
  * The applicant's side of recruitment. Each action validates its input here,
@@ -74,6 +75,7 @@ export async function submitRecruitmentApplication(cycleId: string, input: unkno
   if (error) return { ok: false, message: friendlyDbError(error.message, "Could not submit. Please try again.") };
   revalidatePath("/recruitment");
   revalidatePath("/recruitment/status");
+  deliverEmailsAfterResponse();
   return { ok: true };
 }
 

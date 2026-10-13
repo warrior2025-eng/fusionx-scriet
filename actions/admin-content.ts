@@ -65,6 +65,7 @@ const READERS: { [K in ContentKey]: (formData: FormData, existing: unknown) => u
     maxTeamsPerUser: text(f, "maxTeamsPerUser"),
     inviteExpiryDays: text(f, "inviteExpiryDays"),
   }),
+  "email.settings": (f) => ({ enabled: f.get("enabled") === "on" }),
   "nav.links": (f) => ({
     recruitment: text(f, "recruitment"),
     recruitmentBadge: f.get("recruitmentBadge") === "on",
@@ -97,7 +98,7 @@ const VIEW: Partial<Record<ContentKey, string>> = {
   "join.settings": "/join",
 };
 /** Keys whose empty fields mean "empty", not "use the original". */
-const EXACT_KEYS: ContentKey[] = ["join.settings", "teams.settings", "nav.links"];
+const EXACT_KEYS: ContentKey[] = ["join.settings", "teams.settings", "nav.links", "email.settings"];
 const LIST_KEYS: ContentKey[] = ["lists.pipeline", "lists.journey", "lists.core_areas", "footer.columns"];
 
 /**
