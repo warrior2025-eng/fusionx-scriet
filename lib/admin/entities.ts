@@ -139,7 +139,7 @@ export const ENTITIES = {
         type: "image",
         bucket: "team-photos",
         square: true,
-        hint: "JPEG, PNG or WEBP, up to 2MB. Cropped to a square.",
+        hint: "JPEG, PNG or WEBP, up to 2MB. You choose the square crop after picking the file.",
       },
       { name: "full_name", label: "Name", type: "text", required: true, max: 120, half: true },
       { name: "role_title", label: "Role title", type: "text", required: true, max: 200, half: true },
