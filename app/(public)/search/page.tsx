@@ -21,12 +21,11 @@ export default async function SearchPage({
 
   if (query.length >= 2) {
     const like = `%${query}%`;
-    const [projects, research, events, opportunities, announcements, resources] = await Promise.all([
+    const [projects, research, events, opportunities, resources] = await Promise.all([
       supabase.from("projects").select("id, title, description").eq("is_published", true).ilike("title", like).limit(6),
       supabase.from("research").select("id, title, abstract").eq("is_published", true).ilike("title", like).limit(6),
       supabase.from("events").select("id, title, description").eq("is_published", true).ilike("title", like).limit(6),
       supabase.from("opportunities").select("id, title, description").eq("is_published", true).ilike("title", like).limit(6),
-      supabase.from("announcements").select("id, title, content").eq("status", "published").ilike("title", like).limit(6),
       supabase.from("resources").select("id, title, description").eq("is_published", true).eq("visibility", "public").ilike("title", like).limit(6),
     ]);
 
@@ -35,7 +34,6 @@ export default async function SearchPage({
       ...(research.data ?? []).map((r) => ({ type: "Research", href: "/research", title: r.title, blurb: r.abstract })),
       ...(events.data ?? []).map((e) => ({ type: "Event", href: "/events", title: e.title, blurb: e.description })),
       ...(opportunities.data ?? []).map((o) => ({ type: "Opportunity", href: "/opportunities", title: o.title, blurb: o.description })),
-      ...(announcements.data ?? []).map((a) => ({ type: "Announcement", href: "/", title: a.title, blurb: a.content })),
       ...(resources.data ?? []).map((r) => ({ type: "Resource", href: "/resources", title: r.title, blurb: r.description ?? "" })),
     ];
   }

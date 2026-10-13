@@ -13,7 +13,7 @@ export type Capability =
   /** May open /admin at all. */
   | "admin.access"
   /** Create / edit / publish content: events, opportunities, resources,
-   *  announcements, mentors, programs, page content and lists. */
+   *  mentors, programs, page content and lists. */
   | "content"
   /** Delete content that is published (drafts only need "content"). */
   | "content.delete_published"
