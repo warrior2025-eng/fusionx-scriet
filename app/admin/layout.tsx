@@ -22,7 +22,6 @@ const NAV: { heading: string; items: (AdminNavItem & { cap: Capability })[] }[] 
       { href: "/admin/events", label: "Events", icon: "events", cap: "content" },
       { href: "/admin/opportunities", label: "Opportunities", icon: "opportunities", cap: "content" },
       { href: "/admin/resources", label: "Resources", icon: "resources", cap: "content" },
-      { href: "/admin/announcements", label: "Announcements", icon: "announcements", cap: "content" },
       { href: "/admin/mentors", label: "Mentors", icon: "mentors", cap: "content" },
     ],
   },

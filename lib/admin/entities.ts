@@ -439,52 +439,6 @@ export const ENTITIES = {
     viewHref: () => "/resources",
   },
 
-  announcements: {
-    key: "announcements",
-    table: "announcements",
-    singular: "Announcement",
-    plural: "Announcements",
-    adminPath: "/admin/announcements",
-    cap: "content",
-    deleteRule: "drafts-or-admin",
-    titleColumn: "title",
-    searchColumns: ["title", "category"],
-    publish: { kind: "status" },
-    ownerColumn: "author_id",
-    defaultSort: { column: "created_at", ascending: false },
-    listColumns: [
-      { label: "Category", value: (r) => String(r.category ?? "") },
-      { label: "Published", value: (r) => date(r.published_at) },
-    ],
-    fields: [
-      { name: "title", label: "Title", type: "text", required: true, max: 200 },
-      { name: "content", label: "Content", type: "textarea", required: true, max: 3000, rows: 6 },
-      { name: "category", label: "Category", type: "text", max: 80, half: true },
-      {
-        name: "status",
-        label: "Status",
-        type: "select",
-        required: true,
-        initial: "draft",
-        half: true,
-        options: [
-          { value: "draft", label: "Draft" },
-          { value: "published", label: "Published" },
-          { value: "archived", label: "Archived" },
-        ],
-      },
-    ],
-    publicPaths: ["/"],
-    viewHref: () => "/search",
-    prepare: (values, existing) => {
-      if (values.status === "published") {
-        if (existing?.status !== "published") values.published_at = new Date().toISOString();
-      } else {
-        values.published_at = null;
-      }
-    },
-  },
-
   mentors: {
     key: "mentors",
     table: "mentors",
