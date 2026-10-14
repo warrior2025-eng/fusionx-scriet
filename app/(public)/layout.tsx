@@ -7,6 +7,7 @@ import { getContent } from "@/lib/data/site-content";
 import { getCurrentRoles, getCurrentUser } from "@/lib/permissions";
 import { capabilitiesFor } from "@/lib/permissions/capabilities";
 import { cycleState, getCurrentCycle } from "@/lib/recruitment/data";
+import { resultsVisible } from "@/lib/recruitment/results";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
@@ -43,7 +44,12 @@ export default async function PublicLayout({ children }: { children: React.React
   // Recruitment in the header: while a cycle is open ("auto"), always, or never.
   const [navLinks, cycle, storedColumns] = await Promise.all([getContent("nav.links"), getCurrentCycle(), getContent("footer.columns")]);
   const recruitmentOpen = cycleState(cycle) === "open";
-  const showRecruitment = navLinks.recruitment === "on" || (navLinks.recruitment === "auto" && recruitmentOpen);
+  // From the publish time on (decided by the clock, no redeploy): a "Results" badge that leads to the lists.
+  const resultsOut = resultsVisible(cycle) && cycle?.results_banner_on !== false;
+  const showRecruitment = navLinks.recruitment === "on" || (navLinks.recruitment === "auto" && (recruitmentOpen || resultsOut));
+  const recruitmentLink = resultsOut
+    ? { badge: "Results", href: "/recruitment/results" }
+    : { badge: navLinks.recruitmentBadge && recruitmentOpen ? "Open" : null, href: "/recruitment" };
 
   // A team reviewer gets a link to their applications in the account menu.
   if (user) {
@@ -82,7 +88,7 @@ export default async function PublicLayout({ children }: { children: React.React
         chapterName={settings.chapter_name}
         subtitle={settings.subtitle}
         logoUrl={settings.logo_path}
-        recruitment={showRecruitment ? { badge: navLinks.recruitmentBadge && recruitmentOpen } : null}
+        recruitment={showRecruitment ? recruitmentLink : null}
         user={user ? { email: user.email ?? "", fullName: profile?.full_name ?? "Member", avatarUrl: profile?.avatar_url ?? null, panels } : null}
       />
       <main className="flex-1">{children}</main>

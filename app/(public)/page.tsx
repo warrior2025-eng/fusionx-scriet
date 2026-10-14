@@ -21,6 +21,8 @@ import { getPeople, peopleIn } from "@/lib/data/people";
 import { getPrograms } from "@/lib/data/programs";
 import { pageMetadata } from "@/lib/data/seo";
 import { getContent } from "@/lib/data/site-content";
+import { getCurrentCycle } from "@/lib/recruitment/data";
+import { resultsVisible } from "@/lib/recruitment/results";
 import { createClient } from "@/lib/supabase/server";
 
 export const generateMetadata = (): Promise<Metadata> => pageMetadata("home", {});
@@ -86,6 +88,7 @@ export default async function HomePage() {
     { data: memberCount, error: memberCountError },
     { count: projectCount },
     { count: eventCount },
+    cycle,
   ] = await Promise.all([
     getOrganizationSettings(),
     getContent("home.hero"),
@@ -108,6 +111,7 @@ export default async function HomePage() {
     supabase.rpc("get_member_count"),
     supabase.from("projects").select("*", { count: "exact", head: true }).eq("is_published", true),
     supabase.from("events").select("*", { count: "exact", head: true }).eq("is_published", true),
+    getCurrentCycle(),
   ]);
 
   if (memberCountError) console.error("get_member_count failed:", memberCountError.message);
@@ -411,8 +415,19 @@ export default async function HomePage() {
   const BANDS: Band[] = [undefined, "surface", "tint"];
   const visibleSections = sections.filter((section) => section.visible);
 
+  // From the results' publish time on (by the clock, no redeploy), unless switched off in the admin panel.
+  const resultsBanner = resultsVisible(cycle) && cycle?.results_banner_on !== false ? cycle?.results_banner_text : null;
+
   return (
     <>
+      {resultsBanner && (
+        <Link
+          href="/recruitment/results"
+          className="relative z-10 flex items-center justify-center gap-2 bg-accent px-4 py-2.5 text-center text-sm font-medium text-white hover:underline"
+        >
+          {resultsBanner} <ArrowRight size={14} aria-hidden />
+        </Link>
+      )}
       <ScrollProgress />
 
       {/* The one 3D scene, fixed behind the whole page. The hero shows it

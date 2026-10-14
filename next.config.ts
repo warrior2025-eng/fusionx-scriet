@@ -20,6 +20,7 @@ const nextConfig: NextConfig = {
   // so they have to be shipped with that route's server function.
   outputFileTracingIncludes: {
     "/api/certificates/*": ["./assets/fonts/*.ttf", "./public/icon.png"],
+    "/recruitment/results/offer-letter": ["./assets/fonts/*.ttf", "./public/icon.png"],
   },
   // One address for the site. "www" used to serve the same pages a second
   // time, which search engines treat as a duplicate site.

@@ -112,11 +112,11 @@ export function SiteHeader({
   /** Uploaded logo; the built-in mark is used when this is empty. */
   logoUrl?: string | null;
   user: SiteUser | null;
-  /** Adds the Recruitment link (decided in the admin panel), with an "Open" badge when asked. */
-  recruitment?: { badge: boolean } | null;
+  /** Adds the Recruitment link (decided in the admin panel), with an "Open" or "Results" badge. */
+  recruitment?: { badge: string | null; href: string } | null;
 }) {
   const links: { href: string; label: string; badge?: string }[] = recruitment
-    ? [...nav, { href: "/recruitment", label: "Recruitment", badge: recruitment.badge ? "Open" : undefined }]
+    ? [...nav, { href: recruitment.href, label: "Recruitment", badge: recruitment.badge ?? undefined }]
     : nav;
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -264,7 +264,7 @@ export function SiteHeader({
               </div>
             </div>
           )}
-          {nav.map((item) => (
+          {links.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -277,6 +277,7 @@ export function SiteHeader({
               )}
             >
               {item.label}
+              {item.badge && <span className="ml-2 bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-white">{item.badge}</span>}
             </Link>
           ))}
           {user && (
