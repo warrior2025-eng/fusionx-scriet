@@ -132,9 +132,12 @@ export function TextField({
   ...props
 }: { name: string; label: string; hint?: string; className?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   const error = useFieldError(name);
+  // Unique per field, so a page with several forms using the same names keeps each label on its own input.
+  const generated = useId();
+  const id = props.id ?? `${name}-${generated}`;
   return (
-    <Field name={name} label={label} hint={hint} className={className}>
-      <Input id={name} name={name} aria-invalid={error ? true : undefined} {...props} />
+    <Field name={name} label={label} hint={hint} className={className} htmlFor={id}>
+      <Input name={name} aria-invalid={error ? true : undefined} {...props} id={id} />
     </Field>
   );
 }
@@ -161,10 +164,11 @@ export function TextareaField({
 }) {
   const error = useFieldError(name);
   const [length, setLength] = useState(defaultValue.length);
+  const id = `${name}-${useId()}`;
   return (
-    <Field name={name} label={label} hint={hint} className={className}>
+    <Field name={name} label={label} hint={hint} className={className} htmlFor={id}>
       <Textarea
-        id={name}
+        id={id}
         name={name}
         rows={rows}
         defaultValue={defaultValue}
@@ -195,9 +199,10 @@ export function SelectField({
   defaultValue?: string;
   className?: string;
 }) {
+  const id = `${name}-${useId()}`;
   return (
-    <Field name={name} label={label} hint={hint} className={className}>
-      <Select id={name} name={name} defaultValue={defaultValue}>
+    <Field name={name} label={label} hint={hint} className={className} htmlFor={id}>
+      <Select id={id} name={name} defaultValue={defaultValue}>
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
