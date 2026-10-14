@@ -466,14 +466,16 @@ export async function bulkStage(cycleId: string, _prev: ActionState, formData: F
 }
 
 // ── message templates ──────────────────────────────────────────────────
-const TEMPLATE_KEYS = ["submitted", "shortlisted", "task", "interview", "selected", "waitlisted", "not_selected"] as const;
+// "absent" and "social_post" exist from migration 0017 on.
+const TEMPLATE_KEYS = ["submitted", "shortlisted", "task", "interview", "selected", "waitlisted", "not_selected", "absent", "social_post"] as const;
 
 export async function saveTemplate(key: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
   const ctx = await authorize("recruitment.content");
   if (!ctx) return FORBIDDEN;
   if (!(TEMPLATE_KEYS as readonly string[]).includes(key)) return fail("Unknown message.");
   const body = text(formData, "body");
-  if (body.length < 1 || body.length > 1000) return fail("Please fix the highlighted fields.", { body: "Write 1 to 1000 characters" });
+  const max = key === "social_post" ? 2000 : 1000;
+  if (body.length < 1 || body.length > max) return fail("Please fix the highlighted fields.", { body: `Write 1 to ${max} characters` });
   const { data: before } = await ctx.supabase.from("recruitment_message_templates").select("body").eq("key", key).maybeSingle();
   const { error } = await ctx.supabase.from("recruitment_message_templates").update({ body, updated_at: new Date().toISOString() }).eq("key", key);
   if (error) return fail("Could not save the message.");

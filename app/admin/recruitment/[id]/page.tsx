@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { deleteCycle, duplicateCycle, publishResults, saveCycle, setCycleStatus } from "@/actions/admin-recruitment";
+import { deleteCycle, duplicateCycle, saveCycle, setCycleStatus } from "@/actions/admin-recruitment";
+import { LinkButton } from "@/components/ui/button";
 import { ActionButton } from "@/components/admin/action-button";
 import { AdminForm } from "@/components/admin/admin-form";
 import { CycleFields, CycleTabs } from "@/components/admin/recruitment-parts";
@@ -83,18 +84,9 @@ export default async function CyclePage({ params }: { params: Promise<{ id: stri
               </ActionButton>
             )}
             {(cycle.status === "open" || cycle.status === "closed") && (
-              <ActionButton
-                variant={cycle.status === "closed" ? "primary" : "secondary"}
-                action={publishResults.bind(null, id)}
-                confirm={{
-                  title: "Publish results?",
-                  body: `Every candidate marked Selected, Waitlisted or Not selected is told, and selected candidates can open their team's WhatsApp link. This cannot be undone.${doubles.length ? ` Note: ${doubles.length} candidate(s) are selected for more than one team.` : ""}`,
-                  confirmLabel: "Publish results",
-                  typed: "PUBLISH",
-                }}
-              >
-                Publish results
-              </ActionButton>
+              <LinkButton href={`/admin/recruitment/${id}/results`} variant={cycle.status === "closed" ? "primary" : "secondary"} size="sm">
+                Results: decide, lock and schedule
+              </LinkButton>
             )}
             {cycle.status === "closed" && (
               <ActionButton

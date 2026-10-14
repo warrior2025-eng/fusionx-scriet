@@ -7,6 +7,7 @@ import { saveRecruitmentDraft, submitRecruitmentApplication, uploadRecruitmentFi
 import { Button } from "@/components/ui/button";
 import { FieldHint, Input, Label, Textarea } from "@/components/ui/field";
 import { SlotPicker } from "@/components/recruitment/slot-picker";
+import { CONSENT_NOTICE } from "@/lib/recruitment/results";
 import { questionsFor, type Answer, type Question } from "@/lib/recruitment/shared";
 import { MODE_LABELS, dayLabel, slotRange, type SlotAvailability } from "@/lib/recruitment/slots";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,8 @@ export type ApplyDraft = {
   answers: Record<string, Answer>;
   links: { portfolio: string; github: string; linkedin: string };
   resume_path: string | null;
+  /** Agreement to the results announcement (saved separately from the answers). */
+  public_consent?: boolean;
   website: string;
 };
 
@@ -451,6 +454,19 @@ export function ApplyForm({
                 mySlot ? `${dayLabel(mySlot.day)}, ${slotRange(mySlot.starts_at, mySlot.ends_at)} IST (${MODE_LABELS[mySlot.mode]})` : "",
               )}
           </dl>
+          <div className="mt-6 border border-line px-4 py-4">
+            <p className="text-sm leading-relaxed text-ink">{CONSENT_NOTICE}</p>
+            <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={form.public_consent === true}
+                onChange={(e) => update({ public_consent: e.target.checked })}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
+              />
+              <span>I agree that my name and hub may be announced if I am selected or waitlisted.</span>
+            </label>
+            <p className="mt-2 text-xs text-ink/60">Optional. Without it, you are still counted in the results, but your name is not shown.</p>
+          </div>
         </div>
       )}
 

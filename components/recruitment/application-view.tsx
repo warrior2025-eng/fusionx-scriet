@@ -44,7 +44,10 @@ export async function ApplicationView({
   reviews,
   reviewerNames,
   userId,
+  locked = false,
 }: {
+  /** Decisions are locked (or the results are out): the stage can no longer be moved. */
+  locked?: boolean;
   supabase: Supabase;
   application: Application;
   questions: Question[];
@@ -144,6 +147,11 @@ export async function ApplicationView({
             <div className="grid gap-8 lg:grid-cols-2">
               <div>
                 <h3 className="mb-3 text-sm font-semibold text-ink">Move stage</h3>
+                {locked ? (
+                  <p className="border border-line bg-accent-soft px-3.5 py-2.5 text-sm text-ink">
+                    Decisions are locked. Only an admin can unlock them.
+                  </p>
+                ) : (
                 <AdminForm action={setApplicationStage.bind(null, application.id, status.team_id)} submitLabel="Update stage">
                   <SelectField name="stage" label="Stage" defaultValue={status.stage} options={STAGES.map((s) => ({ value: s, label: STAGE_LABELS[s] }))} />
                   <TextField
@@ -163,6 +171,7 @@ export async function ApplicationView({
                     defaultValue={status.final_note ?? ""}
                   />
                 </AdminForm>
+                )}
               </div>
               <div>
                 <h3 className="mb-3 text-sm font-semibold text-ink">Your review</h3>

@@ -64,6 +64,7 @@ export default async function RecruitmentApplyPage() {
       linkedin: application?.links.linkedin ?? (profile?.linkedin_url as string | undefined) ?? "",
     },
     resume_path: application?.resume_path ?? null,
+    public_consent: row?.public_consent === true ? true : undefined,
     website: "",
   };
 

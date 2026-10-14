@@ -112,11 +112,11 @@ export function SiteHeader({
   /** Uploaded logo; the built-in mark is used when this is empty. */
   logoUrl?: string | null;
   user: SiteUser | null;
-  /** Adds the Recruitment link (decided in the admin panel), with an "Open" badge when asked. */
-  recruitment?: { badge: boolean } | null;
+  /** Adds the Recruitment link (decided in the admin panel), with an "Open" or "Results" badge. */
+  recruitment?: { badge: string | null; href: string } | null;
 }) {
   const links: { href: string; label: string; badge?: string }[] = recruitment
-    ? [...nav, { href: "/recruitment", label: "Recruitment", badge: recruitment.badge ? "Open" : undefined }]
+    ? [...nav, { href: recruitment.href, label: "Recruitment", badge: recruitment.badge ?? undefined }]
     : nav;
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -189,14 +189,14 @@ export function SiteHeader({
               className={cn(
                 "relative whitespace-nowrap py-1.5 text-[13px] font-medium rounded-sm transition-colors duration-150",
                 // One more link in the row: a little less padding so it still fits at 1280px.
-                recruitment ? "px-1.5" : "px-2",
+                recruitment ? "px-1" : "px-2",
                 pathname?.startsWith(item.href)
                   ? "text-ink font-semibold"
                   : "text-ink/65 hover:text-ink hover:bg-ink/5"
               )}
             >
               {item.label}
-              {item.badge && <span className="ml-1.5 bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-white">{item.badge}</span>}
+              {item.badge && <span className="ml-1 bg-accent px-1 py-0.5 text-[10px] font-semibold text-white">{item.badge}</span>}
               {pathname?.startsWith(item.href) && (
                 <span className="absolute bottom-0 left-2 right-2 h-[2px] bg-accent" />
               )}
@@ -215,7 +215,8 @@ export function SiteHeader({
               <Link href="/notifications" aria-label="Notifications" className="p-2 text-ink/50 hover:text-ink transition-colors rounded-sm hover:bg-ink/5">
                 <Bell size={16} />
               </Link>
-              <Link href="/projects/mine" aria-label="My projects" className="p-2 text-ink/50 hover:text-ink transition-colors rounded-sm hover:bg-ink/5">
+              {/* Also in the account menu; shown here only where the row has room. */}
+              <Link href="/projects/mine" aria-label="My projects" className="hidden 2xl:inline-flex p-2 text-ink/50 hover:text-ink transition-colors rounded-sm hover:bg-ink/5">
                 <LayoutGrid size={16} />
               </Link>
               <ProfileMenu user={user} />
@@ -264,7 +265,7 @@ export function SiteHeader({
               </div>
             </div>
           )}
-          {nav.map((item) => (
+          {links.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -277,6 +278,7 @@ export function SiteHeader({
               )}
             >
               {item.label}
+              {item.badge && <span className="ml-2 bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-white">{item.badge}</span>}
             </Link>
           ))}
           {user && (

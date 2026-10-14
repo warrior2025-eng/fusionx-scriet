@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { cycleState, toQuestion, type Cycle, type Question, type RecruitmentTeam } from "./shared";
+import type { MyResult, PublicResults } from "./results";
 import type { MeetLinkState, MyBooking, SlotAvailability } from "./slots";
 
 /**
@@ -68,6 +69,23 @@ export async function getMyBooking(cycleId: string): Promise<MyBooking | null> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("my_slot_booking", { p_cycle: cycleId });
   return error || !data ? null : (data as MyBooking);
+}
+
+/**
+ * The signed-in person's result. Before the publish time the database returns
+ * only "pending" and the date. (Empty before migration 0017.)
+ */
+export async function getMyResult(cycleId: string): Promise<MyResult> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_my_result", { p_cycle: cycleId });
+  return error || !data ? { state: "none" } : (data as MyResult);
+}
+
+/** The public Selected and Waitlist lists, or "pending" with the date before the publish time. */
+export async function getPublicResults(cycleId: string): Promise<PublicResults> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_public_results", { p_cycle: cycleId });
+  return error || !data ? { state: "none" } : (data as PublicResults);
 }
 
 /** Where the signed-in person's Meet link stands; the url only when it may be shown. */

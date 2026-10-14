@@ -9,8 +9,22 @@ import { CutCard } from "@/components/ui/cut-card";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Section } from "@/components/ui/section";
 import { istDateTime } from "@/lib/events/format";
+import { agreeToAnnouncement } from "@/actions/recruitment-results";
 import { InterviewCard } from "@/components/recruitment/interview-card";
-import { STAGE_LABELS, cycleState, getCurrentCycle, getMyBooking, getMyMeetLink, getSlotAvailability, type Stage } from "@/lib/recruitment/data";
+import { ResultView } from "@/components/recruitment/result-view";
+import { ResultsCountdown } from "@/components/recruitment/results-countdown";
+import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
+import {
+  STAGE_LABELS,
+  cycleState,
+  getCurrentCycle,
+  getMyBooking,
+  getMyMeetLink,
+  getMyResult,
+  getSlotAvailability,
+  type Stage,
+} from "@/lib/recruitment/data";
+import { CONSENT_NOTICE, announcement, type MyResult } from "@/lib/recruitment/results";
 import { DEFAULT_INSTRUCTIONS } from "@/lib/recruitment/slots";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -67,11 +81,20 @@ export default async function RecruitmentStatusPage({ searchParams }: { searchPa
     ? await Promise.all([getMyBooking(cycle.id), getMyMeetLink(cycle.id), getSlotAvailability(cycle.id)])
     : [null, { state: "none" as const }, []];
 
-  // The group link, only for a team this person was selected for (the function returns nothing otherwise).
+  // The result: "pending" with the date until the publish time, then the decision (migration 0017).
+  const result: MyResult = cycle && application?.status === "submitted" ? await getMyResult(cycle.id) : { state: "none" };
+  const shown = result.state === "published" ? result : null;
+  // This visit may be the one that published the results: send their emails too.
+  if (shown && cycle && !cycle.results_published_at && cycle.status !== "results_published") deliverEmailsAfterResponse();
+  const consent = result.state === "pending" || result.state === "published" ? result.consent : true;
+
+  // Before migration 0017: the group link, only for a team this person was selected for.
   const groupLinks: Record<string, string> = {};
-  for (const row of rows.filter((r) => r.results_out && r.stage === "selected")) {
-    const { data: url } = await supabase.rpc("recruitment_whatsapp_link", { p_team: row.team_id });
-    if (typeof url === "string" && /^https:\/\//i.test(url)) groupLinks[row.team_id] = url;
+  if (result.state === "none") {
+    for (const row of rows.filter((r) => r.results_out && r.stage === "selected")) {
+      const { data: url } = await supabase.rpc("recruitment_whatsapp_link", { p_team: row.team_id });
+      if (typeof url === "string" && /^https:\/\//i.test(url)) groupLinks[row.team_id] = url;
+    }
   }
 
   const message = (title: string, body: string, action?: React.ReactNode) => (
@@ -126,7 +149,29 @@ export default async function RecruitmentStatusPage({ searchParams }: { searchPa
                 )
               : null}
 
-        {active && (
+        {shown && cycle && <ResultView result={shown} cycleId={cycle.id} />}
+
+        {result.state === "pending" && (
+          <CutCard className="h-auto">
+            <p className="text-sm text-ink/65">Results</p>
+            <p className="mt-2 leading-relaxed text-ink">{announcement(result.publish_at)}</p>
+            {result.publish_at && result.scheduled && <ResultsCountdown until={result.publish_at} className="mt-5" />}
+          </CutCard>
+        )}
+
+        {!consent && cycle && (
+          <div className="border border-line bg-accent-soft px-4 py-4">
+            <p className="text-sm leading-relaxed text-ink">{CONSENT_NOTICE}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <ActionButton variant="primary" action={agreeToAnnouncement.bind(null, cycle.id)}>
+                I agree
+              </ActionButton>
+              <span className="text-xs text-ink/65">Without it, you are still counted, but your name is not shown.</span>
+            </div>
+          </div>
+        )}
+
+        {active && !shown && (
           <InterviewCard
             booking={booking}
             meet={meet}
@@ -137,7 +182,7 @@ export default async function RecruitmentStatusPage({ searchParams }: { searchPa
           />
         )}
 
-        {rows.map((row) => {
+        {!shown && rows.map((row) => {
           const reached = REACHED[row.stage];
           const final = row.results_out && reached === 4;
           return (

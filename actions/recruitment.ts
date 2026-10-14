@@ -31,6 +31,8 @@ const draftSchema = z.object({
   answers: z.record(z.string().uuid(), z.union([z.string().max(5000), z.array(z.string().max(300)).max(30)])),
   links: z.object({ portfolio: optionalUrl, github: optionalUrl, linkedin: optionalUrl }),
   resume_path: z.string().max(300).nullable(),
+  /** "My name and hub may be announced if I am selected or waitlisted." Stored on its own (migration 0017). */
+  public_consent: z.boolean().optional(),
   /** Honeypot: a real person never fills this in. */
   website: z.string().max(0).optional(),
 });
@@ -49,9 +51,9 @@ function parseDraft(input: unknown) {
     const issue = parsed.error.issues[0];
     return { error: issue?.path[0] === "website" ? "Could not save." : (issue?.message ?? "Please check the form.") };
   }
-  const { website: _honeypot, ...data } = parsed.data;
+  const { website: _honeypot, public_consent: consent, ...data } = parsed.data;
   void _honeypot;
-  return { data };
+  return { data, consent };
 }
 
 /** Saves the draft as it stands (called while the form is being filled in). */
@@ -64,6 +66,8 @@ export async function saveRecruitmentDraft(cycleId: string, input: unknown): Pro
 
   const { error } = await supabase.rpc("save_recruitment_draft", { p_cycle: cycleId, p_data: draft.data });
   if (error) return { ok: false, message: friendlyDbError(error.message, "Could not save your draft. Please try again.") };
+  // Before migration 0017 this function does not exist; the application itself is saved either way.
+  if (draft.consent !== undefined) await supabase.rpc("set_recruitment_consent", { p_cycle: cycleId, p_agree: draft.consent });
   return { ok: true };
 }
 

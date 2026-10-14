@@ -8,7 +8,9 @@ export type QuestionType = "short_text" | "long_text" | "url" | "single_choice" 
 export type ApplicationStatus = "draft" | "submitted" | "withdrawn";
 export type Stage = "applied" | "shortlisted" | "task" | "interview" | "selected" | "waitlisted" | "not_selected";
 
-export type Cycle = {
+import { resultsVisible, type CycleResults } from "./results";
+
+export type Cycle = CycleResults & {
   id: string;
   title: string;
   description: string | null;
@@ -114,7 +116,7 @@ export type CycleState = "none" | "upcoming" | "open" | "closed" | "results";
 
 export function cycleState(cycle: Cycle | null, now = Date.now()): CycleState {
   if (!cycle || cycle.status === "draft") return "none";
-  if (cycle.status === "results_published") return "results";
+  if (resultsVisible(cycle, now)) return "results";
   if (cycle.status === "closed") return "closed";
   if (cycle.opens_at && now < new Date(cycle.opens_at).getTime()) return "upcoming";
   if (cycle.closes_at && now >= new Date(cycle.closes_at).getTime()) return "closed";
