@@ -19,6 +19,11 @@ export type Cycle = {
   allowed_years: string[];
   allowed_departments: string[];
   created_at: string;
+  /** Interview slots (migration 0016); absent before it is run. */
+  slot_required?: boolean;
+  cutoff_hours?: number;
+  interview_instructions?: string;
+  reporting_note?: string | null;
 };
 
 export type RecruitmentTeam = {
