@@ -147,7 +147,7 @@ export async function saveDay(cycleId: string, dayId: string | null, _prev: Acti
   touched(cycleId);
   const timesChanged =
     before.date !== values.date || before.slot_minutes !== values.slot_minutes || JSON.stringify(before.sessions) !== JSON.stringify(values.sessions);
-  return ok(timesChanged ? "Saved. Press \"Generate slots\" to apply the new times." : "Saved.");
+  return ok(timesChanged ? "Saved. Press \"Preview\" to see what changes, then \"Generate slots\" to apply the new times." : "Saved.");
 }
 
 export async function deleteDay(cycleId: string, dayId: string): Promise<ActionState> {
@@ -159,19 +159,47 @@ export async function deleteDay(cycleId: string, dayId: string): Promise<ActionS
   return ok("Day deleted.", { redirectTo: `/admin/recruitment/${cycleId}/slots` });
 }
 
+type Generated = {
+  created: number;
+  kept: number;
+  removed: number;
+  total: number;
+  conflicts: { starts_at: string; bookings: number }[];
+  /** From migration 0018: what happened to the bookings. */
+  bookings?: number;
+  moved?: number;
+  changed?: number;
+  rebook?: number;
+};
+
+const bookingsText = (r: Generated) =>
+  r.bookings === undefined ? "" : ` Bookings: ${r.bookings}, ${r.moved ?? 0} moved, ${r.changed ?? 0} told their new time, ${r.rebook ?? 0} need rebooking.`;
+
+/** Re-cuts the day from its saved settings. Every booking is kept (moved into the new slot that covers its time). */
 export async function generateSlots(cycleId: string, dayId: string): Promise<ActionState> {
   const ctx = await authorize("recruitment");
   if (!ctx) return FORBIDDEN;
   const { data, error } = await ctx.supabase.rpc("generate_slots", { p_day: dayId });
   if (error) return fail(friendlyDbError(error.message, "Could not generate the slots."));
-  const r = data as { created: number; kept: number; removed: number; total: number; conflicts: { starts_at: string; bookings: number }[] };
+  const r = data as Generated;
   touched(cycleId);
   const parts = [`${r.total} slots on this day`, `${r.created} new`, `${r.kept} kept`];
   if (r.removed) parts.push(`${r.removed} removed`);
   const conflicts = r.conflicts.length
     ? ` ${r.conflicts.length} slot${r.conflicts.length === 1 ? "" : "s"} outside the new times still hold bookings and were kept: ${r.conflicts.map((c) => slotTime(c.starts_at)).join(", ")}. Move those candidates, then generate again.`
     : "";
-  return conflicts ? fail(`${parts.join(", ")}.${conflicts}`) : ok(`${parts.join(", ")}.`, { viewHref: "/recruitment" });
+  return conflicts ? fail(`${parts.join(", ")}.${conflicts}`) : ok(`${parts.join(", ")}.${bookingsText(r)}`, { viewHref: "/recruitment" });
+}
+
+/** Dry run of Generate: the same steps, rolled back. Nothing changes and nobody is notified. */
+export async function previewSlots(cycleId: string, dayId: string): Promise<ActionState> {
+  const ctx = await authorize("recruitment");
+  if (!ctx) return FORBIDDEN;
+  const { data, error } = await ctx.supabase.rpc("preview_slot_timings", { p_day: dayId });
+  if (error) return fail(friendlyDbError(error.message, "Could not preview. Has migration 0018 been run?"));
+  const r = data as Generated;
+  await logAudit(ctx, { action: "previewed_slots", table: "recruitment_slot_days", id: dayId, note: bookingsText(r).trim() });
+  return ok(`Preview only, nothing changed: ${r.total} slots (${r.created} new, ${r.removed} removed).${bookingsText(r)}`);
 }
 
 // ── slots ──────────────────────────────────────────────────────────────

@@ -7,6 +7,7 @@ import {
   deleteDay,
   generateSlots,
   moveBooking,
+  previewSlots,
   publishMeetLinks,
   remindUnbooked,
   saveDay,
@@ -20,7 +21,6 @@ import { ActionButton } from "@/components/admin/action-button";
 import { AdminForm, CheckboxField, SelectField, TextField, TextareaField } from "@/components/admin/admin-form";
 import { CycleTabs } from "@/components/admin/recruitment-parts";
 import { AdminPage, Panel, Pill, Table, Td, Th, formatDate, param, type ListParams } from "@/components/admin/ui";
-import { LinkButton } from "@/components/ui/button";
 import { requireCapability } from "@/lib/admin/guard";
 import type { Cycle } from "@/lib/recruitment/data";
 import { countUnbooked, loadBoard, loadMeetLinks, loadSlotDays, type SlotDayRow } from "@/lib/recruitment/slot-admin";
@@ -49,7 +49,7 @@ function DayFields({ day }: { day?: SlotDayRow }) {
     <>
       <div className="grid gap-5 sm:grid-cols-3">
         <TextField name="date" label="Date" type="date" defaultValue={day?.date ?? ""} />
-        <TextField name="slot_minutes" label="Slot length (minutes)" type="number" min={5} max={120} defaultValue={String(day?.slot_minutes ?? 10)} />
+        <TextField name="slot_minutes" label="Slot length (minutes)" type="number" min={5} max={120} defaultValue={String(day?.slot_minutes ?? 20)} />
         <TextField name="capacity" label="People per slot" type="number" min={1} max={50} defaultValue={String(day?.capacity ?? 4)} />
       </div>
       <fieldset>
@@ -208,7 +208,7 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
           </div>
         </Panel>
 
-        <Panel title="Interview days" description="Add a day, then press Generate slots. Generating again after a change keeps every booked slot.">
+        <Panel title="Interview days" description="Add a day, then press Generate slots. To change the times: save the new settings, press Preview, then Generate slots. Every booking is kept.">
           <div className="space-y-4">
             {days.map((day) => {
               const count = slotCount(day.sessions, day.slot_minutes);
@@ -227,7 +227,16 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
                         Generates <span className="font-semibold">{count} slots, {count * day.capacity} seats</span> on {dayLabel(day.date)}.
                         <span className="text-ink/65"> Now: {existing} slots.</span>
                       </span>
-                      <ActionButton variant="primary" action={generateSlots.bind(null, id, day.id)}>
+                      <ActionButton action={previewSlots.bind(null, id, day.id)}>Preview</ActionButton>
+                      <ActionButton
+                        variant="primary"
+                        action={generateSlots.bind(null, id, day.id)}
+                        confirm={{
+                          title: "Apply these slot timings?",
+                          body: "Every booking is moved into the new slot that covers its time (first booked first). If that slot is full, into the next free one. Anyone whose time changes is notified. Press Preview first to see the numbers.",
+                          confirmLabel: "Generate slots",
+                        }}
+                      >
                         Generate slots
                       </ActionButton>
                     </div>
@@ -321,11 +330,59 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
               title={`Slot board: ${dayLabel(selected.date, "long")}`}
               description={`${MODE_LABELS[selected.mode]}${selected.venue ? `, ${selected.venue}` : ""}. Names are visible to admins only.`}
             >
-              <div className="mb-5">
-                <LinkButton href={`${base}/export?day=${selected.id}`} variant="secondary" size="sm">
-                  <Download size={14} /> Export this day (CSV)
-                </LinkButton>
-              </div>
+              {/* Download list: one GET form, four ways out. Generated on the server, admins only, logged. Never the Meet link. */}
+              <details className="mb-5 border border-line">
+                <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-ink">
+                  <Download size={14} className="mr-1.5 inline" aria-hidden /> Download list
+                </summary>
+                <form method="get" action={`${base}/export`} target="_blank" className="flex flex-wrap items-end gap-3 border-t border-line p-4">
+                  {(
+                    [
+                      ["day", "Date", days.map((d) => ({ value: d.id, label: dayLabel(d.date) })), selected.id],
+                      ["session", "Session", [{ value: "", label: "All" }, ...selected.sessions.map((s) => ({ value: s.label, label: s.label }))], ""],
+                      [
+                        "status",
+                        "Booking status",
+                        [
+                          { value: "", label: "All except cancelled" },
+                          { value: "booked", label: "Booked" },
+                          { value: "attended", label: "Attended" },
+                          { value: "no_show", label: "No-show" },
+                          { value: "cancelled", label: "Cancelled" },
+                        ],
+                        "",
+                      ],
+                      ["hub", "Hub", [{ value: "", label: "All" }, ...Object.entries(teamName).map(([value, label]) => ({ value, label }))], ""],
+                    ] as const
+                  ).map(([name, label, options, value]) => (
+                    <label key={name} className="block text-xs text-ink/65">
+                      {label}
+                      <select name={name} defaultValue={value} className="mt-1 block min-w-[9rem] border border-line bg-paper px-2 py-2 text-sm text-ink">
+                        {options.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                  <div className="flex w-full flex-wrap gap-2">
+                    <button type="submit" className="border border-accent bg-accent px-3 py-2 text-sm font-medium text-white">
+                      CSV (Excel / Google Sheets)
+                    </button>
+                    <button type="submit" formAction={`/print/recruitment/${id}/slots`} className="border border-line px-3 py-2 text-sm font-medium text-ink hover:border-ink/50">
+                      Printable list (PDF)
+                    </button>
+                    <button type="submit" name="empty" value="1" className="border border-line px-3 py-2 text-sm text-ink hover:border-ink/50">
+                      Empty schedule (CSV)
+                    </button>
+                    <button type="submit" name="empty" value="1" formAction={`/print/recruitment/${id}/slots`} className="border border-line px-3 py-2 text-sm text-ink hover:border-ink/50">
+                      Empty schedule (printable)
+                    </button>
+                  </div>
+                  <p className="w-full text-xs text-ink/60">The empty schedule has times and free seats only, no names, so it is safe to share.</p>
+                </form>
+              </details>
               {daySlots.length === 0 ? (
                 <p className="text-sm text-ink/65">No slots on this day yet. Press Generate slots above.</p>
               ) : (

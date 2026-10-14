@@ -48,7 +48,7 @@ export type MeetLinkState =
 export const IST = "Asia/Kolkata";
 export const DEFAULT_SESSIONS: Session[] = [
   { label: "Morning", start: "10:00", end: "13:00" },
-  { label: "Afternoon", start: "15:00", end: "18:00" },
+  { label: "Afternoon", start: "15:00", end: "20:00" },
 ];
 export const DEFAULT_INSTRUCTIONS =
   "Your interview will be held online on Google Meet. The meeting link will be shared on the day of your interview. Please join on time with a stable internet connection, your camera on, and a working microphone.";

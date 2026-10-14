@@ -46,19 +46,24 @@ export function SlotPicker({
     return next;
   }, [cycleId]);
 
-  // Fresh numbers when the picker opens, then every 20 seconds while it is on screen.
+  // Fresh numbers when the picker opens, then every 20 seconds while it is on screen
+  // (skipped while the tab is hidden; refreshed at once when it comes back).
   useEffect(() => {
     let live = true;
-    const tick = () =>
+    const tick = () => {
+      if (document.hidden) return;
       void loadSlots(cycleId).then((next) => {
         if (live) setSlots(next);
       });
+    };
     const first = window.setTimeout(tick, 0);
     const timer = window.setInterval(tick, REFRESH_MS);
+    document.addEventListener("visibilitychange", tick);
     return () => {
       live = false;
       window.clearTimeout(first);
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
     };
   }, [cycleId]);
 
