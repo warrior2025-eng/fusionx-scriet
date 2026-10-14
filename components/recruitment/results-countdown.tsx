@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 function parts(ms: number) {
@@ -17,8 +17,8 @@ function parts(ms: number) {
 export function ResultsCountdown({ until, className }: { until: string; className?: string }) {
   const router = useRouter();
   const [now, setNow] = useState<number | null>(null);
-  const refreshed = useRef(false);
   const target = new Date(until).getTime();
+  const due = now !== null && now >= target;
 
   useEffect(() => {
     const tick = () => setNow(Date.now());
@@ -30,16 +30,22 @@ export function ResultsCountdown({ until, className }: { until: string; classNam
     };
   }, []);
 
+  // Once due: fetch the page again, and keep trying every few seconds until the
+  // server answers with the results (this component then goes away). Keyed on
+  // `due` only, so the one-second tick does not cancel the timer.
   useEffect(() => {
-    if (now === null || now < target || refreshed.current) return;
-    refreshed.current = true;
+    if (!due) return;
     // A moment's grace for clocks that run a little fast.
-    const later = window.setTimeout(() => router.refresh(), 1500);
-    return () => window.clearTimeout(later);
-  }, [now, target, router]);
+    const first = window.setTimeout(() => router.refresh(), 1500);
+    const again = window.setInterval(() => router.refresh(), 8000);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(again);
+    };
+  }, [due, router]);
 
   if (now === null) return null;
-  if (now >= target) return <p className={className}>The results are being published. This page will update in a moment.</p>;
+  if (due) return <p className={className}>The results are being published. This page will update in a moment.</p>;
   const { days, hours, minutes, seconds } = parts(target - now);
   const cells: [number, string][] = [
     [days, days === 1 ? "day" : "days"],
