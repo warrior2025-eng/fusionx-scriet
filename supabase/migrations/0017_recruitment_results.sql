@@ -60,7 +60,7 @@ create table recruitment_results_config (
   cycle_id uuid primary key references recruitment_cycles(id) on delete cascade,
   induction_at timestamptz,
   induction_mode text check (induction_mode in ('online', 'in_person')),
-  induction_link text check (induction_link is null or induction_link ~* '^https://\S{6,300}$'),
+  induction_link text check (induction_link is null or (char_length(induction_link) <= 300 and induction_link ~* '^https://\S{6,}$')),
   induction_venue text check (induction_venue is null or char_length(induction_venue) <= 300),
   induction_note text check (induction_note is null or char_length(induction_note) <= 1000),
   -- Days a selected candidate has to accept, counted from the results (or from a promotion).
