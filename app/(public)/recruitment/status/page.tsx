@@ -9,7 +9,9 @@ import { CutCard } from "@/components/ui/cut-card";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Section } from "@/components/ui/section";
 import { istDateTime } from "@/lib/events/format";
-import { STAGE_LABELS, cycleState, getCurrentCycle, type Stage } from "@/lib/recruitment/data";
+import { InterviewCard } from "@/components/recruitment/interview-card";
+import { STAGE_LABELS, cycleState, getCurrentCycle, getMyBooking, getMyMeetLink, getSlotAvailability, type Stage } from "@/lib/recruitment/data";
+import { DEFAULT_INSTRUCTIONS } from "@/lib/recruitment/slots";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +60,12 @@ export default async function RecruitmentStatusPage({ searchParams }: { searchPa
   const { data: statusRows } =
     cycle && application?.status === "submitted" ? await supabase.rpc("my_recruitment_status", { p_cycle: cycle.id }) : { data: null };
   const rows = (statusRows ?? []) as StatusRow[];
+
+  // The interview slot, and where its Google Meet link stands (the link only when it may be shown).
+  const active = cycle && (application?.status === "submitted" || application?.status === "draft");
+  const [booking, meet, slots] = active
+    ? await Promise.all([getMyBooking(cycle.id), getMyMeetLink(cycle.id), getSlotAvailability(cycle.id)])
+    : [null, { state: "none" as const }, []];
 
   // The group link, only for a team this person was selected for (the function returns nothing otherwise).
   const groupLinks: Record<string, string> = {};
@@ -117,6 +125,17 @@ export default async function RecruitmentStatusPage({ searchParams }: { searchPa
                   ),
                 )
               : null}
+
+        {active && (
+          <InterviewCard
+            booking={booking}
+            meet={meet}
+            instructions={cycle.interview_instructions || DEFAULT_INSTRUCTIONS}
+            reportingNote={cycle.reporting_note ?? null}
+            hasSlots={slots.length > 0}
+            changeHref={application?.status === "draft" ? (state === "open" ? "/recruitment/apply" : null) : "/recruitment/slot"}
+          />
+        )}
 
         {rows.map((row) => {
           const reached = REACHED[row.stage];

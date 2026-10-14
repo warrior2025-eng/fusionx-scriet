@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, FileText, X } from "lucide-react";
 import { saveRecruitmentDraft, submitRecruitmentApplication, uploadRecruitmentFile } from "@/actions/recruitment";
 import { Button } from "@/components/ui/button";
 import { FieldHint, Input, Label, Textarea } from "@/components/ui/field";
+import { SlotPicker } from "@/components/recruitment/slot-picker";
 import { questionsFor, type Answer, type Question } from "@/lib/recruitment/shared";
+import { MODE_LABELS, dayLabel, slotRange, type SlotAvailability } from "@/lib/recruitment/slots";
 import { cn } from "@/lib/utils";
 
 export type ApplyDraft = {
@@ -22,15 +24,16 @@ export type ApplyDraft = {
 
 type Team = { id: string; name: string; short_description: string | null; emoji: string | null };
 
-const STEPS = ["About you", "Teams", "Questions", "Resume and links", "Review"] as const;
+type StepName = "About you" | "Teams" | "Questions" | "Resume and links" | "Interview slot" | "Review";
+const BASE_STEPS: StepName[] = ["About you", "Teams", "Questions", "Resume and links", "Review"];
 const ORDINALS = ["1st", "2nd", "3rd", "4th"];
 
 const isBlank = (answer: Answer | undefined) =>
   answer === undefined || (Array.isArray(answer) ? answer.length === 0 : answer.trim() === "");
 
 /**
- * The application form: five short steps, saved as a draft while it is being
- * filled in. The database decides what is accepted; the checks here only
+ * The application form: short steps (an interview slot step when the cycle
+ * has slots), saved as a draft while it is being filled in. The database decides what is accepted; the checks here only
  * point at what is missing before the applicant tries to submit.
  */
 export function ApplyForm({
@@ -39,13 +42,23 @@ export function ApplyForm({
   teams,
   questions,
   initial,
+  slots = [],
+  slotRequired = false,
+  instructions = "",
 }: {
   cycleId: string;
   maxPreferences: number;
   teams: Team[];
   questions: Question[];
   initial: ApplyDraft;
+  /** The cycle's interview slots; the slot step appears only when there are some. */
+  slots?: SlotAvailability[];
+  slotRequired?: boolean;
+  instructions?: string;
 }) {
+  const STEPS: StepName[] = slots.length > 0 ? ["About you", "Teams", "Questions", "Resume and links", "Interview slot", "Review"] : BASE_STEPS;
+  const [mySlot, setMySlot] = useState<SlotAvailability | null>(slots.find((x) => x.mine) ?? null);
+  const onSlotChange = useCallback((slot: SlotAvailability | null) => setMySlot(slot), []);
   const router = useRouter();
   const [form, setForm] = useState<ApplyDraft>(initial);
   const [step, setStep] = useState(0);
@@ -94,9 +107,11 @@ export function ApplyForm({
 
   // What is still missing on a step, or null when it is complete.
   const missing = (index: number): string | null => {
-    if (index === 0 && !form.full_name.trim()) return "Add your name.";
-    if (index === 1 && form.preferences.length === 0) return "Choose at least one team.";
-    if (index === 2) {
+    const name = STEPS[index];
+    if (name === "About you" && !form.full_name.trim()) return "Add your name.";
+    if (name === "Teams" && form.preferences.length === 0) return "Choose at least one team.";
+    if (name === "Interview slot" && slotRequired && !mySlot) return "Choose your interview slot.";
+    if (name === "Questions") {
       const open = asked.find((q) => q.required && isBlank(form.answers[q.id]));
       if (open) return `Please answer: ${open.label}`;
       const long = asked.find((q) => {
@@ -275,7 +290,7 @@ export function ApplyForm({
         </label>
       </div>
 
-      {step === 0 && (
+      {STEPS[step] === "About you" && (
         <div className="space-y-5">
           <div>
             <Label htmlFor="full_name">
@@ -296,7 +311,7 @@ export function ApplyForm({
         </div>
       )}
 
-      {step === 1 && (
+      {STEPS[step] === "Teams" && (
         <div className="space-y-6">
           <p className="text-sm text-ink/70">
             Choose up to {maxPreferences} team{maxPreferences === 1 ? "" : "s"}, in order of preference.
@@ -356,7 +371,7 @@ export function ApplyForm({
         </div>
       )}
 
-      {step === 2 && (
+      {STEPS[step] === "Questions" && (
         <div className="space-y-8">
           {asked.length === 0 && <p className="text-sm text-ink/70">There are no questions for this application.</p>}
           {asked.some((q) => q.team_id === null) && <div className="space-y-6">{asked.filter((q) => q.team_id === null).map(question)}</div>}
@@ -373,7 +388,7 @@ export function ApplyForm({
         </div>
       )}
 
-      {step === 3 && (
+      {STEPS[step] === "Resume and links" && (
         <div className="space-y-6">
           <div>
             <p className="mb-1.5 text-sm font-medium text-ink">Resume (optional)</p>
@@ -396,9 +411,16 @@ export function ApplyForm({
         </div>
       )}
 
-      {step === 4 && (
+      {STEPS[step] === "Interview slot" && (
+        <SlotPicker cycleId={cycleId} initial={slots} instructions={instructions} onChange={onSlotChange} />
+      )}
+
+      {STEPS[step] === "Review" && (
         <div>
           <p className="mb-4 text-sm text-ink/70">Check your application. After you submit, you can withdraw it but not edit it.</p>
+          {slots.length > 0 && instructions && (
+            <p className="mb-4 border border-line bg-accent-soft px-4 py-3 text-sm leading-relaxed text-ink">{instructions}</p>
+          )}
           <dl className="divide-y divide-line border-y border-line">
             {reviewRow("Name", form.full_name)}
             {reviewRow("Department", form.department)}
@@ -423,6 +445,11 @@ export function ApplyForm({
             ))}
             {reviewRow("Resume", form.resume_path ? "PDF uploaded" : "")}
             {reviewRow("Links", [form.links.portfolio, form.links.github, form.links.linkedin].filter(Boolean).join("\n"))}
+            {slots.length > 0 &&
+              reviewRow(
+                "Interview slot",
+                mySlot ? `${dayLabel(mySlot.day)}, ${slotRange(mySlot.starts_at, mySlot.ends_at)} IST (${MODE_LABELS[mySlot.mode]})` : "",
+              )}
           </dl>
         </div>
       )}

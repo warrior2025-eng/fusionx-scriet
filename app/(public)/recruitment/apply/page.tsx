@@ -6,7 +6,8 @@ import { CutCard } from "@/components/ui/cut-card";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Section } from "@/components/ui/section";
 import { istDateTime } from "@/lib/events/format";
-import { cycleState, getCurrentCycle, getQuestions, getVisibleTeams, toApplication } from "@/lib/recruitment/data";
+import { cycleState, getCurrentCycle, getQuestions, getSlotAvailability, getVisibleTeams, toApplication } from "@/lib/recruitment/data";
+import { DEFAULT_INSTRUCTIONS } from "@/lib/recruitment/slots";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Apply", robots: { index: false } };
@@ -47,7 +48,7 @@ export default async function RecruitmentApplyPage() {
   if (state === "upcoming") return closed(`Applications open on ${istDateTime(cycle.opens_at)}.`);
   if (state !== "open") return closed("Applications are closed.");
 
-  const [teams, questions] = await Promise.all([getVisibleTeams(cycle.id), getQuestions(cycle.id)]);
+  const [teams, questions, slots] = await Promise.all([getVisibleTeams(cycle.id), getQuestions(cycle.id), getSlotAvailability(cycle.id)]);
   const open = teams.filter((t) => t.accepting_applications);
 
   // The saved draft, or a first draft filled in from the profile.
@@ -78,6 +79,9 @@ export default async function RecruitmentApplyPage() {
           teams={open.map((t) => ({ id: t.id, name: t.name, short_description: t.short_description, emoji: t.emoji }))}
           questions={questions.filter((q) => q.team_id === null || open.some((t) => t.id === q.team_id))}
           initial={initial}
+          slots={slots}
+          slotRequired={cycle.slot_required !== false}
+          instructions={cycle.interview_instructions || DEFAULT_INSTRUCTIONS}
         />
       </CutCard>
     </Section>

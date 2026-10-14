@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { cycleState, toQuestion, type Cycle, type Question, type RecruitmentTeam } from "./shared";
+import type { MeetLinkState, MyBooking, SlotAvailability } from "./slots";
 
 /**
  * Recruitment: the reads behind the public pages. Every read here returns
@@ -54,3 +55,24 @@ export async function getQuestions(cycleId: string): Promise<Question[]> {
   return (data ?? []).map((row) => toQuestion(row as Record<string, unknown>));
 }
 
+
+/** The cycle's interview slots with seat counts (empty before migration 0016, or when there are none). */
+export async function getSlotAvailability(cycleId: string): Promise<SlotAvailability[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("recruitment_slot_availability", { p_cycle: cycleId });
+  return error ? [] : ((data ?? []) as SlotAvailability[]);
+}
+
+/** The signed-in person's booking in this cycle, or null. */
+export async function getMyBooking(cycleId: string): Promise<MyBooking | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("my_slot_booking", { p_cycle: cycleId });
+  return error || !data ? null : (data as MyBooking);
+}
+
+/** Where the signed-in person's Meet link stands; the url only when it may be shown. */
+export async function getMyMeetLink(cycleId: string): Promise<MeetLinkState> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_my_meet_link", { p_cycle: cycleId });
+  return error || !data ? { state: "none" } : (data as MeetLinkState);
+}
