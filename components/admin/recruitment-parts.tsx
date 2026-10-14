@@ -11,13 +11,14 @@ const TABS = [
   { path: "/reviewers", label: "Reviewers" },
   { path: "/applications", label: "Applications" },
   { path: "/slots", label: "Interview slots" },
+  { path: "/results", label: "Results" },
 ] as const;
 
-/** The tabs shared by every page of one recruitment cycle. Reviewers, applications and slots are admin-only. */
+/** The tabs shared by every page of one recruitment cycle. Reviewers, applications, slots and results are admin-only. */
 export function CycleTabs({ cycleId, current, admin }: { cycleId: string; current: (typeof TABS)[number]["path"]; admin: boolean }) {
   return (
     <nav aria-label="Cycle sections" className="mb-6 flex flex-wrap gap-x-6 gap-y-1 border-b border-line">
-      {TABS.filter((tab) => admin || (tab.path !== "/reviewers" && tab.path !== "/applications" && tab.path !== "/slots")).map((tab) => (
+      {TABS.filter((tab) => admin || (tab.path !== "/reviewers" && tab.path !== "/applications" && tab.path !== "/slots" && tab.path !== "/results")).map((tab) => (
         <Link
           key={tab.path}
           href={`/admin/recruitment/${cycleId}${tab.path}`}
