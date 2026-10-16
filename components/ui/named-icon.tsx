@@ -1,12 +1,14 @@
 import {
   BookOpen,
   Briefcase,
+  CalendarCheck,
   Cpu,
   FlaskConical,
   GraduationCap,
   Hammer,
   Lightbulb,
   Network,
+  Palette,
   Rocket,
   Search,
   Shield,
@@ -36,6 +38,8 @@ const ICONS: Record<IconName, LucideIcon> = {
   GraduationCap,
   Wrench,
   Search,
+  Palette,
+  CalendarCheck,
 };
 
 /** An icon chosen by name in the admin panel. Renders nothing for an unknown name. */

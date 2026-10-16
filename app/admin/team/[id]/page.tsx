@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { EntityFormPage } from "@/components/admin/entity-pages";
 
-export const metadata: Metadata = { title: "Admin: Edit Team" };
+export const metadata: Metadata = { title: "Admin: Edit Core profile" };
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

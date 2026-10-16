@@ -32,6 +32,11 @@ const nextConfig: NextConfig = {
         destination: "https://fxscriet.com/:path*",
         permanent: true,
       },
+      // Programs became FusionX Hubs, and the Team page became Core.
+      { source: "/programs", destination: "/hubs", permanent: true },
+      { source: "/programs/:path*", destination: "/hubs", permanent: true },
+      { source: "/founders", destination: "/core", permanent: true },
+      { source: "/founders/:path*", destination: "/core", permanent: true },
     ];
   },
   images: {

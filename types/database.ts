@@ -277,12 +277,23 @@ export interface OrgPerson {
   updated_at: string;
 }
 
-export interface Program {
+/** A FusionX Hub (the `programs` table). */
+export interface Hub {
   id: string;
   slug: string;
   name: string;
+  tagline: string | null;
+  /** Short text for cards and search results. */
   summary: string;
-  details: string[];
+  /** Paragraphs separated by an empty line. */
+  about: string | null;
+  /** "Title: description", one per item. */
+  responsibilities: string[];
+  who_should_join: string | null;
+  what_you_gain: string | null;
+  type_label: string | null;
+  type_note: string | null;
+  cta: "recruitment" | "teams" | "none";
   icon_name: string | null;
   display_order: number;
   is_visible: boolean;

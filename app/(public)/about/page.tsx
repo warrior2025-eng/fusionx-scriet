@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Section } from "@/components/ui/section";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { siteName } from "@/lib/site-config";
@@ -49,8 +50,8 @@ export default async function AboutPage() {
           <ScrollReveal delay={200}>
             <h2>How FusionX works</h2>
             <p>
-              Through six focused programs (Build Lab, Research Forum, IP &amp; Innovation Cell,
-              Venture Cell, Competition Support &amp; Mentorship, and Teams), FusionX gives students
+              Through the <Link href="/hubs">FusionX Hubs</Link> (Design &amp; Branding, Competitions &amp;
+              Opportunities, Projects, Research &amp; Startups, FusionX Event Crew, and FusionX Teams), FusionX gives students
               a place to move an idea forward at whichever stage they&rsquo;re at, with support from
               peers, seniors, and faculty.
             </p>

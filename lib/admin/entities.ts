@@ -43,6 +43,8 @@ export type FieldDef = {
   options?: { value: string; label: string }[];
   /** Value a new record starts with. */
   initial?: string | boolean;
+  /** Lines fields: the longest one item may be (default 120). */
+  itemMax?: number;
   /** Show a live character counter (textarea). */
   counter?: boolean;
   /** Image fields: where the file goes, and whether it is cropped square. */
@@ -119,8 +121,8 @@ export const ENTITIES = {
   team: {
     key: "team",
     table: "org_people",
-    singular: "Team profile",
-    plural: "Team",
+    singular: "Core profile",
+    plural: "Core",
     adminPath: "/admin/team",
     cap: "team",
     deleteRule: "cap",
@@ -163,20 +165,20 @@ export const ENTITIES = {
       { name: "portfolio_url", label: "Portfolio", type: "url", half: true },
       { name: "is_visible", label: "Visible on the site", type: "checkbox", initial: true },
     ],
-    publicPaths: ["/founders", "/"],
-    viewHref: () => "/founders",
+    publicPaths: ["/core", "/"],
+    viewHref: () => "/core",
   },
 
   programs: {
     key: "programs",
     table: "programs",
-    singular: "Program",
-    plural: "Programs",
+    singular: "Hub",
+    plural: "FusionX Hubs",
     adminPath: "/admin/programs",
     cap: "content",
     deleteRule: "admin",
     titleColumn: "name",
-    searchColumns: ["name", "summary"],
+    searchColumns: ["name", "tagline", "summary"],
     publish: { kind: "boolean", column: "is_visible", on: "Visible", off: "Hidden" },
     orderable: true,
     defaultSort: { column: "display_order", ascending: true },
@@ -190,10 +192,43 @@ export const ENTITIES = {
         required: true,
         max: 60,
         half: true,
-        hint: "Lowercase letters, numbers and hyphens. Used in the link: /programs#slug",
+        hint: "Lowercase letters, numbers and hyphens. Used in the link: /hubs/slug",
       },
-      { name: "summary", label: "Summary", type: "textarea", required: true, max: 600, rows: 3 },
-      { name: "details", label: "Detail points", type: "lines", hint: "One per line.", rows: 6 },
+      { name: "tagline", label: "Tagline", type: "text", max: 200 },
+      {
+        name: "summary",
+        label: "Short summary",
+        type: "textarea",
+        required: true,
+        max: 600,
+        rows: 3,
+        hint: "Used for search results and the page description.",
+      },
+      { name: "about", label: "About", type: "textarea", max: 4000, rows: 8, hint: "Leave an empty line between paragraphs. The first paragraph is shown on the cards." },
+      {
+        name: "responsibilities",
+        label: "Key responsibilities",
+        type: "lines",
+        itemMax: 400,
+        rows: 8,
+        hint: "One per line, written Title: description.",
+      },
+      { name: "who_should_join", label: "Who should join?", type: "textarea", max: 2000, rows: 4, hint: "Leave an empty line between paragraphs." },
+      { name: "what_you_gain", label: "What you will gain", type: "textarea", max: 2000, rows: 4 },
+      { name: "type_label", label: "Badge (optional)", type: "text", max: 60, half: true, placeholder: "Collaborative Network" },
+      { name: "type_note", label: "Note under the badge", type: "text", max: 200, half: true },
+      {
+        name: "cta",
+        label: "Button on the hub page",
+        type: "select",
+        required: true,
+        initial: "recruitment",
+        options: [
+          { value: "recruitment", label: "Apply through recruitment" },
+          { value: "teams", label: "Register your team / Find teammates (shown as the highlighted card)" },
+          { value: "none", label: "No button" },
+        ],
+      },
       {
         name: "icon_name",
         label: "Icon",
@@ -202,8 +237,8 @@ export const ENTITIES = {
       },
       { name: "is_visible", label: "Visible on the site", type: "checkbox", initial: true },
     ],
-    publicPaths: ["/programs", "/"],
-    viewHref: (r) => `/programs#${r.slug}`,
+    publicPaths: ["/hubs", "/"],
+    viewHref: (r) => `/hubs/${r.slug}`,
   },
 
   events: {
@@ -549,7 +584,9 @@ function fieldSchema(f: FieldDef): z.ZodType {
       return z.boolean();
     case "tags":
     case "lines":
-      return z.array(z.string().max(120, "Keep each item under 120 characters")).max(30, "Keep this to 30 items");
+      return z
+        .array(z.string().max(f.itemMax ?? 120, `Keep each item under ${f.itemMax ?? 120} characters`))
+        .max(30, "Keep this to 30 items");
     case "image":
       return z.any();
   }
