@@ -94,3 +94,23 @@ export async function getMyMeetLink(cycleId: string): Promise<MeetLinkState> {
   const { data, error } = await supabase.rpc("get_my_meet_link", { p_cycle: cycleId });
   return error || !data ? { state: "none" } : (data as MeetLinkState);
 }
+
+/** A hub's post-result task, as its selected candidates see it (migration 0021). */
+export type MyTask = {
+  team_id: string;
+  team_name: string;
+  title: string;
+  description: string | null;
+  deadline: string | null;
+  link: string | null;
+  status: "not_started" | "submitted" | "reviewed";
+  submission_link: string | null;
+  submitted_at: string | null;
+};
+
+/** The tasks of the hubs the signed-in person is selected for; empty before the results (or before migration 0021). */
+export async function getMyTasks(cycleId: string): Promise<MyTask[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("my_recruitment_tasks", { p_cycle: cycleId });
+  return error || !Array.isArray(data) ? [] : (data as MyTask[]);
+}

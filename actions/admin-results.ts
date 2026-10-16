@@ -301,3 +301,90 @@ export async function saveOnboarding(cycleId: string, applicationId: string, tea
   revalidatePath(`/admin/recruitment/${cycleId}/results`);
   return ok("Saved.");
 }
+
+// ── the post-result task (migration 0021) ──────────────────────────────
+const httpsLink = z
+  .string()
+  .trim()
+  .max(500, "At most 500 characters")
+  .refine((v) => v === "" || (/^https:\/\/\S+$/i.test(v) && URL.canParse(v)), "Use a full link that starts with https://");
+const taskSchema = z.object({
+  title: z.string().trim().min(2, "Add a title").max(200, "At most 200 characters"),
+  description: z.string().trim().max(4000, "At most 4000 characters"),
+  deadline: z.string().trim().refine((v) => v === "" || /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v), "Pick a date and time"),
+  link: httpsLink,
+  is_published: z.boolean(),
+});
+
+/**
+ * One task per hub, for the candidates selected into it. Candidates see it
+ * only after the results are out (the database decides); once it is
+ * published and the results are out, they are notified.
+ */
+export async function saveHubTask(cycleId: string, teamId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
+  const ctx = await admin(cycleId);
+  if (!ctx || !uuid.safeParse(teamId).success) return FORBIDDEN;
+  const parsed = taskSchema.safeParse({
+    title: text(formData, "task_title"),
+    description: text(formData, "task_description"),
+    deadline: text(formData, "task_deadline"),
+    link: text(formData, "task_link"),
+    is_published: formData.get("task_published") === "on",
+  });
+  if (!parsed.success) {
+    const errors = zodFieldErrors(parsed.error);
+    return fail("Please fix the highlighted fields.", Object.fromEntries(Object.entries(errors).map(([k, v]) => [`task_${k === "is_published" ? "published" : k}`, v])));
+  }
+  const v = parsed.data;
+  const { data: team } = await ctx.supabase.from("recruitment_teams").select("id, name").eq("id", teamId).eq("cycle_id", cycleId).maybeSingle();
+  if (!team) return fail("Hub not found.");
+  const { data: before } = await ctx.supabase.from("recruitment_hub_tasks").select("*").eq("team_id", teamId).maybeSingle();
+  const values = {
+    team_id: teamId,
+    title: v.title,
+    description: v.description || null,
+    deadline: v.deadline ? fromIstInput(v.deadline) : null,
+    link: v.link || null,
+    is_published: v.is_published,
+    published_at: v.is_published ? (before?.published_at ?? new Date().toISOString()) : null,
+    updated_by: ctx.user.id,
+  };
+  const { error } = await ctx.supabase.from("recruitment_hub_tasks").upsert(values, { onConflict: "team_id" });
+  if (error) return fail(friendlyDbError(error.message, "Could not save the task. Has migration 0021 been run?"));
+  // Tells the selected candidates now if the results are already out (does nothing before).
+  const { data: told } = v.is_published ? await ctx.supabase.rpc("recruitment_notify_tasks", { p_cycle: cycleId }) : { data: 0 };
+  await logAudit(ctx, {
+    action: before ? "updated_hub_task" : "created_hub_task",
+    table: "recruitment_hub_tasks",
+    id: teamId,
+    before,
+    after: values,
+    note: `${team.name}: "${v.title}", ${v.is_published ? "published" : "draft"}${told ? `; ${told} candidate(s) notified` : ""}`,
+  });
+  touched(cycleId);
+  return ok(
+    v.is_published
+      ? told
+        ? `Saved and published. ${told} selected candidate(s) notified.`
+        : "Saved and published. Selected candidates see it, and are notified, once the results are out."
+      : "Saved as a draft. Candidates do not see it until you publish it.",
+  );
+}
+
+/** Marks a candidate's task reviewed (or back to submitted). */
+export async function setTaskReviewed(cycleId: string, teamId: string, applicationId: string, reviewed: boolean): Promise<ActionState> {
+  const ctx = await admin(cycleId);
+  if (!ctx || !uuid.safeParse(teamId).success || !uuid.safeParse(applicationId).success) return FORBIDDEN;
+  const { data, error } = await ctx.supabase
+    .from("recruitment_task_submissions")
+    .update(reviewed ? { status: "reviewed", reviewed_at: new Date().toISOString(), reviewed_by: ctx.user.id } : { status: "submitted", reviewed_at: null, reviewed_by: null })
+    .eq("team_id", teamId)
+    .eq("application_id", applicationId)
+    .neq("status", "not_started")
+    .select("application_id");
+  if (error) return fail(friendlyDbError(error.message, "Could not save."));
+  if (!data?.length) return fail("This candidate has not submitted the task yet.");
+  await logAudit(ctx, { action: reviewed ? "reviewed_hub_task" : "reopened_hub_task", table: "recruitment_task_submissions", id: applicationId, note: teamId });
+  revalidatePath(`/admin/recruitment/${cycleId}/results`);
+  return ok(reviewed ? "Marked reviewed." : "Marked not reviewed.");
+}

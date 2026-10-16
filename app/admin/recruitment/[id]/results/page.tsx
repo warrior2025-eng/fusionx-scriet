@@ -11,11 +11,13 @@ import {
   publishNow,
   removeFromWaitlist,
   saveDecisions,
+  saveHubTask,
   saveInduction,
   saveOnboarding,
   saveResultSettings,
   saveResultsDate,
   scheduleResults,
+  setTaskReviewed,
   unlockDecisions,
 } from "@/actions/admin-results";
 import { ActionButton } from "@/components/admin/action-button";
@@ -81,6 +83,16 @@ export default async function CycleResultsPage({ params, searchParams }: { param
   const base = `/admin/recruitment/${id}/results`;
 
   const hub = teams.find((t) => t.id === param(query, "hub")) ?? teams[0] ?? null;
+  // The hub's post-result task and who has done it (migration 0021; null before it is run).
+  const [{ data: hubTask, error: taskError }, { data: taskRows }] = hub
+    ? await Promise.all([
+        ctx.supabase.from("recruitment_hub_tasks").select("*").eq("team_id", hub.id).maybeSingle(),
+        ctx.supabase.from("recruitment_task_submissions").select("application_id, status, link, submitted_at, reviewed_at").eq("team_id", hub.id),
+      ])
+    : [{ data: null, error: null }, { data: null }];
+  const taskOf = new Map(
+    ((taskRows ?? []) as { application_id: string; status: "not_started" | "submitted" | "reviewed"; link: string | null; submitted_at: string | null; reviewed_at: string | null }[]).map((t) => [t.application_id, t]),
+  );
   const hubRows = hub ? rows.filter((r) => r.team_id === hub.id) : [];
   const fDecision = param(query, "decision");
   const fAttendance = param(query, "attendance");
@@ -509,6 +521,79 @@ export default async function CycleResultsPage({ params, searchParams }: { param
                   </Table>
                 </Panel>
               )}
+
+              <Panel
+                title={`Post-result task: ${hub.name}`}
+                description="One task for the candidates selected into this hub. They see it on their status page, and are notified, only after the results are out."
+              >
+                {taskError ? (
+                  <p className="text-sm text-ink/75">Post-result tasks need database migration 0021. Run it in the Supabase SQL editor, then reload this page.</p>
+                ) : (
+                  <>
+                    <AdminForm action={saveHubTask.bind(null, id, hub.id)} submitLabel="Save task" key={hub.id}>
+                      <TextField name="task_title" label="Title" required maxLength={200} defaultValue={hubTask?.title ?? ""} />
+                      <TextareaField name="task_description" label="Description" rows={4} max={4000} defaultValue={hubTask?.description ?? ""} />
+                      <div className="grid gap-5 sm:grid-cols-2">
+                        <TextField name="task_deadline" label="Deadline (IST)" type="datetime-local" defaultValue={toIstInput(hubTask?.deadline ?? null)} />
+                        <TextField name="task_link" label="Submission link (optional)" type="url" placeholder="https://forms.gle/..." defaultValue={hubTask?.link ?? ""} hint="A Google Form, Drive folder or similar." />
+                      </div>
+                      <CheckboxField
+                        name="task_published"
+                        label="Published (selected candidates see it after the results)"
+                        defaultChecked={hubTask?.is_published ?? false}
+                      />
+                    </AdminForm>
+
+                    <h3 className="mb-3 mt-8 text-sm font-semibold text-ink">Selected candidates</h3>
+                    <Table label={`Task status in ${hub.name}`}>
+                      <thead>
+                        <tr>
+                          <Th>Candidate</Th>
+                          <Th>Task</Th>
+                          <Th>Link</Th>
+                          <Th>
+                            <span className="sr-only">Review</span>
+                          </Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selected.length === 0 && <EmptyRow colSpan={4}>No one is selected in this hub{visible ? "." : " yet."}</EmptyRow>}
+                        {selected.map((r) => {
+                          const t = taskOf.get(r.application_id);
+                          const status = t?.status ?? "not_started";
+                          return (
+                            <tr key={r.application_id}>
+                              <Td className="font-medium text-ink">{r.name}</Td>
+                              <Td>
+                                <Pill tone={status === "reviewed" ? "good" : status === "submitted" ? "warn" : "neutral"}>
+                                  {status === "reviewed" ? "Reviewed" : status === "submitted" ? "Submitted" : "Not started"}
+                                </Pill>
+                                {t?.submitted_at && <span className="block text-xs text-ink/60">{istDateTime(t.submitted_at)}</span>}
+                              </Td>
+                              <Td className="max-w-56 break-all">
+                                {t?.link ? (
+                                  <a href={t.link} target="_blank" rel="noopener noreferrer" className="text-accent underline underline-offset-2">
+                                    {t.link}
+                                  </a>
+                                ) : (
+                                  <span className="text-ink/50">None</span>
+                                )}
+                              </Td>
+                              <Td>
+                                {status !== "not_started" && (
+                                  <ActionButton action={setTaskReviewed.bind(null, id, hub.id, r.application_id, status !== "reviewed")}>
+                                    {status === "reviewed" ? "Mark not reviewed" : "Mark reviewed"}
+                                  </ActionButton>
+                                )}
+                              </Td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </Table>
+                  </>
+                )}
+              </Panel>
             </>
           )
         )}
