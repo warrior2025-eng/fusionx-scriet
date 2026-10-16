@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Check } from "lucide-react";
 import { withdrawRecruitmentApplication } from "@/actions/recruitment";
 import { ActionButton } from "@/components/admin/action-button";
 import { Toaster } from "@/components/admin/toast";
@@ -13,6 +12,8 @@ import { agreeToAnnouncement } from "@/actions/recruitment-results";
 import { InterviewCard } from "@/components/recruitment/interview-card";
 import { ResultView } from "@/components/recruitment/result-view";
 import { ResultsCountdown } from "@/components/recruitment/results-countdown";
+import { StageTimeline } from "@/components/recruitment/stage-timeline";
+import { TaskCard } from "@/components/recruitment/task-card";
 import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
 import {
   STAGE_LABELS,
@@ -21,13 +22,14 @@ import {
   getMyBooking,
   getMyMeetLink,
   getMyResult,
+  getMyTasks,
   getSlotAvailability,
+  timeline,
   type Stage,
 } from "@/lib/recruitment/data";
 import { CONSENT_NOTICE, announcement, type MyResult } from "@/lib/recruitment/results";
 import { DEFAULT_INSTRUCTIONS } from "@/lib/recruitment/slots";
 import { createClient } from "@/lib/supabase/server";
-import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Your application", robots: { index: false } };
 
@@ -43,18 +45,7 @@ type StatusRow = {
   results_out: boolean;
 };
 
-const STEPS = ["Applied", "Shortlisted", "Task", "Interview", "Result"];
-// How far along the timeline each stage sits.
-const REACHED: Record<StatusRow["stage"], number> = {
-  applied: 0,
-  shortlisted: 1,
-  task: 2,
-  interview: 3,
-  in_review: 3,
-  selected: 4,
-  waitlisted: 4,
-  not_selected: 4,
-};
+// The timeline (Applied, Shortlisted, Interview, Result, Task) comes from timeline() in lib/recruitment/stages.ts.
 const ORDINALS = ["1st", "2nd", "3rd", "4th"];
 
 export default async function RecruitmentStatusPage({ searchParams }: { searchParams: Promise<{ submitted?: string }> }) {
@@ -87,6 +78,9 @@ export default async function RecruitmentStatusPage({ searchParams }: { searchPa
   // This visit may be the one that published the results: send their emails too.
   if (shown && cycle && !cycle.results_published_at && cycle.status !== "results_published") deliverEmailsAfterResponse();
   const consent = result.state === "pending" || result.state === "published" ? result.consent : true;
+  // Post-result tasks: the database returns them only to a selected candidate, after the results (migration 0021).
+  const tasks = shown && cycle ? await getMyTasks(cycle.id) : [];
+  const taskFor = (teamId: string) => tasks.find((t) => t.team_id === teamId);
 
   // Before migration 0017: the group link, only for a team this person was selected for.
   const groupLinks: Record<string, string> = {};
@@ -151,6 +145,27 @@ export default async function RecruitmentStatusPage({ searchParams }: { searchPa
 
         {shown && cycle && <ResultView result={shown} cycleId={cycle.id} />}
 
+        {tasks.map((task) => (
+          <TaskCard key={task.team_id} task={task} />
+        ))}
+
+        {/* After the results: where each hub got to, ending at Task for the hub they were selected into. */}
+        {shown &&
+          rows.map((row) => (
+            <CutCard key={row.team_id} className="h-auto">
+              <p className="text-sm text-ink/65">{ORDINALS[row.rank - 1] ?? row.rank} choice</p>
+              <h2 className="mt-1 font-serif text-xl font-medium text-ink">{row.team_name}</h2>
+              <StageTimeline
+                label={`Progress for ${row.team_name}`}
+                steps={timeline({
+                  stage: row.stage === "not_selected" && shown.outcome === "absent" ? "absent" : row.stage,
+                  resultsOut: true,
+                  taskDone: (taskFor(row.team_id)?.status ?? "not_started") !== "not_started",
+                })}
+              />
+            </CutCard>
+          ))}
+
         {result.state === "pending" && (
           <CutCard className="h-auto">
             <p className="text-sm text-ink/65">Results</p>
@@ -183,28 +198,13 @@ export default async function RecruitmentStatusPage({ searchParams }: { searchPa
         )}
 
         {!shown && rows.map((row) => {
-          const reached = REACHED[row.stage];
-          const final = row.results_out && reached === 4;
+          const final = row.results_out && (row.stage === "selected" || row.stage === "waitlisted" || row.stage === "not_selected");
           return (
             <CutCard key={row.team_id} className="h-auto">
               <p className="text-sm text-ink/65">{ORDINALS[row.rank - 1] ?? row.rank} choice</p>
               <h2 className="mt-1 font-serif text-xl font-medium text-ink">{row.team_name}</h2>
 
-              <ol className="mt-6 grid grid-cols-5 gap-1" aria-label={`Progress for ${row.team_name}`}>
-                {STEPS.map((step, i) => (
-                  <li key={step} className="text-center">
-                    <span
-                      className={cn(
-                        "mx-auto flex h-7 w-7 items-center justify-center border text-xs font-semibold",
-                        i <= reached ? "border-accent bg-accent text-white" : "border-ink/25 text-ink/50",
-                      )}
-                    >
-                      {i < reached || (i === reached && (i === 0 || final)) ? <Check size={14} /> : i + 1}
-                    </span>
-                    <span className={cn("mt-1.5 block text-[11px] leading-tight sm:text-xs", i <= reached ? "text-ink" : "text-ink/50")}>{step}</span>
-                  </li>
-                ))}
-              </ol>
+              <StageTimeline label={`Progress for ${row.team_name}`} steps={timeline({ stage: row.stage, resultsOut: row.results_out })} />
 
               <div className="mt-6 border-t border-line pt-5 text-sm">
                 {row.stage === "in_review" && <p className="text-ink">Under review. The result will appear here when results are published.</p>}
