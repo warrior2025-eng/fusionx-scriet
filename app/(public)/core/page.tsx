@@ -10,7 +10,7 @@ import type { OrgPersonCategory } from "@/types/database";
 
 export const generateMetadata = (): Promise<Metadata> =>
   pageMetadata("founders", {
-    title: "Founding Team",
+    title: "Core",
     description: `The founding members, faculty guide, and senior mentor of ${siteName}.`,
   });
 
@@ -23,8 +23,8 @@ const GROUPS: { category: OrgPersonCategory; eyebrow: string; title: string }[] 
   { category: "advisor", eyebrow: "Advisors", title: "Advice and support from outside the team." },
 ];
 
-export default async function FoundersPage() {
-  // Managed from the admin panel (Team). Until that data exists, getPeople
+export default async function CorePage() {
+  // Managed from the admin panel (Core). Until that data exists, getPeople
   // returns the people this page has always listed.
   const people = await getPeople();
   const founders = peopleIn(people, "founder");
@@ -34,7 +34,7 @@ export default async function FoundersPage() {
       <section className="border-b border-line">
         <div className="container-fx pt-20 pb-12 md:pt-24 md:pb-16">
           <ScrollReveal>
-            <Eyebrow>Founding Team</Eyebrow>
+            <Eyebrow>Core</Eyebrow>
             <h1 className="text-4xl md:text-5xl font-serif font-normal tracking-tight text-ink">
               Built by students, for students.
             </h1>
