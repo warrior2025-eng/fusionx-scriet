@@ -12,12 +12,14 @@ import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Apply", robots: { index: false } };
 
-export default async function RecruitmentApplyPage() {
+export default async function RecruitmentApplyPage({ searchParams }: { searchParams: Promise<{ hub?: string }> }) {
+  // From a hub page's "Apply to join this hub": that hub becomes the first choice of a new draft.
+  const hub = String((await searchParams).hub ?? "").replace(/[^a-z0-9-]/g, "").slice(0, 80);
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/recruitment/apply");
+  if (!user) redirect(`/login?next=${encodeURIComponent(hub ? `/recruitment/apply?hub=${hub}` : "/recruitment/apply")}`);
 
   const cycle = await getCurrentCycle();
   const state = cycleState(cycle);
@@ -50,13 +52,15 @@ export default async function RecruitmentApplyPage() {
 
   const [teams, questions, slots] = await Promise.all([getVisibleTeams(cycle.id), getQuestions(cycle.id), getSlotAvailability(cycle.id)]);
   const open = teams.filter((t) => t.accepting_applications);
+  const saved = (application?.preferences ?? []).filter((id) => open.some((t) => t.id === id));
+  const fromHub = hub ? open.find((t) => t.slug === hub || t.slug.endsWith(`-${hub}`)) : undefined;
 
   // The saved draft, or a first draft filled in from the profile.
   const initial: ApplyDraft = {
     full_name: application?.full_name ?? (profile?.full_name as string | undefined) ?? "",
     department: application?.department ?? (profile?.department as string | undefined) ?? "",
     year: application?.year ?? (profile?.year as string | undefined) ?? "",
-    preferences: (application?.preferences ?? []).filter((id) => open.some((t) => t.id === id)),
+    preferences: saved.length === 0 && fromHub ? [fromHub.id] : saved,
     answers: application?.answers ?? {},
     links: {
       portfolio: application?.links.portfolio ?? (profile?.portfolio_url as string | undefined) ?? "",

@@ -33,6 +33,8 @@ export const ICON_NAMES = [
   "GraduationCap",
   "Wrench",
   "Search",
+  "Palette",
+  "CalendarCheck",
 ] as const;
 export type IconName = (typeof ICON_NAMES)[number];
 
@@ -40,12 +42,12 @@ export type IconName = (typeof ICON_NAMES)[number];
 export const SEO_PAGES = [
   { key: "home", label: "Home", path: "/" },
   { key: "about", label: "About", path: "/about" },
-  { key: "programs", label: "Programs", path: "/programs" },
+  { key: "programs", label: "FusionX Hubs", path: "/hubs" },
   { key: "projects", label: "Projects", path: "/projects" },
   { key: "research", label: "Research & IP", path: "/research" },
   { key: "events", label: "Events", path: "/events" },
   { key: "opportunities", label: "Opportunities", path: "/opportunities" },
-  { key: "founders", label: "Team", path: "/founders" },
+  { key: "founders", label: "Core", path: "/core" },
   { key: "contact", label: "Contact", path: "/contact" },
   { key: "join", label: "Join", path: "/join" },
 ] as const;
@@ -56,10 +58,10 @@ export const HOME_SECTIONS = [
   { key: "activity", label: "Activity panel" },
   { key: "pipeline", label: "Idea to impact pipeline" },
   { key: "coreAreas", label: "Core areas" },
-  { key: "programs", label: "Programs" },
+  { key: "programs", label: "FusionX Hubs" },
   { key: "projects", label: "Projects" },
   { key: "events", label: "Events" },
-  { key: "team", label: "Founding team" },
+  { key: "team", label: "Core" },
   { key: "join", label: "Join call to action" },
 ] as const;
 
@@ -106,7 +108,7 @@ export const CONTENT = {
       highlight: "Grow",
       description:
         "{name} brings together students, ideas, and opportunities to build, research, and create real-world impact, together.",
-      primaryCta: { label: "Explore Programs", href: "/programs" },
+      primaryCta: { label: "Explore FusionX Hubs", href: "/hubs" },
       secondaryCta: { label: "Join the Network", href: "/join" },
     },
   },
@@ -179,7 +181,7 @@ export const CONTENT = {
         heading: "Explore",
         links: [
           { href: "/about", label: "About" },
-          { href: "/programs", label: "Programs" },
+          { href: "/hubs", label: "FusionX Hubs" },
           { href: "/projects", label: "Projects" },
           { href: "/research", label: "Research & IP" },
         ],
@@ -197,7 +199,7 @@ export const CONTENT = {
       {
         heading: "Organization",
         links: [
-          { href: "/founders", label: "Founding Team" },
+          { href: "/core", label: "Core" },
           { href: "/resources", label: "Resources" },
           { href: "/contact", label: "Contact" },
           { href: "/privacy", label: "Privacy Policy" },

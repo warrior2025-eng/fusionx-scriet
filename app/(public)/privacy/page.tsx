@@ -27,7 +27,7 @@ export default function PrivacyPage() {
         </p>
         <h2>How we use it</h2>
         <p>
-          To operate FusionX programs, review applications, coordinate teams and events, and
+          To operate the FusionX Hubs, review applications, coordinate teams and events, and
           communicate with you about your involvement. We do not sell personal information.
         </p>
         <h2>Data storage</h2>

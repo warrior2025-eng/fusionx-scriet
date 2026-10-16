@@ -18,7 +18,8 @@ import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { FusionXHero } from "@/components/hero/fusionx-hero";
 import { getOrganizationSettings } from "@/lib/data/organization";
 import { getPeople, peopleIn } from "@/lib/data/people";
-import { getPrograms } from "@/lib/data/programs";
+import { getHubs } from "@/lib/data/hubs";
+import { HubCards } from "@/components/hubs/hub-cards";
 import { pageMetadata } from "@/lib/data/seo";
 import { getContent } from "@/lib/data/site-content";
 import { getCurrentCycle } from "@/lib/recruitment/data";
@@ -82,7 +83,7 @@ export default async function HomePage() {
     journey,
     coreAreas,
     people,
-    programs,
+    hubs,
     projects,
     { data: events },
     { data: memberCount, error: memberCountError },
@@ -97,7 +98,7 @@ export default async function HomePage() {
     getContent("lists.journey"),
     getContent("lists.core_areas"),
     getPeople(),
-    getPrograms(),
+    getHubs(),
     homeProjects(supabase),
     supabase
       .from("events")
@@ -218,38 +219,16 @@ export default async function HomePage() {
           <ScrollReveal>
             <SectionHeading
               index={index}
-              eyebrow="Programs"
-              title="Structured tracks for every stage of the journey."
-              description={`${countWord(programs.length)} focused programs, each built around a different part of the idea-to-impact pipeline.`}
+              eyebrow="FusionX Hubs"
+              title="Four operational teams and one collaborative network."
               action={
-                <LinkButton href="/programs" variant="secondary" size="sm">
-                  View all programs <ArrowRight size={14} className="arrow-nudge" />
+                <LinkButton href="/hubs" variant="secondary" size="sm">
+                  View all hubs <ArrowRight size={14} className="arrow-nudge" />
                 </LinkButton>
               }
             />
           </ScrollReveal>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {programs.map((p, i) => (
-              <ScrollReveal key={p.slug} delay={i * 60} className="h-full">
-                <CutCard interactive className="flex flex-col">
-                  {p.icon_name && (
-                    <span className="mb-4 text-ink/70">
-                      <NamedIcon name={p.icon_name} size={20} />
-                    </span>
-                  )}
-                  <h3 className="font-serif text-xl font-medium text-ink">{p.name}</h3>
-                  <p className="mt-3 text-sm leading-relaxed text-ink/75">{p.summary}</p>
-                  <Link
-                    href={`/programs#${p.slug}`}
-                    className="mt-auto inline-flex items-center gap-2 pt-6 text-sm font-medium text-accent"
-                  >
-                    <span className="link-slide">Learn more</span>
-                    <ArrowRight size={14} className="arrow-nudge" />
-                  </Link>
-                </CutCard>
-              </ScrollReveal>
-            ))}
-          </div>
+          <HubCards hubs={hubs} />
         </Section>
       ),
     },
@@ -370,11 +349,11 @@ export default async function HomePage() {
           <ScrollReveal>
             <SectionHeading
               index={index}
-              eyebrow="Founding team"
+              eyebrow="Core"
               title="Built by students, for students."
               action={
-                <LinkButton href="/founders" variant="secondary" size="sm">
-                  Meet the full team <ArrowRight size={14} className="arrow-nudge" />
+                <LinkButton href="/core" variant="secondary" size="sm">
+                  Meet the core <ArrowRight size={14} className="arrow-nudge" />
                 </LinkButton>
               }
             />

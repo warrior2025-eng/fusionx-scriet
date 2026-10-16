@@ -12,12 +12,12 @@ import { logoutAction } from "@/actions/auth";
 
 const nav = [
   { href: "/about", label: "About" },
-  { href: "/programs", label: "Programs" },
+  { href: "/hubs", label: "FusionX Hubs" },
   { href: "/projects", label: "Projects" },
   { href: "/research", label: "Research" },
   { href: "/opportunities", label: "Opportunities" },
   { href: "/events", label: "Events" },
-  { href: "/founders", label: "Team" },
+  { href: "/core", label: "Core" },
 ];
 
 type SiteUser = {
