@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
+import { probeFrameRate, useLowEnd } from "@/lib/low-end";
 
 /**
  * Full-page, fixed, behind-all-content particle field (Canvas 2D — no WebGL
@@ -28,6 +29,12 @@ import { usePathname } from "next/navigation";
  *
  * Not rendered on the home page: its hero runs its own 3D scene, and the two
  * animations are not stacked.
+ *
+ * The pages keep their copy readable over it with a scrim on <main>
+ * (INNER PAGES in globals.css). It starts once the browser is idle, and a
+ * frame is only drawn when something moved. In low-end mode (lib/low-end.ts)
+ * it is 300 still particles that redraw only when the page scrolls, at most
+ * 30 times a second.
  */
 
 type Phase = { formStart: number; formEnd: number; holdEnd: number };
@@ -132,10 +139,16 @@ export function ParticleLogoField() {
   // Not on the home page (it has its own scene) or the check-in scanner (the
   // camera needs the phone to itself).
   if (pathname === "/" || pathname.startsWith("/check-in")) return null;
-  return <ParticleLogoFieldCanvas />;
+  return <ParticleLogoFieldHost />;
 }
 
-function ParticleLogoFieldCanvas() {
+function ParticleLogoFieldHost() {
+  const lowEnd = useLowEnd();
+  // A fresh canvas when the mode changes, so the loop starts over with the new settings.
+  return <ParticleLogoFieldCanvas key={lowEnd ? "light" : "full"} lowEnd={lowEnd} />;
+}
+
+function ParticleLogoFieldCanvas({ lowEnd }: { lowEnd: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -147,10 +160,15 @@ function ParticleLogoFieldCanvas() {
     if (!ctx) return;
 
     const isSmall = window.matchMedia("(max-width: 768px)").matches;
-    const MAX_POINTS = isSmall ? 600 : 1600;
+    const MAX_POINTS = lowEnd ? 300 : isSmall ? 600 : 1600;
     // Phones draw every other frame: the drift is slow, and it halves the work.
-    const FRAME_GAP = isSmall ? 30 : 0;
+    // Low-end mode: at most 30 frames a second.
+    const FRAME_GAP = lowEnd ? 33 : isSmall ? 30 : 0;
+    // Low-end particles do not drift, so a frame only changes when the page scrolls.
+    const DRIFT = lowEnd ? 0 : 6;
     let lastDraw = 0;
+    let lastProgress = -1;
+    let lastMouse = "";
     // How far the page can scroll, measured when its size changes rather than
     // every frame (reading scrollHeight in the loop forces a layout).
     let scrollMax = 0;
@@ -164,7 +182,8 @@ function ParticleLogoFieldCanvas() {
     let logo: LogoSample | null = null;
     let formRadius = 1.4;
     let rafId = 0;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // Sharpness capped: 1.5x on phones, 2x elsewhere.
+    const dpr = Math.min(window.devicePixelRatio || 1, isSmall ? 1.5 : 2);
     let width = window.innerWidth;
     let height = window.innerHeight;
     const mouse = { x: -9999, y: -9999, active: false };
@@ -176,6 +195,7 @@ function ParticleLogoFieldCanvas() {
       const style = getComputedStyle(document.documentElement);
       ink = style.getPropertyValue("--color-ink").trim() || ink;
       accent = style.getPropertyValue("--color-accent").trim() || accent;
+      lastProgress = -1;
     }
 
     /** Fits the logo into the space below the header, at its real aspect ratio. */
@@ -207,6 +227,7 @@ function ParticleLogoFieldCanvas() {
       canvas!.style.width = `${width}px`;
       canvas!.style.height = `${height}px`;
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+      lastProgress = -1;
       for (const p of particles) {
         p.ax *= scaleX;
         p.ay *= scaleY;
@@ -234,10 +255,7 @@ function ParticleLogoFieldCanvas() {
         rafId = requestAnimationFrame(loop);
         return;
       }
-      lastDraw = time;
       const progress = scrollProgress();
-      ctx!.clearRect(0, 0, width, height);
-
       let formAmount = 0;
       if (progress < PHASE.formStart) {
         formAmount = 0;
@@ -250,6 +268,19 @@ function ParticleLogoFieldCanvas() {
         formAmount = 1 - easeInOutCubic((progress - PHASE.holdEnd) / disperseRange);
       }
 
+      // Nothing moves (no drift: held logo or low-end mode; same scroll, same
+      // pointer): the last frame still stands, so it is not drawn again.
+      const pointer = mouse.active && formAmount < 0.3 ? `${mouse.x},${mouse.y}` : "";
+      const still = DRIFT === 0 || formAmount === 1;
+      if (still && progress === lastProgress && pointer === lastMouse) {
+        rafId = requestAnimationFrame(loop);
+        return;
+      }
+      lastDraw = time;
+      lastProgress = progress;
+      lastMouse = pointer;
+      ctx!.clearRect(0, 0, width, height);
+
       // Held back from fully opaque: the logo sits behind the page copy.
       ctx!.globalAlpha = 0.22 + 0.42 * formAmount;
       // Two passes, one fill each: the "X" in ink, then the slash in accent.
@@ -258,8 +289,8 @@ function ParticleLogoFieldCanvas() {
         ctx!.beginPath();
         for (const p of particles) {
           if (p.slash !== slash) continue;
-          const driftX = Math.sin(time * 0.0003 + p.seed) * 6;
-          const driftY = Math.cos(time * 0.00025 + p.seed) * 6;
+          const driftX = DRIFT && Math.sin(time * 0.0003 + p.seed) * DRIFT;
+          const driftY = DRIFT && Math.cos(time * 0.00025 + p.seed) * DRIFT;
 
           let x = p.ax + driftX * (1 - formAmount);
           let y = p.ay + driftY * (1 - formAmount);
@@ -302,7 +333,11 @@ function ParticleLogoFieldCanvas() {
 
     const themeObserver = new MutationObserver(readColours);
 
-    (async () => {
+    // Starts once the browser is idle after first paint.
+    const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 200));
+    const cancelIdle = window.cancelIdleCallback ?? window.clearTimeout;
+    const idleHandle = idle(async () => {
+      if (!lowEnd) probeFrameRate();
       const sample = await sampleLogo(MAX_POINTS);
       if (disposed || !sample) return;
       logo = sample;
@@ -328,10 +363,11 @@ function ParticleLogoFieldCanvas() {
       document.addEventListener("visibilitychange", onVisibility);
       themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
       start();
-    })();
+    });
 
     return () => {
       disposed = true;
+      cancelIdle(idleHandle);
       stop();
       sizes.disconnect();
       themeObserver.disconnect();
@@ -340,7 +376,7 @@ function ParticleLogoFieldCanvas() {
       window.removeEventListener("mouseleave", onMouseLeave);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, []);
+  }, [lowEnd]);
 
-  return <canvas ref={canvasRef} aria-hidden className="fixed inset-0 -z-10 pointer-events-none" />;
+  return <canvas ref={canvasRef} aria-hidden className="particle-field fixed inset-0 -z-10 pointer-events-none" />;
 }

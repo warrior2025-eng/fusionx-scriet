@@ -76,6 +76,11 @@
   text-underline-offset: 3px;
 }
 
+/* The header shows every link from here up (components/navigation/site-header.tsx). */
+@theme {
+  --breakpoint-wide: 90rem;
+}
+
 @theme inline {
   --color-paper: var(--color-paper);
   --color-ink: var(--color-ink);
@@ -438,13 +443,20 @@ a:hover > .arrow-nudge {
 }
 
 .home-below {
-  --below: color-mix(in srgb, var(--color-paper) 68%, transparent);
+  /* 85%: the scene still shows through, the copy stays AA */
+  --below: color-mix(in srgb, var(--color-paper) 85%, transparent);
   position: relative;
   background: var(--below);
 }
 
 :root[data-theme="light"] .home-below {
   --below: var(--color-paper);
+}
+
+/* The sections far below the fold skip layout and paint until they come near. */
+.home-below > section:nth-of-type(n + 3) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 720px;
 }
 
 /* eases the hero into the scrim instead of meeting it on a hard edge */
@@ -456,6 +468,45 @@ a:hover > .arrow-nudge {
   height: 9rem;
   pointer-events: none;
   background: linear-gradient(to bottom, transparent, var(--below));
+}
+
+/* =========================================================================
+   INNER PAGES — readable over the particle field (components/ui/particle-logo-field).
+   The field itself is unchanged; <main> carries a scrim of the page colour:
+   88% (dark) / 90% (light) across the content column, so text always meets
+   AA, thinning to the page edges on wide screens, where the field shows.
+   Cards and form fields are opaque surfaces of their own.
+   ========================================================================= */
+.particle-field ~ main {
+  --scrim: color-mix(in srgb, var(--color-paper) 88%, transparent);
+  --scrim-edge: color-mix(in srgb, var(--color-paper) 45%, transparent);
+  background: linear-gradient(
+    to right,
+    var(--scrim-edge),
+    var(--scrim) max(0px, calc(50% - 40rem)),
+    var(--scrim) min(100%, calc(50% + 40rem)),
+    var(--scrim-edge)
+  );
+}
+:root[data-theme="light"] .particle-field ~ main {
+  --scrim: color-mix(in srgb, var(--color-paper) 90%, transparent);
+  --scrim-edge: color-mix(in srgb, var(--color-paper) 55%, transparent);
+}
+
+/* =========================================================================
+   LOW-END MODE (lib/low-end.ts): no entrance or scroll animations.
+   ========================================================================= */
+[data-lowend] .scroll-reveal {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+  will-change: auto !important;
+}
+[data-lowend] :is(.animate-reveal, .animate-fade) {
+  animation: none;
+}
+[data-lowend] .hero-float {
+  transform: none;
 }
 
 /* =========================================================================

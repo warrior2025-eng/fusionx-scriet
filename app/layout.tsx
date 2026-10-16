@@ -3,6 +3,8 @@ import { Manrope, Fraunces } from "next/font/google";
 import "./globals.css";
 import { ParticleLogoField } from "@/components/ui/particle-logo-field";
 import { getOrganizationSettings } from "@/lib/data/organization";
+import { EARLY_REVEAL_SCRIPT } from "@/lib/early-reveal-script";
+import { LOW_END_INIT_SCRIPT } from "@/lib/low-end-script";
 import { getContent } from "@/lib/data/site-content";
 import { socialLinks } from "@/lib/site-config";
 
@@ -87,9 +89,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   }).replace(/</g, "\\u003c");
 
   return (
-    <html lang="en" className={`${manrope.variable} ${fraunces.variable} h-full antialiased`}>
+    <html lang="en" suppressHydrationWarning className={`${manrope.variable} ${fraunces.variable} h-full antialiased`}>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript + LOW_END_INIT_SCRIPT + EARLY_REVEAL_SCRIPT }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: organization }} />
       </head>
       <body className="min-h-full flex flex-col bg-paper text-ink">

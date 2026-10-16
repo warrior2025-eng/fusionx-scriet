@@ -505,7 +505,7 @@ export default async function HomePage() {
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-5 text-sm text-ink/65">Student Innovation &amp; Research, SCRIET, CCSU</p>
+                  <p className="mt-5 text-sm text-ink/65 text-balance lg:whitespace-nowrap">Student Innovation &amp; Research Network, SCRIET, CCSU</p>
                 </CutCard>
               </div>
             </div>
