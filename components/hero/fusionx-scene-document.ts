@@ -162,15 +162,15 @@ function recolour(p: FusionXScenePalette): Swap[] {
   ];
 }
 
-/** Large-screen blade counts and render resolution (see FUSIONX_SCENE_DENSITY). */
+/** Blade counts and render resolution, large and small screens (see FUSIONX_SCENE_DENSITY). */
 function density(d: FusionXSceneDensity): Swap[] {
   return [
-    { what: "near blade count", find: "var BLADES_NEAR = small ? 70000 : 190000;", replace: `var BLADES_NEAR = small ? 70000 : ${Math.round(d.bladesNear)};` },
-    { what: "far blade count", find: "var BLADES_FAR  = small ? 20000 :  60000;", replace: `var BLADES_FAR  = small ? 20000 : ${Math.round(d.bladesFar)};` },
+    { what: "near blade count", find: "var BLADES_NEAR = small ? 70000 : 190000;", replace: `var BLADES_NEAR = small ? ${Math.round(d.smallBladesNear)} : ${Math.round(d.bladesNear)};` },
+    { what: "far blade count", find: "var BLADES_FAR  = small ? 20000 :  60000;", replace: `var BLADES_FAR  = small ? ${Math.round(d.smallBladesFar)} : ${Math.round(d.bladesFar)};` },
     {
       what: "pixel ratio",
       find: "renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, small ? 1.6 : 2));",
-      replace: `renderer.setPixelRatio(small ? Math.min(window.devicePixelRatio || 1, 1.5) : Math.min((window.devicePixelRatio || 1) * ${d.renderScale}, ${d.maxPixelRatio}));`,
+      replace: `renderer.setPixelRatio(small ? Math.min(window.devicePixelRatio || 1, ${d.smallPixelRatio}) : Math.min((window.devicePixelRatio || 1) * ${d.renderScale}, ${d.maxPixelRatio}));`,
     },
   ];
 }
@@ -196,15 +196,28 @@ body{position:relative!important;background:${bg.top}!important}
 /**
  * Host bridge. requestAnimationFrame is the scene's only clock, so holding
  * its callbacks while paused stops all rendering without touching scene code;
- * they are released, in order, on resume.
+ * they are released, in order, on resume. It also lets frames through at most
+ * `fps` times a second, `smallFps` on a small screen (the same "small" test
+ * as the scene: narrow, or under 620,000 px).
  */
-const HOST_BRIDGE = `<script data-fusionx-bridge>
+const hostBridge = (fps: number, smallFps: number) => `<script data-fusionx-bridge>
 (function () {
   var raf = window.requestAnimationFrame.bind(window);
   var paused = false, held = [];
+  var small = matchMedia("(max-width: 900px)").matches || innerWidth * innerHeight < 620000;
+  var gap = 1000 / (small ? ${smallFps} : ${fps}) - 2, shown = -1, last = -1e9;
+  function capped(cb) {
+    return function step(t) {
+      if (t !== shown) {
+        if (t - last < gap) { raf(step); return; }
+        shown = last = t;
+      }
+      cb(t);
+    };
+  }
   window.requestAnimationFrame = function (cb) {
     if (paused) { held.push(cb); return 0; }
-    return raf(cb);
+    return raf(gap ? capped(cb) : cb);
   };
   function tell(state) { try { parent.postMessage({ type: "${FUSIONX_SCENE_MESSAGE}", state: state }, "*"); } catch (e) {} }
   window.addEventListener("message", function (e) {
@@ -265,5 +278,5 @@ export function buildFusionXSceneDocument(
     .replace(/<title>[^<]*<\/title>/, "<title>FusionX hero scene</title>")
     .replace(/<meta name="description"[^>]*>/, "")
     .replace("</head>", `${sceneStyle(palette)}</head>`)
-    .replace(THREE_RUNTIME_TAG, `${HOST_BRIDGE}<script src="${origin}${THREE_RUNTIME_PATH}"></script>`);
+    .replace(THREE_RUNTIME_TAG, `${hostBridge(sceneDensity.fps, sceneDensity.smallFps)}<script src="${origin}${THREE_RUNTIME_PATH}"></script>`);
 }
