@@ -68,7 +68,7 @@ export default async function ProjectsPage({
               name="q"
               placeholder="Search by title…"
               defaultValue={params.q}
-              className="rounded-sm border border-ink/15 bg-surface px-4 py-2 text-sm placeholder:text-ink/35 focus:outline-none focus:ring-2 focus:ring-accent/40"
+              className="rounded-sm border border-ink/15 bg-surface px-4 py-2 text-sm placeholder:text-ink/60 focus:outline-none focus:ring-2 focus:ring-accent/40"
             />
             <select
               name="status"

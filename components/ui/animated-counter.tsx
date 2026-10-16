@@ -31,7 +31,8 @@ export function AnimatedCounter({
           observer.unobserve(el);
 
           // Respect reduced motion: show the final value, no count-up.
-          if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          // Low-end mode (lib/low-end.ts) too.
+          if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.hasAttribute("data-lowend")) {
             setDisplay(value);
             return;
           }

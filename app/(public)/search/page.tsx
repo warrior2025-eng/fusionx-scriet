@@ -51,7 +51,7 @@ export default async function SearchPage({
           name="q"
           defaultValue={query}
           placeholder="Search projects, research, events, opportunities…"
-          className="w-full max-w-xl rounded-sm border border-ink/15 bg-surface px-4 py-3 text-sm placeholder:text-ink/35 focus:outline-none focus:ring-2 focus:ring-accent/40"
+          className="w-full max-w-xl rounded-sm border border-ink/15 bg-surface px-4 py-3 text-sm placeholder:text-ink/60 focus:outline-none focus:ring-2 focus:ring-accent/40"
           autoFocus
         />
       </form>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { probeFrameRate, useLowEnd } from "@/lib/low-end";
 import { cn } from "@/lib/utils";
 import { FUSIONX_SCENE_PALETTES, type FusionXSceneTheme } from "./fusionx-palette";
 import {
@@ -22,7 +23,8 @@ import {
  *
  *  - The static poster (`.scene-poster` in globals.css, one image per theme)
  *    is what renders on the server, before the scene has loaded, under
- *    prefers-reduced-motion, and if WebGL or the scene fails.
+ *    prefers-reduced-motion, in low-end mode (lib/low-end.ts: the scene and
+ *    its Three.js file are then never fetched), and if WebGL or the scene fails.
  *  - The scene runs in a sandboxed iframe (scripts only, no same-origin
  *    access) and mounts after hydration, so it never blocks first paint.
  *    Switching theme rebuilds it with the other palette.
@@ -92,25 +94,37 @@ export function FusionXHero({ className, floatTarget }: { className?: string; fl
     () => true,
   );
   const theme = useSyncExternalStore(subscribeTheme, currentTheme, (): FusionXSceneTheme => "dark");
+  const lowEnd = useLowEnd(true);
 
   const srcDoc = scene?.theme === theme ? scene.doc : null;
   const status: SceneStatus = report?.theme === theme ? report.status : "loading";
-  const showScene = !reducedMotion && status !== "failed" && srcDoc !== null;
+  const showScene = !reducedMotion && !lowEnd && status !== "failed" && srcDoc !== null;
 
   useEffect(() => {
-    if (reducedMotion) return;
+    if (reducedMotion || lowEnd) return;
     let cancelled = false;
-    loadSceneDocument(theme).then(
-      (doc) => !cancelled && setScene({ theme, doc }),
-      (err) => {
-        console.warn(err);
-        if (!cancelled) setReport({ theme, status: "failed" });
-      },
-    );
+    // Fetched after the frame-rate check (lib/low-end.ts) and once the browser
+    // is idle, so it never competes with first paint or skews the reading.
+    const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 200));
+    const cancelIdle = window.cancelIdleCallback ?? window.clearTimeout;
+    let handle = 0;
+    probeFrameRate().then(() => {
+      if (cancelled || document.documentElement.hasAttribute("data-lowend")) return;
+      handle = idle(() =>
+        loadSceneDocument(theme).then(
+          (doc) => !cancelled && setScene({ theme, doc }),
+          (err) => {
+            console.warn(err);
+            if (!cancelled) setReport({ theme, status: "failed" });
+          },
+        ),
+      );
+    });
     return () => {
       cancelled = true;
+      cancelIdle(handle);
     };
-  }, [reducedMotion, theme]);
+  }, [reducedMotion, lowEnd, theme]);
 
   // Pause / resume, and the scene's ready / failed reports.
   useEffect(() => {
@@ -183,7 +197,7 @@ export function FusionXHero({ className, floatTarget }: { className?: string; fl
 
   // Pointer: relay to the scene, and drive the float.
   useEffect(() => {
-    if (reducedMotion) return;
+    if (reducedMotion || lowEnd) return;
     const host = hostRef.current;
     if (!host) return;
     const target = floatTarget ? document.querySelector<HTMLElement>(floatTarget) : null;
@@ -239,7 +253,7 @@ export function FusionXHero({ className, floatTarget }: { className?: string; fl
       target?.style.removeProperty("--px");
       target?.style.removeProperty("--py");
     };
-  }, [reducedMotion, floatTarget]);
+  }, [reducedMotion, lowEnd, floatTarget]);
 
   return (
     <div

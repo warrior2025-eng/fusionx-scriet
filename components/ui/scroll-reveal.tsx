@@ -66,7 +66,8 @@ export function ScrollReveal({
             : "scroll-reveal-fade";
 
   return (
-    <div ref={ref} className={`scroll-reveal ${dirClass} ${className ?? ""}`}>
+    // suppressHydrationWarning: a reveal on the first screen may already be shown by lib/early-reveal-script.ts.
+    <div ref={ref} suppressHydrationWarning className={`scroll-reveal ${dirClass} ${className ?? ""}`}>
       {children}
     </div>
   );
