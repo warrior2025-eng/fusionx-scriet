@@ -426,7 +426,9 @@ export default async function HomePage() {
       <section
         id="home-hero"
         data-scene-window
-        className="relative flex min-h-[calc(100svh-4rem)] items-center"
+        // On a tall (portrait) screen: at most 56rem, copy from the top. A phone in "desktop site" mode is
+        // ~980px wide and very tall, and centred in 100svh the copy sat far below the header.
+        className="relative flex min-h-[calc(100svh-4rem)] items-center portrait:min-h-[min(calc(100svh-4rem),56rem)] portrait:items-start"
       >
         {/* Scrim so the copy stays readable where it overlaps the scene */}
         <div
