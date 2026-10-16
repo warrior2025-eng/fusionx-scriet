@@ -32,19 +32,19 @@ export const socialLinks = {
 export const founders = [
   {
     name: "Pranjal Srivastav",
-    role: "Founding Member, Strategic Development Lead",
+    role: "Founding Member, Head of Strategy & Technology",
     responsibilities:
       "Leads overall vision, strategic direction, institutional coordination, and long-term planning and development of FusionX.",
   },
   {
     name: "Anshika Dwivedi",
-    role: "Founding Member, Network & Innovation Operations Lead",
+    role: "Founding Member, Head of Network & Innovation Operations",
     responsibilities:
       "Leads the student network, innovation operations, program coordination, team formation, and execution of FusionX initiatives.",
   },
   {
     name: "Sirin Bano",
-    role: "Founding Member, Research & Technical Development Lead",
+    role: "Founding Member, Head of Research & Development",
     responsibilities:
       "Leads research activities, technical development, experimentation, documentation, and project validation.",
   },
