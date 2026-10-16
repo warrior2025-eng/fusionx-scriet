@@ -6,7 +6,7 @@
 export type CycleStatus = "draft" | "open" | "closed" | "results_published";
 export type QuestionType = "short_text" | "long_text" | "url" | "single_choice" | "multi_choice" | "file";
 export type ApplicationStatus = "draft" | "submitted" | "withdrawn";
-export type Stage = "applied" | "shortlisted" | "task" | "interview" | "selected" | "waitlisted" | "not_selected";
+export * from "./stages";
 
 import { resultsVisible, type CycleResults } from "./results";
 
@@ -72,27 +72,6 @@ export type Application = {
   resume_path: string | null;
   status: ApplicationStatus;
   submitted_at: string | null;
-};
-
-export const STAGES: Stage[] = ["applied", "shortlisted", "task", "interview", "selected", "waitlisted", "not_selected"];
-export const STAGE_LABELS: Record<Stage, string> = {
-  applied: "Applied",
-  shortlisted: "Shortlisted",
-  task: "Task",
-  interview: "Interview",
-  selected: "Selected",
-  waitlisted: "Waitlisted",
-  not_selected: "Not selected",
-};
-export const FINAL_STAGES: Stage[] = ["selected", "waitlisted", "not_selected"];
-export const STAGE_TONE: Record<Stage, "neutral" | "good" | "warn" | "bad"> = {
-  applied: "neutral",
-  shortlisted: "neutral",
-  task: "neutral",
-  interview: "warn",
-  selected: "good",
-  waitlisted: "warn",
-  not_selected: "bad",
 };
 
 export const CYCLE_STATUS_LABELS: Record<CycleStatus, string> = {

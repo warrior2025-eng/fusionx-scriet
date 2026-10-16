@@ -10,7 +10,6 @@ export const metadata: Metadata = { title: "Admin: Recruitment messages" };
 const MESSAGES = [
   { key: "submitted", title: "Application received", when: "Sent when a candidate submits. {team} is the list of teams they chose." },
   { key: "shortlisted", title: "Shortlisted", when: "Sent as soon as a candidate is moved to Shortlisted." },
-  { key: "task", title: "Task round", when: "Sent as soon as a candidate is moved to Task." },
   { key: "interview", title: "Interview", when: "Sent when an interview is scheduled or its time or place changes." },
   { key: "selected", title: "Selected", when: "Sent when results are published, and shown on the candidate's status page. {hub} is the hub." },
   { key: "waitlisted", title: "Waitlisted", when: "Sent when results are published, and shown on the status page. {rank} is the waitlist position." },
