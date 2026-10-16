@@ -10,7 +10,21 @@ import { LinkButton } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { logoutAction } from "@/actions/auth";
 
-const nav = [
+/*
+ * Three layouts, by what fits (measured; the header row is up to 90rem wide):
+ *  - wide (1440px+): every link, every action
+ *  - lg to wide (1024-1439px): the most used links, the rest under "More";
+ *    notifications and my projects are in the account menu, and below xl
+ *    search moves under "More" too
+ *  - below lg: the menu button and the full list
+ * The brand never shrinks and keeps a 32px gap before the links.
+ */
+type NavItem = { href: string; label: string; badge?: string };
+
+/** Under "More" between lg and wide. */
+const MORE = new Set(["/about", "/projects", "/research", "/opportunities"]);
+
+const nav: NavItem[] = [
   { href: "/about", label: "About" },
   { href: "/hubs", label: "FusionX Hubs" },
   { href: "/projects", label: "Projects" },
@@ -33,6 +47,103 @@ function initials(name: string) {
   if (parts.length === 0) return "?";
   if (parts.length === 1) return parts[0][0].toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+  return (
+    <Link
+      href={item.href}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "relative inline-flex shrink-0 items-center whitespace-nowrap rounded-sm px-1.5 py-1.5 text-[13px] font-medium transition-colors duration-150 xl:px-2",
+        active ? "text-ink font-semibold" : "text-ink/65 hover:text-ink hover:bg-ink/5",
+      )}
+    >
+      {item.label}
+      {item.badge && <span className="ml-1 bg-accent px-1 py-0.5 text-[10px] font-semibold text-white">{item.badge}</span>}
+      {active && <span className="absolute bottom-0 left-2 right-2 h-[2px] bg-accent" />}
+    </Link>
+  );
+}
+
+/** The links that do not fit between lg and wide. A button that opens a list; Escape or a click outside closes it. */
+function MoreMenu({ items, isActive }: { items: NavItem[]; isActive: (href: string) => boolean }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const pathname = usePathname();
+  const active = items.some((i) => isActive(i.href));
+
+  // Closed again after navigating.
+  const [shownFor, setShownFor] = useState(pathname);
+  if (shownFor !== pathname) {
+    setShownFor(pathname);
+    setOpen(false);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        button.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button
+        ref={button}
+        type="button"
+        aria-expanded={open}
+        aria-controls="nav-more"
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          "relative inline-flex items-center gap-1 whitespace-nowrap rounded-sm px-1.5 py-1.5 text-[13px] font-medium transition-colors duration-150 xl:px-2",
+          active ? "text-ink font-semibold" : "text-ink/65 hover:text-ink hover:bg-ink/5",
+        )}
+      >
+        More
+        <ChevronDown size={14} aria-hidden className={cn("transition-transform", open && "rotate-180")} />
+        {active && <span className="absolute bottom-0 left-2 right-2 h-[2px] bg-accent" />}
+      </button>
+      {open && (
+        <ul id="nav-more" className="absolute left-0 top-full z-50 mt-2 w-48 rounded-sm border border-line bg-paper py-2 shadow-lg">
+          {items.map((item) => (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                aria-current={isActive(item.href) ? "page" : undefined}
+                onClick={() => setOpen(false)}
+                className={cn(
+                  "block px-3.5 py-2 text-sm hover:bg-ink/5",
+                  isActive(item.href) ? "font-semibold text-ink" : "text-ink/75 hover:text-ink",
+                )}
+              >
+                {item.label}
+              </Link>
+            </li>
+          ))}
+          {/* The search icon is not in the row below xl. */}
+          <li className="mt-1 border-t border-line pt-1 xl:hidden">
+            <Link href="/search" onClick={() => setOpen(false)} className="flex items-center gap-2 px-3.5 py-2 text-sm text-ink/75 hover:bg-ink/5 hover:text-ink">
+              <Search size={14} aria-hidden /> Search
+            </Link>
+          </li>
+        </ul>
+      )}
+    </div>
+  );
 }
 
 function ProfileMenu({ user }: { user: SiteUser }) {
@@ -115,12 +226,14 @@ export function SiteHeader({
   /** Adds the Recruitment link (decided in the admin panel), with an "Open" or "Results" badge. */
   recruitment?: { badge: string | null; href: string } | null;
 }) {
-  const links: { href: string; label: string; badge?: string }[] = recruitment
+  const links: NavItem[] = recruitment
     ? [...nav, { href: recruitment.href, label: "Recruitment", badge: recruitment.badge ?? undefined }]
     : nav;
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
+  const isActive = (href: string) => !!pathname?.startsWith(href);
+  const more = links.filter((l) => MORE.has(l.href));
 
   useEffect(() => {
     // Only touch state when the value actually flips.
@@ -142,9 +255,10 @@ export function SiteHeader({
           : "bg-surface border-b border-transparent"
       )}
     >
-      <div className="container-fx flex h-16 items-center justify-between">
+      {/* gap-4 everywhere, plus mr-4 on the brand: 32px before the links, 16px before the actions. */}
+      <div className="container-fx flex h-16 max-w-[90rem]! items-center gap-4">
         {/* Logos & Brand */}
-        <div className="flex shrink-0 items-center gap-2.5 sm:gap-3">
+        <div className="mr-4 flex shrink-0 items-center gap-2.5 sm:gap-3">
           {/* College Official Logo */}
           <Link href="/" className="flex items-center shrink-0" aria-label="CCSU Meerut">
             <Image
@@ -180,39 +294,30 @@ export function SiteHeader({
           </Link>
         </div>
 
-        {/* Desktop Nav */}
-        <nav className="hidden xl:flex items-center gap-0.5">
+        {/* Desktop nav: every link from wide up; between lg and wide, the most used ones and "More". */}
+        <nav aria-label="Main" className="hidden lg:flex flex-1 items-center justify-evenly gap-1">
           {links.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "relative whitespace-nowrap py-1.5 text-[13px] font-medium rounded-sm transition-colors duration-150",
-                // One more link in the row: a little less padding so it still fits at 1280px.
-                recruitment ? "px-1" : "px-2",
-                pathname?.startsWith(item.href)
-                  ? "text-ink font-semibold"
-                  : "text-ink/65 hover:text-ink hover:bg-ink/5"
-              )}
-            >
-              {item.label}
-              {item.badge && <span className="ml-1 bg-accent px-1 py-0.5 text-[10px] font-semibold text-white">{item.badge}</span>}
-              {pathname?.startsWith(item.href) && (
-                <span className="absolute bottom-0 left-2 right-2 h-[2px] bg-accent" />
-              )}
-            </Link>
+            <span key={item.href} className={cn("inline-flex", MORE.has(item.href) && "hidden wide:inline-flex")}>
+              <NavLink item={item} active={isActive(item.href)} />
+            </span>
           ))}
+          {more.length > 0 && (
+            <span className="inline-flex wide:hidden">
+              <MoreMenu items={more} isActive={isActive} />
+            </span>
+          )}
         </nav>
 
         {/* Desktop Actions */}
-        <div className="hidden xl:flex shrink-0 items-center gap-1">
-          <Link href="/search" aria-label="Search" className="p-2 text-ink/50 hover:text-ink transition-colors rounded-sm hover:bg-ink/5">
+        <div className="hidden lg:flex shrink-0 items-center gap-1">
+          <Link href="/search" aria-label="Search" className="hidden xl:inline-flex p-2 text-ink/50 hover:text-ink transition-colors rounded-sm hover:bg-ink/5">
             <Search size={16} />
           </Link>
           <ThemeToggle className="p-2 text-ink/50 hover:text-ink transition-colors rounded-sm hover:bg-ink/5" />
           {user ? (
             <>
-              <Link href="/notifications" aria-label="Notifications" className="p-2 text-ink/50 hover:text-ink transition-colors rounded-sm hover:bg-ink/5">
+              {/* In the account menu too; shown here only where the row has room. */}
+              <Link href="/notifications" aria-label="Notifications" className="hidden wide:inline-flex p-2 text-ink/50 hover:text-ink transition-colors rounded-sm hover:bg-ink/5">
                 <Bell size={16} />
               </Link>
               {/* Also in the account menu; shown here only where the row has room. */}
@@ -233,7 +338,7 @@ export function SiteHeader({
 
         {/* Mobile toggle */}
         <button
-          className="xl:hidden p-2 -mr-2 text-ink"
+          className="lg:hidden ml-auto p-2 -mr-2 text-ink"
           aria-label={open ? "Close menu" : "Open menu"}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
@@ -244,7 +349,7 @@ export function SiteHeader({
 
       {/* Mobile Nav */}
       {open && (
-        <nav className="xl:hidden border-t border-ink/10 bg-paper px-6 py-4 flex flex-col gap-1">
+        <nav aria-label="Main" className="lg:hidden border-t border-ink/10 bg-paper px-6 py-4 flex flex-col gap-1">
           <div className="flex items-center justify-between pb-3 mb-2 border-b border-ink/10">
             <span className="text-sm text-ink/65">Theme</span>
             <ThemeToggle className="p-1.5 rounded-full border border-ink/15 text-ink/70 hover:text-ink" />
