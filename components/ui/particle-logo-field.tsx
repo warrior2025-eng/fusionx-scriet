@@ -160,10 +160,9 @@ function ParticleLogoFieldCanvas({ lowEnd }: { lowEnd: boolean }) {
     if (!ctx) return;
 
     const isSmall = window.matchMedia("(max-width: 768px)").matches;
-    const MAX_POINTS = lowEnd ? 300 : isSmall ? 600 : 1600;
-    // Phones draw every other frame: the drift is slow, and it halves the work.
-    // Low-end mode: at most 30 frames a second.
-    const FRAME_GAP = lowEnd ? 33 : isSmall ? 30 : 0;
+    const MAX_POINTS = lowEnd ? 300 : isSmall ? 400 : 1600;
+    // Phones and low-end mode: at most 30 frames a second (the drift is slow).
+    const FRAME_GAP = lowEnd || isSmall ? 33 : 0;
     // Low-end particles do not drift, so a frame only changes when the page scrolls.
     const DRIFT = lowEnd ? 0 : 6;
     let lastDraw = 0;

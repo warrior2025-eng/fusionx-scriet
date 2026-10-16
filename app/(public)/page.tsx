@@ -515,7 +515,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <div className="home-below" data-scene-window="dark">
+      {/* Not a scene window: below the hero the scene sits behind an 85% scrim, so it rests (a still frame) instead of drawing. */}
+      <div className="home-below">
         {visibleSections.map((section, i) => (
           <Fragment key={section.key}>{section.render(i + 1, BANDS[i % BANDS.length])}</Fragment>
         ))}

@@ -270,13 +270,24 @@ export const FUSIONX_SCENE_PALETTES: Record<FusionXSceneTheme, FusionXScenePalet
  *  - bladesNear / bladesFar: moss blades on the near root / far ridge.
  *  - renderScale: fraction of the device pixel ratio the scene renders at
  *    (the browser upscales it); maxPixelRatio caps it on hi-dpi screens.
- * Small screens keep the authored 70,000 / 20,000 blades and pixel ratio.
+ * Small screens (phones; the scene's own "small" test) are lighter still: the
+ * authored 70,000 / 20,000 blades at up to 1.5x lagged on mid-range phones, so
+ * they draw smallBladesNear / smallBladesFar at 1x, at most smallFps a second.
+ * Large screens, too, still made the page itself stutter at 1920px, so they
+ * render at 0.6x and at most `fps` frames a second: the scene drifts slowly,
+ * and the scroll, hover and clicks on top keep the full frame rate.
  */
 export const FUSIONX_SCENE_DENSITY = {
   bladesNear: 110_000,
   bladesFar: 35_000,
-  renderScale: 0.75,
-  maxPixelRatio: 1.5,
+  renderScale: 0.6,
+  maxPixelRatio: 1.25,
+  /** Frames a second the scene may draw on a large screen; the page itself stays at the screen's rate. */
+  fps: 40,
+  smallBladesNear: 32_000,
+  smallBladesFar: 9_000,
+  smallPixelRatio: 1,
+  smallFps: 30,
 } as const;
 
 export type FusionXSceneDensity = typeof FUSIONX_SCENE_DENSITY;
