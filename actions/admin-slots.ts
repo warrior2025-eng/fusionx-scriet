@@ -147,7 +147,17 @@ export async function saveDay(cycleId: string, dayId: string | null, _prev: Acti
   touched(cycleId);
   const timesChanged =
     before.date !== values.date || before.slot_minutes !== values.slot_minutes || JSON.stringify(before.sessions) !== JSON.stringify(values.sessions);
-  return ok(timesChanged ? "Saved. Press \"Preview\" to see what changes, then \"Generate slots\" to apply the new times." : "Saved.");
+  // A postponed day with bookings: say exactly what to do next (migration 0022 keeps everyone's time).
+  let dateNote = "";
+  if (before.date !== values.date) {
+    const { count } = await ctx.supabase
+      .from("recruitment_slot_bookings")
+      .select("id, recruitment_slots!inner(day_id)", { count: "exact", head: true })
+      .eq("recruitment_slots.day_id", dayId)
+      .neq("status", "cancelled");
+    if (count) dateNote = " Date changed. Press Preview, check that 'need rebooking' is 0, then Generate slots. Everyone keeps their time and is notified.";
+  }
+  return ok(timesChanged ? `Saved. Press "Preview" to see what changes, then "Generate slots" to apply the new times.${dateNote}` : "Saved.");
 }
 
 export async function deleteDay(cycleId: string, dayId: string): Promise<ActionState> {
@@ -170,10 +180,17 @@ type Generated = {
   moved?: number;
   changed?: number;
   rebook?: number;
+  over_capacity?: number;
+  /** From migration 0022: the day moved to another date, and how many Meet links were unpublished. */
+  date_changed?: boolean;
+  links_reset?: number;
 };
 
 const bookingsText = (r: Generated) =>
-  r.bookings === undefined ? "" : ` Bookings: ${r.bookings}, ${r.moved ?? 0} moved, ${r.changed ?? 0} told their new time, ${r.rebook ?? 0} need rebooking.`;
+  (r.bookings === undefined
+    ? ""
+    : ` Bookings: ${r.bookings}, moved: ${r.moved ?? 0}, time(s) changed: ${r.changed ?? 0}, need rebooking: ${r.rebook ?? 0}, over capacity: ${r.over_capacity ?? 0}.`) +
+  (r.links_reset ? " The Google Meet link is unpublished until you publish it again on the new day." : "");
 
 /** Re-cuts the day from its saved settings. Every booking is kept (moved into the new slot that covers its time). */
 export async function generateSlots(cycleId: string, dayId: string): Promise<ActionState> {
