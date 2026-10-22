@@ -4,9 +4,9 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { useRouter } from "next/navigation";
 import { Camera, CheckCircle2, Maximize, Mic, Smartphone, TriangleAlert } from "lucide-react";
 import type { DailyCall, DailyParticipant } from "@daily-co/daily-js";
-import { giveConsent, joinInterview, myInterviewQuestions, phoneCameraLink } from "@/actions/interview";
+import { giveConsent, joinInterview, myInterviewQuestions, phoneCameraLink, roomStillOn } from "@/actions/interview";
 import { useIntegrity } from "@/components/interview/use-integrity";
-import { Button } from "@/components/ui/button";
+import { Button, LinkButton } from "@/components/ui/button";
 import { CutCard } from "@/components/ui/cut-card";
 import { phoneUserId, type InterviewWindow, type RevealedQuestion } from "@/lib/interview/shared";
 import { slotRange } from "@/lib/recruitment/slots";
@@ -230,7 +230,7 @@ function PhoneQr({ access, connected }: { access: Open; connected: boolean }) {
       </p>
       <p className="mt-1 text-xs text-ink/70">Scan with your phone and place it to show your desk and hands. It joins muted, camera only.</p>
       {link && (
-        <svg viewBox={`0 0 ${link.qr.size} ${link.qr.size}`} className="mt-3 h-40 w-40 bg-white p-1" role="img" aria-label="QR code for the phone camera">
+        <svg viewBox={`0 0 ${link.qr.size} ${link.qr.size}`} className="mt-3 h-40 w-40 bg-white p-1" role="img" aria-label="QR code for the phone camera" data-url={link.url}>
           <path d={link.qr.path} fill="#00030d" />
         </svg>
       )}
@@ -251,6 +251,7 @@ export function CandidateRoom({ access }: { access: Open }) {
   const [joining, setJoining] = useState(false);
   const [fullscreen, setFullscreen] = useState(true);
   const [phoneConnected, setPhoneConnected] = useState(false);
+  const [moved, setMoved] = useState(false);
   const shell = useRef<HTMLDivElement>(null);
   const frameHost = useRef<HTMLDivElement>(null);
   const call = useRef<DailyCall | null>(null);
@@ -273,6 +274,19 @@ export function CandidateRoom({ access }: { access: Open }) {
   }, []);
 
   useEffect(() => () => void call.current?.destroy(), []);
+
+  // The panel can switch the day back to Google Meet at any time: leave the call and say where to go.
+  useEffect(() => {
+    if (!inRoom || moved) return;
+    const timer = window.setInterval(async () => {
+      if (await roomStillOn(access.booking_id).catch(() => true)) return;
+      void call.current?.destroy();
+      call.current = null;
+      setMoved(true);
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    }, 15_000);
+    return () => window.clearInterval(timer);
+  }, [inRoom, moved, access.booking_id]);
 
   const enterFullscreen = async () => {
     if (!access.strict_fullscreen) return;
@@ -403,7 +417,21 @@ export function CandidateRoom({ access }: { access: Open }) {
             )}
           </aside>
 
-          {access.strict_fullscreen && !fullscreen && (
+          {moved && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-paper p-6" role="alertdialog" aria-modal="true" aria-labelledby="moved-title">
+              <div className="max-w-md text-center">
+                <h2 id="moved-title" className="font-serif text-2xl text-ink">
+                  Your interview has moved to Google Meet
+                </h2>
+                <p className="mt-3 text-sm text-ink/75">The panel has switched today&rsquo;s interviews to Google Meet. Open your status page for the Meet link.</p>
+                <LinkButton href="/recruitment/status" className="mt-5">
+                  Go to your status page
+                </LinkButton>
+              </div>
+            </div>
+          )}
+
+          {access.strict_fullscreen && !fullscreen && !moved && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-paper/95 p-6" role="dialog" aria-modal="true" aria-labelledby="fs-title">
               <div className="max-w-md text-center">
                 <h2 id="fs-title" className="font-serif text-2xl text-ink">

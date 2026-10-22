@@ -99,7 +99,18 @@ export async function phoneCameraLink(bookingId: string): Promise<Result<{ url: 
   if (error) return { ok: false, message: friendlyDbError(error.message, "Could not make the phone link.") };
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
-  const origin = host ? `${h.get("x-forwarded-proto") ?? "https"}://${host}` : (process.env.NEXT_PUBLIC_SITE_URL ?? "");
+  // The site the candidate is on (a Vercel preview links to itself); http only for a local machine.
+  const proto = h.get("x-forwarded-proto") ?? (/^(localhost|127\.0\.0\.1)(:|$)/.test(host ?? "") ? "http" : "https");
+  const origin = host ? `${proto}://${host}` : (process.env.NEXT_PUBLIC_SITE_URL ?? "");
   const url = `${origin}/recruitment/interview/phone?t=${token}`;
   return { ok: true, url, expiresAt: String(data), qr: qrSvgPath(url, 2) };
+}
+
+/** Whether the candidate's day is still in the website room (the admin can switch it back to Google Meet at any time). */
+export async function roomStillOn(bookingId: string): Promise<boolean> {
+  if (!uuid.safeParse(bookingId).success) return false;
+  const { supabase, user } = await signedIn();
+  if (!user) return false;
+  const { error } = await supabase.rpc("interview_join_info", { p_booking: bookingId });
+  return !(error && /not in the website room/.test(error.message));
 }
