@@ -9,6 +9,7 @@ import { Pill } from "@/components/admin/ui";
 import { Button } from "@/components/ui/button";
 import { EVENT_LABELS, FLAG_TYPES, phoneUserId, type IntegrityEvent, type IntegrityType, type PhoneCameraSetting } from "@/lib/interview/shared";
 import { slotTime } from "@/lib/recruitment/slots";
+import { joinErrorText } from "@/lib/interview/join-error";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -144,12 +145,19 @@ export function PanelRoom({
     call.current = frame;
     const refresh = () => setPresent(new Set((Object.values(frame.participants()) as DailyParticipant[]).map((p) => p.user_id)));
     frame.on("joined-meeting", refresh).on("participant-joined", refresh).on("participant-left", refresh).on("left-meeting", () => setJoined("idle"));
+    let failure: unknown = null;
+    frame.on("error", (e) => {
+      failure = e?.errorMsg ?? e;
+    });
     try {
       await frame.join({ url: res.url, token: res.token });
       setJoined("joined");
       refresh();
-    } catch {
-      setError("Could not connect to the call. Check the internet connection and try again.");
+    } catch (e) {
+      // Take Daily's own error page away, so the panel sees one clear message.
+      void frame.destroy();
+      call.current = null;
+      setError(joinErrorText(failure ?? e, "panel"));
       setJoined("idle");
     }
   };
@@ -163,7 +171,7 @@ export function PanelRoom({
         <div className="relative aspect-video w-full bg-black">
           <div ref={host} className="absolute inset-0" />
           {joined !== "joined" && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black p-6 text-center">
               {roomEnabled ? (
                 <Button onClick={join} disabled={joined === "joining"}>
                   <Video size={16} aria-hidden /> {joined === "joining" ? "Opening the room…" : "Join the call"}
@@ -171,7 +179,11 @@ export function PanelRoom({
               ) : (
                 <p className="text-sm text-white/85">This day uses Google Meet. Switch it to the in-website room on the Interview slots page to use this call.</p>
               )}
-              {error && <p className="text-sm text-white">{error}</p>}
+              {error && (
+                <p role="alert" className="max-w-md text-sm leading-relaxed text-white">
+                  {error}
+                </p>
+              )}
             </div>
           )}
         </div>
