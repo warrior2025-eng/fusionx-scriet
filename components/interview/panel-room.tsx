@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Eye, EyeOff, Smartphone, Video } from "lucide-react";
-import type { DailyCall, DailyParticipant } from "@daily-co/daily-js";
 import { hideQuestion, joinAsPanel, revealQuestion, revealedIds, slotEvents } from "@/actions/interview-panel";
 import { ActionButton } from "@/components/admin/action-button";
+import { LiveKitStage } from "@/components/interview/livekit-stage";
 import { Pill } from "@/components/admin/ui";
 import { Button } from "@/components/ui/button";
 import { EVENT_LABELS, FLAG_TYPES, phoneUserId, type IntegrityEvent, type IntegrityType, type PhoneCameraSetting } from "@/lib/interview/shared";
@@ -103,10 +103,7 @@ export function PanelRoom({
   const [error, setError] = useState("");
   const [present, setPresent] = useState<Set<string>>(new Set());
   const [revealed, setRevealed] = useState(new Set(initialRevealed));
-  const host = useRef<HTMLDivElement>(null);
-  const call = useRef<DailyCall | null>(null);
-
-  useEffect(() => () => void call.current?.destroy(), []);
+  const [conn, setConn] = useState<{ serverUrl: string; token: string } | null>(null);
   // Another panel member may reveal or hide too.
   useEffect(() => {
     const timer = window.setInterval(async () => {
@@ -138,29 +135,19 @@ export function PanelRoom({
       setJoined("idle");
       return;
     }
-    const Daily = (await import("@daily-co/daily-js")).default;
-    if (!host.current) return;
-    call.current?.destroy();
-    const frame = Daily.createFrame(host.current, { iframeStyle: { width: "100%", height: "100%", border: "0" }, showLeaveButton: true });
-    call.current = frame;
-    const refresh = () => setPresent(new Set((Object.values(frame.participants()) as DailyParticipant[]).map((p) => p.user_id)));
-    frame.on("joined-meeting", refresh).on("participant-joined", refresh).on("participant-left", refresh).on("left-meeting", () => setJoined("idle"));
-    let failure: unknown = null;
-    frame.on("error", (e) => {
-      failure = e?.errorMsg ?? e;
-    });
-    try {
-      await frame.join({ url: res.url, token: res.token });
-      setJoined("joined");
-      refresh();
-    } catch (e) {
-      // Take Daily's own error page away, so the panel sees one clear message.
-      void frame.destroy();
-      call.current = null;
-      setError(joinErrorText(failure ?? e, "panel"));
-      setJoined("idle");
-    }
+    setConn({ serverUrl: res.serverUrl, token: res.token });
   };
+  const onConnected = useCallback(() => setJoined("joined"), []);
+  const onDisconnected = useCallback(() => {
+    setConn(null);
+    setJoined("idle");
+  }, []);
+  const onCallError = useCallback((message: string) => {
+    setError(joinErrorText(message, "panel"));
+    setConn(null);
+    setJoined("idle");
+  }, []);
+  const onPeople = useCallback((ids: string[]) => setPresent(new Set(ids)), []);
 
   const person = people.find((p) => p.booking_id === selected);
   const mine = byPerson[selected] ?? [];
@@ -169,7 +156,19 @@ export function PanelRoom({
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_26rem]">
       <div className="min-w-0 space-y-4">
         <div className="relative aspect-video w-full bg-black">
-          <div ref={host} className="absolute inset-0" />
+          {conn && (
+            <div className="absolute inset-0">
+              <LiveKitStage
+                serverUrl={conn.serverUrl}
+                token={conn.token}
+                mode="panel"
+                onConnected={onConnected}
+                onDisconnected={onDisconnected}
+                onError={onCallError}
+                onPeople={onPeople}
+              />
+            </div>
+          )}
           {joined !== "joined" && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black p-6 text-center">
               {roomEnabled ? (

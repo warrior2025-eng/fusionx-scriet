@@ -100,7 +100,7 @@ export type SlotPerson = {
   hubs: { team_id: string; name: string; rank: number }[] | null;
 };
 
-/** The Daily user_id of a candidate's phone camera: "p" and the booking id without dashes (Daily allows 36 characters). */
+/** The call identity of a candidate's phone camera: "p" and the booking id without dashes. */
 export const phoneUserId = (bookingId: string) => `p${bookingId.replace(/-/g, "")}`;
 
 export const RUBRIC = [

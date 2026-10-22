@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { PhoneCamera } from "@/components/interview/phone-camera";
 import { CutCard } from "@/components/ui/cut-card";
 import { Section } from "@/components/ui/section";
-import { ensureRoom, meetingToken } from "@/lib/interview/daily";
+import { accessToken } from "@/lib/interview/livekit";
 import { phoneUserId } from "@/lib/interview/shared";
 import { slotRange } from "@/lib/recruitment/slots";
 import { createClient } from "@/lib/supabase/server";
@@ -43,18 +43,16 @@ export default async function PhoneCameraPage({ searchParams }: { searchParams: 
     );
   }
 
-  let join: { url: string; token: string } | null = null;
+  let join: { serverUrl: string; token: string } | null = null;
   try {
-    const room = await ensureRoom(info.slot_id, info.closes_at);
-    const dailyToken = await meetingToken({
-      room: room.name,
+    join = accessToken({
+      slotId: info.slot_id,
       kind: "phone",
-      userName: `${info.name} (phone)`,
-      userId: phoneUserId(info.booking_id),
+      identity: phoneUserId(info.booking_id),
+      name: `${info.name} (phone)`,
       opensAt: info.opens_at,
       closesAt: info.closes_at,
     });
-    join = { url: room.url, token: dailyToken };
   } catch {
     join = null;
   }
@@ -66,7 +64,7 @@ export default async function PhoneCameraPage({ searchParams }: { searchParams: 
         {info.name} · {slotRange(info.starts_at, info.ends_at)} IST
       </p>
       {join ? (
-        <PhoneCamera url={join.url} token={join.token} />
+        <PhoneCamera serverUrl={join.serverUrl} token={join.token} />
       ) : (
         <CutCard className="mt-6 h-auto">
           <p className="text-sm text-ink">Could not open the camera link. Please scan the QR code again in a moment.</p>

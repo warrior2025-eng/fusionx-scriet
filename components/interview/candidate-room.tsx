@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, CheckCircle2, Maximize, Mic, Smartphone, TriangleAlert } from "lucide-react";
-import type { DailyCall, DailyParticipant } from "@daily-co/daily-js";
 import { giveConsent, joinInterview, myInterviewQuestions, phoneCameraLink, roomStillOn } from "@/actions/interview";
+import { LiveKitStage } from "@/components/interview/livekit-stage";
 import { useIntegrity } from "@/components/interview/use-integrity";
 import { Button, LinkButton } from "@/components/ui/button";
 import { CutCard } from "@/components/ui/cut-card";
@@ -242,7 +242,7 @@ function PhoneQr({ access, connected }: { access: Open; connected: boolean }) {
 
 /**
  * The FusionX Interview Room for a candidate: device check → consent → the
- * call (Daily Prebuilt in a frame), in fullscreen when the day asks for it,
+ * call (LiveKit), in fullscreen when the day asks for it,
  * with the revealed questions and the phone-camera QR beside it.
  */
 export function CandidateRoom({ access }: { access: Open }) {
@@ -254,8 +254,10 @@ export function CandidateRoom({ access }: { access: Open }) {
   const [phoneConnected, setPhoneConnected] = useState(false);
   const [moved, setMoved] = useState(false);
   const shell = useRef<HTMLDivElement>(null);
-  const frameHost = useRef<HTMLDivElement>(null);
-  const call = useRef<DailyCall | null>(null);
+  // The call: its server and token while connected (null = not in the call).
+  const [conn, setConn] = useState<{ serverUrl: string; token: string } | null>(null);
+  const joinedOnce = useRef(false);
+  const phoneId = phoneUserId(access.booking_id);
   const inRoom = step === "room";
   const onFullscreenExit = useCallback(() => setFullscreen(false), []);
   const { record } = useIntegrity(access.booking_id, inRoom, { strictFullscreen: access.strict_fullscreen, onFullscreenExit });
@@ -274,15 +276,12 @@ export function CandidateRoom({ access }: { access: Open }) {
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
-  useEffect(() => () => void call.current?.destroy(), []);
-
   // The panel can switch the day back to Google Meet at any time: leave the call and say where to go.
   useEffect(() => {
     if (!inRoom || moved) return;
     const timer = window.setInterval(async () => {
       if (await roomStillOn(access.booking_id).catch(() => true)) return;
-      void call.current?.destroy();
-      call.current = null;
+      setConn(null);
       setMoved(true);
       if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     }, 15_000);
@@ -306,66 +305,33 @@ export function CandidateRoom({ access }: { access: Open }) {
       setError(res.message);
       return;
     }
+    setConn({ serverUrl: res.serverUrl, token: res.token });
     setStep("room");
-    const Daily = (await import("@daily-co/daily-js")).default;
-    // Wait a frame for the room layout (and its frame host) to render.
-    await new Promise((r) => requestAnimationFrame(() => r(null)));
-    if (!frameHost.current) return;
-    call.current?.destroy();
-    const frame = Daily.createFrame(frameHost.current, {
-      iframeStyle: { width: "100%", height: "100%", border: "0" },
-      showLeaveButton: true,
-      showFullscreenButton: false,
-    });
-    call.current = frame;
-    let joinedOnce = false;
-    const phoneId = phoneUserId(access.booking_id);
-    let cameraOff = false;
-    let micOff = false;
-    frame
-      .on("joined-meeting", () => {
-        if (joinedOnce) record("rejoined");
-        joinedOnce = true;
-        const others = Object.values(frame.participants()) as DailyParticipant[];
-        if (others.some((p) => p.user_id === phoneId)) setPhoneConnected(true);
-      })
-      .on("left-meeting", () => record("left_room"))
-      .on("participant-joined", (e) => {
-        if (e?.participant.user_id === phoneId) {
-          setPhoneConnected(true);
-          record("phone_camera_joined");
-        }
-      })
-      .on("participant-left", (e) => {
-        if (e?.participant.user_id === phoneId) {
-          setPhoneConnected(false);
-          record("phone_camera_left");
-        }
-      })
-      .on("participant-updated", (e) => {
-        const p = e?.participant;
-        if (!p?.local) return;
-        const videoOff = p.tracks?.video?.state === "off";
-        const audioOff = p.tracks?.audio?.state === "off";
-        if (videoOff && !cameraOff) record("camera_off");
-        if (audioOff && !micOff) record("mic_off");
-        cameraOff = videoOff;
-        micOff = audioOff;
-      });
-    let failure: unknown = null;
-    frame.on("error", (e) => {
-      failure = e?.errorMsg ?? e;
-    });
-    try {
-      await frame.join({ url: res.url, token: res.token });
-    } catch (e) {
-      // Back to the Join step with one clear message (Daily's own error page is removed).
-      void frame.destroy();
-      call.current = null;
-      setError(joinErrorText(failure ?? e, "candidate"));
-      setStep("ready");
-    }
     setJoining(false);
+  };
+
+  // Call events → integrity events (the room's own signals).
+  const onConnected = useCallback(() => {
+    if (joinedOnce.current) record("rejoined");
+    joinedOnce.current = true;
+    setError("");
+  }, [record]);
+  const onDisconnected = useCallback(() => {
+    record("left_room");
+    setConn(null);
+  }, [record]);
+  const onCallError = useCallback((message: string) => {
+    setError(joinErrorText(message, "candidate"));
+  }, []);
+  const onPeople = useCallback((ids: string[]) => setPhoneConnected(ids.includes(phoneId)), [phoneId]);
+  const onJoined = useCallback((id: string) => id === phoneId && record("phone_camera_joined"), [phoneId, record]);
+  const onLeft = useCallback((id: string) => id === phoneId && record("phone_camera_left"), [phoneId, record]);
+  const onLocalOff = useCallback((kind: "camera" | "microphone") => record(kind === "camera" ? "camera_off" : "mic_off"), [record]);
+  const rejoin = async () => {
+    setError("");
+    const res = await joinInterview(access.booking_id);
+    if (res.ok) setConn({ serverUrl: res.serverUrl, token: res.token });
+    else setError(res.message);
   };
 
   return (
@@ -396,7 +362,29 @@ export function CandidateRoom({ access }: { access: Open }) {
 
       {inRoom && (
         <div className="relative flex min-h-0 flex-1 flex-col lg:flex-row">
-          <div ref={frameHost} data-interview-frame className="min-h-[60vh] flex-1 bg-black lg:min-h-0" />
+          <div data-interview-frame className="relative min-h-[60vh] flex-1 bg-black lg:min-h-0">
+            {conn ? (
+              <LiveKitStage
+                serverUrl={conn.serverUrl}
+                token={conn.token}
+                mode="candidate"
+                onConnected={onConnected}
+                onDisconnected={onDisconnected}
+                onError={onCallError}
+                onPeople={onPeople}
+                onJoined={onJoined}
+                onLeft={onLeft}
+                onLocalOff={onLocalOff}
+              />
+            ) : (
+              !moved && (
+                <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+                  <p className="text-sm text-white/85">You are not in the call.</p>
+                  <Button onClick={rejoin}>Rejoin the call</Button>
+                </div>
+              )
+            )}
+          </div>
           <aside className="w-full shrink-0 overflow-y-auto border-t border-line bg-surface p-5 lg:w-96 lg:border-l lg:border-t-0" aria-label="Interview questions and phone camera">
             <p className="text-xs text-ink/70">FusionX@SCRIET interview room · {slotRange(access.starts_at, access.ends_at)} IST</p>
             <h2 className="mt-4 font-serif text-lg text-ink">Questions</h2>

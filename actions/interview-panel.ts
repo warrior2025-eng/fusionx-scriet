@@ -6,7 +6,7 @@ import { saveReview } from "@/actions/review";
 import { fail, ok, zodFieldErrors, type ActionState } from "@/lib/admin/action-state";
 import { logAudit } from "@/lib/admin/audit";
 import { authorize, FORBIDDEN, getAdminContext, type AdminContext } from "@/lib/admin/guard";
-import { dailyConfigured, ensureRoom, meetingToken } from "@/lib/interview/daily";
+import { accessToken, roomConfigured } from "@/lib/interview/livekit";
 import type { IntegrityEvent } from "@/lib/interview/shared";
 import { friendlyDbError } from "@/lib/recruitment/data";
 
@@ -46,25 +46,22 @@ async function panel(slotId: string): Promise<{ ctx: AdminContext; access: Panel
   return { ctx: ctx as AdminContext, access: data as PanelAccess };
 }
 
-/** An owner token for the slot's room (panel members can open it an hour either side of the slot). */
-export async function joinAsPanel(slotId: string): Promise<Result<{ url: string; token: string }>> {
+/** A room-admin token for the slot's room (panel members can open it an hour either side of the slot). */
+export async function joinAsPanel(slotId: string): Promise<Result<{ serverUrl: string; token: string }>> {
   const p = await panel(slotId);
   if (!p) return { ok: false, message: "You don't have permission to do this." };
   const { ctx, access } = p;
-  const closes = new Date(new Date(access.ends_at).getTime() + access.grace_minutes * 60_000).toISOString();
   try {
-    const room = await ensureRoom(slotId, closes);
-    await ctx.supabase.rpc("record_interview_room", { p_slot: slotId, p_url: room.url });
-    const token = await meetingToken({
-      room: room.name,
+    const { serverUrl, token } = accessToken({
+      slotId,
       kind: "panel",
-      userName: `${ctx.fullName || "Panel"} (Panel)`,
-      userId: ctx.user.id,
+      identity: `panel-${ctx.user.id}`,
+      name: `${ctx.fullName || "Panel"} (Panel)`,
       opensAt: new Date(new Date(access.starts_at).getTime() - 60 * 60_000).toISOString(),
       closesAt: new Date(new Date(access.ends_at).getTime() + 60 * 60_000).toISOString(),
     });
     await logAudit(ctx, { action: "joined_interview_room", table: "recruitment_slots", id: slotId, note: access.role });
-    return { ok: true, url: room.url, token };
+    return { ok: true, serverUrl, token };
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Could not open the interview room." };
   }
@@ -136,8 +133,8 @@ const settingsSchema = z.object({
 
 /**
  * Interview mode for a day: Google Meet (default) or the in-website room, and
- * the room's settings. Switching on opens a room for every booked slot of the
- * day (when Daily is set up); booked candidates are told either way.
+ * the room's settings. Switching on needs the LiveKit keys; booked candidates
+ * are told either way. (LiveKit opens a slot's room on its first join.)
  */
 export async function saveRoomSettings(cycleId: string, dayId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
   const ctx = await authorize("recruitment");
@@ -156,8 +153,8 @@ export async function saveRoomSettings(cycleId: string, dayId: string, _prev: Ac
   });
   if (!parsed.success) return fail("Please fix the highlighted fields.", zodFieldErrors(parsed.error));
   const v = parsed.data;
-  if (v.room_enabled && !dailyConfigured()) {
-    return fail("The interview room is not set up yet: add DAILY_API_KEY in Vercel (see the setup steps), then switch it on.");
+  if (v.room_enabled && !roomConfigured()) {
+    return fail("The interview room is not set up yet: add LIVEKIT_URL, LIVEKIT_API_KEY and LIVEKIT_API_SECRET in Vercel (see the setup steps), then switch it on.");
   }
   const { data, error } = await ctx.supabase.rpc("set_interview_room_settings", {
     p_day: dayId,
@@ -170,34 +167,11 @@ export async function saveRoomSettings(cycleId: string, dayId: string, _prev: Ac
   if (error) return fail(friendlyDbError(error.message, "Could not save. Has migration 0023 been run?"));
   const told = (data as { notified?: number } | null)?.notified ?? 0;
 
-  // Open the rooms now for the slots that have bookings, so the first join is quick.
-  let opened = 0;
-  let roomError = "";
-  if (v.room_enabled) {
-    const { data: slots } = await ctx.supabase
-      .from("recruitment_slots")
-      .select("id, ends_at, recruitment_slot_bookings!inner(status)")
-      .eq("day_id", dayId)
-      .in("recruitment_slot_bookings.status", ["booked", "attended"]);
-    for (const slot of (slots ?? []) as { id: string; ends_at: string }[]) {
-      try {
-        const room = await ensureRoom(slot.id, new Date(new Date(slot.ends_at).getTime() + v.grace_minutes * 60_000).toISOString());
-        await ctx.supabase.rpc("record_interview_room", { p_slot: slot.id, p_url: room.url });
-        opened++;
-      } catch (e) {
-        roomError = e instanceof Error ? e.message : "Could not open a room.";
-      }
-    }
-  }
+  // LiveKit opens a slot's room on the first join; nothing to create here.
   revalidatePath(`/admin/recruitment/${cycleId}`, "layout");
   revalidatePath("/admin/interviews", "layout");
   revalidatePath("/recruitment/status");
   revalidatePath("/recruitment/interview");
   const toldText = told ? ` ${told} candidate${told === 1 ? "" : "s"} told.` : "";
-  if (roomError) return fail(`Saved, but some rooms could not be opened yet (${roomError}). They open on the first join.${toldText}`);
-  return ok(
-    v.room_enabled
-      ? `Saved: this day uses the in-website room.${opened ? ` ${opened} room${opened === 1 ? "" : "s"} ready.` : ""}${toldText}`
-      : `Saved: this day uses Google Meet.${toldText}`,
-  );
+  return ok(v.room_enabled ? `Saved: this day uses the in-website room.${toldText}` : `Saved: this day uses Google Meet.${toldText}`);
 }
