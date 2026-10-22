@@ -14,6 +14,7 @@ import {
   type Stage,
 } from "@/lib/recruitment/data";
 import type { createClient } from "@/lib/supabase/server";
+import { RUBRIC, rubricAverage, type RubricScores } from "@/lib/interview/shared";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -26,7 +27,7 @@ export type TeamStatusRow = {
   interview_location: string | null;
   final_note: string | null;
 };
-export type ReviewRow = { team_id: string; reviewer_id: string; score: number | null; private_notes: string | null; updated_at: string };
+export type ReviewRow = { team_id: string; reviewer_id: string; score: number | null; private_notes: string | null; updated_at: string } & RubricScores;
 
 const ORDINALS = ["1st", "2nd", "3rd", "4th"];
 
@@ -64,6 +65,9 @@ export async function ApplicationView({
     return data?.signedUrl ?? null;
   };
   const asked = questionsFor(questions, application.preferences);
+  // The interview rubric (migration 0023): shown and saved only once its columns exist.
+  const { error: rubricMissing } = await supabase.from("recruitment_reviews").select("rubric_skills").limit(1);
+  const rubric = !rubricMissing;
   const fileLinks = Object.fromEntries(
     await Promise.all(
       asked.filter((q) => q.type === "file").map(async (q) => [q.id, await signed(answerText(application.answers[q.id]))] as const),
@@ -134,11 +138,16 @@ export async function ApplicationView({
         const mine = teamReviews.find((r) => r.reviewer_id === userId);
         const scores = teamReviews.filter((r) => r.score !== null).map((r) => r.score as number);
         const average = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : null;
+        const rubricScores = teamReviews.map(rubricAverage).filter((v): v is number => v !== null);
+        const rubricAvg = rubricScores.length ? (rubricScores.reduce((a, b) => a + b, 0) / rubricScores.length).toFixed(1) : null;
         return (
           <Panel
             key={status.team_id}
             title={`${teamNames[status.team_id] ?? "Team"} (${ORDINALS[status.rank - 1] ?? status.rank} choice)`}
-            description={average ? `Average score ${average} from ${scores.length} review${scores.length === 1 ? "" : "s"}` : "No scores yet"}
+            description={
+              (average ? `Average score ${average} from ${scores.length} review${scores.length === 1 ? "" : "s"}` : "No scores yet") +
+              (rubricAvg ? ` · Interview rubric average ${rubricAvg}` : "")
+            }
           >
             <p className="mb-5 text-sm text-ink">
               Stage: <Pill tone={STAGE_TONE[status.stage]}>{STAGE_LABELS[status.stage]}</Pill>
@@ -182,6 +191,19 @@ export async function ApplicationView({
                     defaultValue={mine?.score ? String(mine.score) : ""}
                     options={[{ value: "", label: "No score" }, ...[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n) }))]}
                   />
+                  {rubric && (
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      {RUBRIC.map((r) => (
+                        <SelectField
+                          key={r.key}
+                          name={r.key}
+                          label={`${r.label} (1–5)`}
+                          defaultValue={mine?.[r.key] ? String(mine[r.key]) : ""}
+                          options={[{ value: "", label: "Not scored" }, ...[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n) }))]}
+                        />
+                      ))}
+                    </div>
+                  )}
                   <TextareaField
                     name="private_notes"
                     label="Private notes"
@@ -200,6 +222,7 @@ export async function ApplicationView({
                           <p className="font-medium text-ink">
                             {reviewerNames[r.reviewer_id] ?? "Reviewer"}
                             {r.score !== null && <span className="ml-2 tabular-nums text-accent">{r.score} / 5</span>}
+                            {rubricAverage(r) !== null && <span className="ml-2 tabular-nums text-ink/70">rubric {rubricAverage(r)!.toFixed(1)}</span>}
                           </p>
                           {r.private_notes && <p className="mt-1 whitespace-pre-line text-ink/75">{r.private_notes}</p>}
                         </li>

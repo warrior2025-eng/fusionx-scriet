@@ -29,7 +29,8 @@ export async function loadApplicationDetail(supabase: Supabase, applicationId: s
     supabase.from("recruitment_questions").select("*").eq("cycle_id", application.cycle_id).order("display_order").order("created_at"),
     supabase.from("recruitment_teams").select("id, name").eq("cycle_id", application.cycle_id),
     supabase.from("recruitment_team_status").select("*").eq("application_id", applicationId).order("rank"),
-    supabase.from("recruitment_reviews").select("team_id, reviewer_id, score, private_notes, updated_at").eq("application_id", applicationId),
+    // "*": the interview rubric columns (migration 0023) come along when they exist.
+    supabase.from("recruitment_reviews").select("*").eq("application_id", applicationId),
   ]);
 
   const reviews = (reviewRows ?? []) as ReviewRow[];

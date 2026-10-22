@@ -33,6 +33,7 @@ const NAV: { heading: string; items: (AdminNavItem & { cap: Capability })[] }[] 
       { href: "/admin/projects", label: "Projects", icon: "projects", cap: "moderation" },
       { href: "/admin/research", label: "Research", icon: "research", cap: "moderation" },
       { href: "/admin/recruitment", label: "Recruitment", icon: "applications", cap: "recruitment.content" },
+      { href: "/admin/interviews", label: "Interviews", icon: "events", cap: "recruitment" },
       { href: "/admin/teams", label: "FusionX Teams", icon: "teams", cap: "moderation" },
       { href: "/admin/messages", label: "Messages", icon: "messages", cap: "messages" },
       { href: "/admin/notifications", label: "Broadcast", icon: "notifications", cap: "broadcast" },

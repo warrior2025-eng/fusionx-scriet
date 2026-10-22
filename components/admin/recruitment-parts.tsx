@@ -11,6 +11,7 @@ const TABS = [
   { path: "/reviewers", label: "Reviewers" },
   { path: "/applications", label: "Applications" },
   { path: "/slots", label: "Interview slots" },
+  { path: "/interview-questions", label: "Interview questions" },
   { path: "/results", label: "Results" },
 ] as const;
 
