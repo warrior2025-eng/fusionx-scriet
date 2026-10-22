@@ -54,6 +54,14 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     <Section className="pt-16">
       <Eyebrow>Recruitment</Eyebrow>
       <h1 className="font-serif text-3xl tracking-tight text-ink md:text-4xl">Review applications</h1>
+      {teams.length > 0 && (
+        <p className="mt-2 text-sm">
+          <Link href="/review/interviews" className="font-medium text-accent underline underline-offset-2">
+            Interview panel
+          </Link>
+          <span className="text-ink/70"> for the slots with your candidates</span>
+        </p>
+      )}
 
       {teams.length === 0 ? (
         <div className="mt-8">

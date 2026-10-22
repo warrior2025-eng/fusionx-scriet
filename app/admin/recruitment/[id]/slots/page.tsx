@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Download, Link2 } from "lucide-react";
+import { Download, Link2, Video } from "lucide-react";
 import {
   cancelBooking,
   deleteDay,
@@ -17,6 +17,7 @@ import {
   setSlotBlocked,
   setSlotCapacity,
 } from "@/actions/admin-slots";
+import { saveRoomSettings } from "@/actions/interview-panel";
 import { ActionButton } from "@/components/admin/action-button";
 import { AdminForm, CheckboxField, SelectField, TextField, TextareaField } from "@/components/admin/admin-form";
 import { CycleTabs } from "@/components/admin/recruitment-parts";
@@ -97,6 +98,12 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
     ctx.supabase.from("recruitment_teams").select("id, name").eq("cycle_id", id),
   ]);
   const links = await loadMeetLinks(ctx.supabase, days.map((d) => d.id));
+  // The in-website interview room (migration 0023): settings per day; an error means the migration has not run.
+  const { data: roomRows, error: roomError } = days.length
+    ? await ctx.supabase.from("recruitment_room_settings").select("*").in("day_id", days.map((d) => d.id))
+    : { data: [], error: null };
+  type RoomSettings = { day_id: string; room_enabled: boolean; early_join_minutes: number; grace_minutes: number; strict_fullscreen: boolean; phone_camera: string };
+  const roomOf = (dayId: string) => ((roomRows ?? []) as RoomSettings[]).find((r) => r.day_id === dayId);
   const today = todayIst();
   const selected = days.find((d) => d.id === param(query, "day")) ?? days.find((d) => d.date >= today) ?? days[0] ?? null;
   const daySlots = selected ? board.filter((s) => s.day_id === selected.id) : [];
@@ -281,6 +288,60 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
                   </Link>
                 ))}
               </nav>
+            )}
+
+            {selected.mode === "online_meet" && (
+              <Panel
+                title={`Interview mode: ${dayLabel(selected.date)}`}
+                description="Google Meet (the link below) is the default. The in-website room runs the interview on fxscriet.com with integrity signals for the panel; switch back to Google Meet at any time, even mid-day."
+              >
+                {roomError ? (
+                  <p className="text-sm text-ink/75">The in-website room needs database migration 0023. Until then this day uses Google Meet.</p>
+                ) : (
+                  <>
+                    <p className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+                      {roomOf(selected.id)?.room_enabled ? <Pill tone="good">In-website room</Pill> : <Pill>Google Meet</Pill>}
+                      {roomOf(selected.id)?.room_enabled && (
+                        <Link href="/admin/interviews" className="inline-flex items-center gap-1.5 font-medium text-accent underline underline-offset-2">
+                          <Video size={14} aria-hidden /> Open the interview panel
+                        </Link>
+                      )}
+                    </p>
+                    <AdminForm action={saveRoomSettings.bind(null, id, selected.id)} submitLabel="Save interview mode" warnUnsaved={false}>
+                      <SelectField
+                        name="interview_mode"
+                        label="Interview mode"
+                        defaultValue={roomOf(selected.id)?.room_enabled ? "room" : "meet"}
+                        options={[
+                          { value: "meet", label: "Google Meet (external link)" },
+                          { value: "room", label: "In-website room" },
+                        ]}
+                        className="max-w-sm"
+                      />
+                      <div className="grid gap-5 sm:grid-cols-3">
+                        <TextField name="early_join_minutes" label="Candidates may join (minutes early)" type="number" min={0} max={60} defaultValue={String(roomOf(selected.id)?.early_join_minutes ?? 10)} />
+                        <TextField name="grace_minutes" label="Grace after the slot (minutes)" type="number" min={0} max={60} defaultValue={String(roomOf(selected.id)?.grace_minutes ?? 10)} />
+                        <SelectField
+                          name="phone_camera"
+                          label="Phone camera"
+                          defaultValue={roomOf(selected.id)?.phone_camera ?? "optional"}
+                          options={[
+                            { value: "off", label: "Off" },
+                            { value: "optional", label: "Optional" },
+                            { value: "required", label: "Required (flagged if missing)" },
+                          ]}
+                        />
+                      </div>
+                      <CheckboxField
+                        name="strict_fullscreen"
+                        label="Strict fullscreen"
+                        hint="The interview shows only in fullscreen; leaving it is flagged to the panel."
+                        defaultChecked={roomOf(selected.id)?.strict_fullscreen ?? true}
+                      />
+                    </AdminForm>
+                  </>
+                )}
+              </Panel>
             )}
 
             {selected.mode === "online_meet" && (

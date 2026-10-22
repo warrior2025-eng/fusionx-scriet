@@ -10,6 +10,8 @@ import { Section } from "@/components/ui/section";
 import { istDateTime } from "@/lib/events/format";
 import { agreeToAnnouncement } from "@/actions/recruitment-results";
 import { InterviewCard } from "@/components/recruitment/interview-card";
+import type { InterviewAccess } from "@/lib/interview/shared";
+import { dayLabel, slotRange } from "@/lib/recruitment/slots";
 import { ResultView } from "@/components/recruitment/result-view";
 import { ResultsCountdown } from "@/components/recruitment/results-countdown";
 import { StageTimeline } from "@/components/recruitment/stage-timeline";
@@ -71,6 +73,12 @@ export default async function RecruitmentStatusPage({ searchParams }: { searchPa
   const [booking, meet, slots] = active
     ? await Promise.all([getMyBooking(cycle.id), getMyMeetLink(cycle.id), getSlotAvailability(cycle.id)])
     : [null, { state: "none" as const }, []];
+  // The in-website interview room, when the admin has switched the day to it (migration 0023; nothing before it).
+  const room =
+    active && application?.status === "submitted"
+      ? (((await supabase.rpc("my_interview_access", { p_cycle: cycle.id })).data ?? null) as InterviewAccess | null)
+      : null;
+  const roomCard = room && (room.state === "open" || room.state === "too_early") ? room : null;
 
   // The result: "pending" with the date until the publish time, then the decision (migration 0017).
   const result: MyResult = cycle && application?.status === "submitted" ? await getMyResult(cycle.id) : { state: "none" };
@@ -184,6 +192,22 @@ export default async function RecruitmentStatusPage({ searchParams }: { searchPa
               <span className="text-xs text-ink/65">Without it, you are still counted, but your name is not shown.</span>
             </div>
           </div>
+        )}
+
+        {roomCard && !shown && (
+          <CutCard className="h-auto border-accent">
+            <p className="text-sm text-ink/65">Interview room</p>
+            <p className="mt-2 font-medium text-ink">Your interview is in the FusionX@SCRIET interview room, on this website</p>
+            <p className="mt-2 text-sm text-ink/75">
+              {dayLabel(roomCard.day)}, {slotRange(roomCard.starts_at, roomCard.ends_at)} IST. Use a laptop or desktop with Chrome or Edge, and keep
+              your phone ready as a second camera.
+            </p>
+            <div className="mt-5">
+              <LinkButton href="/recruitment/interview" size="sm">
+                {roomCard.state === "open" ? "Open the interview room" : "See when the room opens"}
+              </LinkButton>
+            </div>
+          </CutCard>
         )}
 
         {active && !shown && (
