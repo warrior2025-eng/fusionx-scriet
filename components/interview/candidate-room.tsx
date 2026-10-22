@@ -10,6 +10,7 @@ import { Button, LinkButton } from "@/components/ui/button";
 import { CutCard } from "@/components/ui/cut-card";
 import { phoneUserId, type InterviewWindow, type RevealedQuestion } from "@/lib/interview/shared";
 import { slotRange } from "@/lib/recruitment/slots";
+import { joinErrorText } from "@/lib/interview/join-error";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -351,10 +352,18 @@ export function CandidateRoom({ access }: { access: Open }) {
         cameraOff = videoOff;
         micOff = audioOff;
       });
+    let failure: unknown = null;
+    frame.on("error", (e) => {
+      failure = e?.errorMsg ?? e;
+    });
     try {
       await frame.join({ url: res.url, token: res.token });
-    } catch {
-      setError("Could not connect to the call. Check your internet connection and press Join again.");
+    } catch (e) {
+      // Back to the Join step with one clear message (Daily's own error page is removed).
+      void frame.destroy();
+      call.current = null;
+      setError(joinErrorText(failure ?? e, "candidate"));
+      setStep("ready");
     }
     setJoining(false);
   };
