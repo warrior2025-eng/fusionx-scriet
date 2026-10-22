@@ -1,0 +1,105 @@
+"use server";
+
+import { createHash, randomBytes } from "node:crypto";
+import { headers } from "next/headers";
+import { z } from "zod";
+import { ensureRoom, meetingToken } from "@/lib/interview/daily";
+import { EVENT_TYPES, type RevealedQuestion } from "@/lib/interview/shared";
+import { qrSvgPath } from "@/lib/events/qr";
+import { friendlyDbError } from "@/lib/recruitment/data";
+import { createClient } from "@/lib/supabase/server";
+
+/**
+ * The candidate's side of the FusionX Interview Room. Every call goes through
+ * a database function that checks the booking is the caller's own, live, and
+ * inside its time window (migration 0023); the Daily API key stays here on
+ * the server.
+ */
+
+const uuid = z.string().uuid();
+type Result<T> = ({ ok: true } & T) | { ok: false; message: string };
+
+async function signedIn() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return { supabase, user };
+}
+
+/** "I agree" on the monitoring notice. */
+export async function giveConsent(bookingId: string): Promise<Result<object>> {
+  if (!uuid.safeParse(bookingId).success) return { ok: false, message: "Interview not found." };
+  const { supabase, user } = await signedIn();
+  if (!user) return { ok: false, message: "Please sign in." };
+  const agent = (await headers()).get("user-agent")?.slice(0, 300) ?? null;
+  const { error } = await supabase.rpc("give_interview_consent", { p_booking: bookingId, p_agent: agent });
+  if (error) return { ok: false, message: friendlyDbError(error.message, "Could not save. Please try again.") };
+  return { ok: true };
+}
+
+/** The room URL and the candidate's own short-lived token. */
+export async function joinInterview(bookingId: string): Promise<Result<{ url: string; token: string }>> {
+  if (!uuid.safeParse(bookingId).success) return { ok: false, message: "Interview not found." };
+  const { supabase, user } = await signedIn();
+  if (!user) return { ok: false, message: "Please sign in." };
+  const { data, error } = await supabase.rpc("interview_join_info", { p_booking: bookingId });
+  if (error || !data) return { ok: false, message: friendlyDbError(error?.message ?? "", "You can't join this interview.") };
+  const info = data as { slot_id: string; opens_at: string; closes_at: string; name: string; room_url: string | null };
+  try {
+    const room = await ensureRoom(info.slot_id, info.closes_at);
+    if (room.url !== info.room_url) await supabase.rpc("record_interview_room", { p_slot: info.slot_id, p_url: room.url });
+    const token = await meetingToken({ room: room.name, kind: "candidate", userName: info.name, userId: bookingId, opensAt: info.opens_at, closesAt: info.closes_at });
+    return { ok: true, url: room.url, token };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Could not open the interview room." };
+  }
+}
+
+const eventSchema = z
+  .array(
+    z.object({
+      type: z.enum(EVENT_TYPES),
+      at: z.string().datetime(),
+      detail: z.record(z.string(), z.union([z.string().max(120), z.number(), z.boolean()])).optional(),
+    }),
+  )
+  .min(1)
+  .max(50);
+
+/** A batch of integrity events (the database rate-limits per person). */
+export async function logInterviewEvents(bookingId: string, events: unknown): Promise<Result<{ saved: number }>> {
+  if (!uuid.safeParse(bookingId).success) return { ok: false, message: "Interview not found." };
+  const parsed = eventSchema.safeParse(events);
+  if (!parsed.success) return { ok: false, message: "Invalid events." };
+  const { supabase, user } = await signedIn();
+  if (!user) return { ok: false, message: "Please sign in." };
+  const { data, error } = await supabase.rpc("log_interview_events", { p_booking: bookingId, p_events: parsed.data });
+  if (error) return { ok: false, message: friendlyDbError(error.message, "Could not save.") };
+  return { ok: true, saved: Number(data ?? 0) };
+}
+
+/** The questions the panel has revealed to the candidate's slot (never the others). */
+export async function myInterviewQuestions(bookingId: string): Promise<RevealedQuestion[]> {
+  if (!uuid.safeParse(bookingId).success) return [];
+  const { supabase, user } = await signedIn();
+  if (!user) return [];
+  const { data, error } = await supabase.rpc("my_interview_questions", { p_booking: bookingId });
+  return error || !Array.isArray(data) ? [] : (data as RevealedQuestion[]);
+}
+
+/** A 10-minute link (and its QR code) for the phone camera. Only the token's hash is stored. */
+export async function phoneCameraLink(bookingId: string): Promise<Result<{ url: string; expiresAt: string; qr: { path: string; size: number } }>> {
+  if (!uuid.safeParse(bookingId).success) return { ok: false, message: "Interview not found." };
+  const { supabase, user } = await signedIn();
+  if (!user) return { ok: false, message: "Please sign in." };
+  const token = randomBytes(24).toString("base64url");
+  const hash = createHash("sha256").update(token).digest("hex");
+  const { data, error } = await supabase.rpc("create_phone_link", { p_booking: bookingId, p_hash: hash });
+  if (error) return { ok: false, message: friendlyDbError(error.message, "Could not make the phone link.") };
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const origin = host ? `${h.get("x-forwarded-proto") ?? "https"}://${host}` : (process.env.NEXT_PUBLIC_SITE_URL ?? "");
+  const url = `${origin}/recruitment/interview/phone?t=${token}`;
+  return { ok: true, url, expiresAt: String(data), qr: qrSvgPath(url, 2) };
+}

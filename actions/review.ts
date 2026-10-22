@@ -6,6 +6,7 @@ import { fail, ok, zodFieldErrors, type ActionState } from "@/lib/admin/action-s
 import { fromIstInput } from "@/lib/events/format";
 import { STAGES, friendlyDbError } from "@/lib/recruitment/data";
 import { createClient } from "@/lib/supabase/server";
+import { RUBRIC } from "@/lib/interview/shared";
 import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
 
 /**
@@ -21,10 +22,20 @@ const reviewSchema = z.object({
   private_notes: z.string().trim().max(2000),
 });
 
+const rubricScore = z.union([z.literal(""), z.coerce.number().int().min(1).max(5)]);
+
 export async function saveReview(applicationId: string, teamId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!uuid.safeParse(applicationId).success || !uuid.safeParse(teamId).success) return fail("Application not found.");
   const parsed = reviewSchema.safeParse({ score: formData.get("score") ?? "", private_notes: formData.get("private_notes") ?? "" });
   if (!parsed.success) return fail("Please fix the highlighted fields.", zodFieldErrors(parsed.error));
+  // The interview rubric (migration 0023), only when the form has it: forms without it save exactly as before.
+  const rubric: Record<string, number | null> = {};
+  for (const { key } of RUBRIC) {
+    if (!formData.has(key)) continue;
+    const value = rubricScore.safeParse(formData.get(key) ?? "");
+    if (!value.success) return fail("Please fix the highlighted fields.", { [key]: "Choose 1 to 5" });
+    rubric[key] = value.data === "" ? null : value.data;
+  }
 
   const supabase = await createClient();
   const {
@@ -39,6 +50,7 @@ export async function saveReview(applicationId: string, teamId: string, _prev: A
       reviewer_id: user.id,
       score: parsed.data.score === "" ? null : parsed.data.score,
       private_notes: parsed.data.private_notes || null,
+      ...rubric,
     },
     { onConflict: "application_id,team_id,reviewer_id" },
   );
