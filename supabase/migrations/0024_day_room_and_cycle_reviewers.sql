@@ -347,7 +347,8 @@ begin
     from recruitment_slot_bookings b join recruitment_slots s on s.id = b.slot_id
     where b.id = bk and s.day_id = p_day;
     if not found then continue; end if;
-    -- Two panel screens may clean up at the same moment: note it once.
+    -- Two panel screens may clean up at the same moment: note it once (the lock makes the second wait for the first).
+    perform pg_advisory_xact_lock(hashtextextended('day-room-removal:' || bk::text || ':' || coalesce(item ->> 'who', ''), 0));
     if exists (select 1 from recruitment_integrity_events e where e.booking_id = bk and e.type = 'removed_slot_ended'
                and e.detail ->> 'who' is not distinct from (item ->> 'who') and e.created_at > now() - interval '2 minutes') then
       continue;

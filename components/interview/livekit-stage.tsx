@@ -2,7 +2,7 @@
 
 import "@livekit/components-styles";
 import { useEffect, useRef } from "react";
-import { ControlBar, GridLayout, LiveKitRoom, ParticipantTile, RoomAudioRenderer, useRoomContext, useTracks } from "@livekit/components-react";
+import { ControlBar, LiveKitRoom, ParticipantTile, RoomAudioRenderer, TrackLoop, useRoomContext, useTracks } from "@livekit/components-react";
 import { DisconnectReason, RoomEvent, Track, VideoPresets, type Participant, type RoomOptions } from "livekit-client";
 import { isPhoneIdentity } from "@/lib/interview/shared";
 
@@ -40,10 +40,17 @@ function Tiles({ onlyLocal, hidePhones }: { onlyLocal: boolean; hidePhones: bool
     { onlySubscribed: false },
   );
   const tracks = onlyLocal ? all.filter((t) => t.participant.isLocal) : hidePhones ? all.filter((t) => !isPhoneIdentity(t.participant.identity)) : all;
+  // Everyone on one screen (no pages): the panel sees the whole slot at once.
+  const cols = Math.max(1, Math.ceil(Math.sqrt(tracks.length)));
   return (
-    <GridLayout tracks={tracks} style={{ height: "calc(100% - var(--lk-control-bar-height))" }}>
-      <ParticipantTile />
-    </GridLayout>
+    <div
+      className="grid auto-rows-fr gap-1 overflow-y-auto p-1"
+      style={{ height: "calc(100% - var(--lk-control-bar-height))", gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+    >
+      <TrackLoop tracks={tracks}>
+        <ParticipantTile />
+      </TrackLoop>
+    </div>
   );
 }
 

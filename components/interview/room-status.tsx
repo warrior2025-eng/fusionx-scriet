@@ -18,6 +18,7 @@ type Status = { live: boolean; panel: number; candidates: number; phones: number
 export function RoomStatus({ dayId }: { dayId: string }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [message, setMessage] = useState("");
+  const [done, setDone] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -40,7 +41,7 @@ export function RoomStatus({ dayId }: { dayId: string }) {
     setBusy(true);
     const res = await enforceDayRoom(dayId).catch(() => null);
     setBusy(false);
-    setMessage(res?.ok ? `Done: ${res.removed} removed.` : (res?.message ?? "Could not check the room."));
+    setDone(res?.ok ? `Done: ${res.removed} removed.` : (res?.message ?? "Could not check the room."));
     void load();
   };
 
@@ -74,9 +75,9 @@ export function RoomStatus({ dayId }: { dayId: string }) {
       ) : (
         !message && <p className="mt-2 text-sm text-ink/70">Reading the room…</p>
       )}
-      {message && (
+      {(message || done) && (
         <p className="mt-2 text-sm text-ink" role="status">
-          {message}
+          {message || done}
         </p>
       )}
       <div className="mt-4 flex flex-wrap items-center gap-3">

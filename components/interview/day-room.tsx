@@ -67,17 +67,22 @@ export function DayRoomShell({ access, children }: { access: DayAccess; children
     };
   }, [check]);
   useEffect(() => {
-    const t = now();
-    const bounds = access.slots.flatMap((s) => [new Date(s.starts_at).getTime(), new Date(s.ends_at).getTime()]).filter((b) => b > t);
-    if (!bounds.length) return;
-    const at = Math.min(...bounds);
-    const timer = window.setTimeout(() => {
-      void check();
-      router.refresh();
-    }, at - t + 1000);
+    let timer = 0;
+    // One timer to the next slot start or end; when it fires it sets the one after.
+    const arm = () => {
+      const t = now();
+      const bounds = access.slots.flatMap((s) => [new Date(s.starts_at).getTime(), new Date(s.ends_at).getTime()]).filter((b) => b > t);
+      if (!bounds.length) return;
+      const at = Math.min(...bounds);
+      timer = window.setTimeout(() => {
+        void check();
+        router.refresh();
+        arm();
+      }, at - t + 1000);
+    };
+    arm();
     return () => window.clearTimeout(timer);
-    // Re-armed on every refresh (a new access.now) and after each boundary (the tick passes it).
-  }, [access.slots, access.now, now, check, router, slot?.id, live]);
+  }, [access.slots, now, check, router]);
 
   const join = async () => {
     setJoined("joining");
@@ -147,7 +152,8 @@ export function DayRoomShell({ access, children }: { access: DayAccess; children
             )}
           </div>
 
-          <div className="relative aspect-video w-full bg-black">
+          {/* Tall enough for the whole slot in one grid: the panel, 4 candidates and their phones. */}
+          <div className="relative h-[70vh] min-h-[22rem] w-full bg-black">
             {conn && (
               <div className="absolute inset-0">
                 <LiveKitStage
