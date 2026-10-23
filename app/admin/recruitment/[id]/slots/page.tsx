@@ -18,6 +18,7 @@ import {
   setSlotCapacity,
 } from "@/actions/admin-slots";
 import { saveRoomSettings } from "@/actions/interview-panel";
+import { RoomStatus } from "@/components/interview/room-status";
 import { ActionButton } from "@/components/admin/action-button";
 import { AdminForm, CheckboxField, SelectField, TextField, TextareaField } from "@/components/admin/admin-form";
 import { CycleTabs } from "@/components/admin/recruitment-parts";
@@ -293,7 +294,7 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
             {selected.mode === "online_meet" && (
               <Panel
                 title={`Interview mode: ${dayLabel(selected.date)}`}
-                description="Google Meet (the link below) is the default. The in-website room runs the interview on fxscriet.com with integrity signals for the panel; switch back to Google Meet at any time, even mid-day."
+                description="Google Meet (the link below) is the default. The in-website room runs the whole day in one room on fxscriet.com: the panel stays in it, each slot's candidates are let in for their slot and removed when it ends. Switch back to Google Meet at any time, even mid-day."
               >
                 {roomError ? (
                   <p className="text-sm text-ink/75">The in-website room needs database migration 0023. Until then this day uses Google Meet.</p>
@@ -302,8 +303,8 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
                     <p className="mb-4 flex flex-wrap items-center gap-2 text-sm">
                       {roomOf(selected.id)?.room_enabled ? <Pill tone="good">In-website room</Pill> : <Pill>Google Meet</Pill>}
                       {roomOf(selected.id)?.room_enabled && (
-                        <Link href="/admin/interviews" className="inline-flex items-center gap-1.5 font-medium text-accent underline underline-offset-2">
-                          <Video size={14} aria-hidden /> Open the interview panel
+                        <Link href={`/admin/interviews/day/${selected.id}`} className="inline-flex items-center gap-1.5 font-medium text-accent underline underline-offset-2">
+                          <Video size={14} aria-hidden /> Open the interview room
                         </Link>
                       )}
                     </p>
@@ -314,13 +315,13 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
                         defaultValue={roomOf(selected.id)?.room_enabled ? "room" : "meet"}
                         options={[
                           { value: "meet", label: "Google Meet (external link)" },
-                          { value: "room", label: "In-website room" },
+                          { value: "room", label: "In-website room (one room for the whole day)" },
                         ]}
                         className="max-w-sm"
                       />
                       <div className="grid gap-5 sm:grid-cols-3">
-                        <TextField name="early_join_minutes" label="Candidates may join (minutes early)" type="number" min={0} max={60} defaultValue={String(roomOf(selected.id)?.early_join_minutes ?? 10)} />
-                        <TextField name="grace_minutes" label="Grace after the slot (minutes)" type="number" min={0} max={60} defaultValue={String(roomOf(selected.id)?.grace_minutes ?? 10)} />
+                        <TextField name="early_join_minutes" label="Early-join minutes" hint="0: each slot's candidates join at its start, so slots never overlap." type="number" min={0} max={60} defaultValue={String(roomOf(selected.id)?.early_join_minutes ?? 0)} />
+                        <TextField name="grace_minutes" label="Candidate grace (minutes)" hint="Extra minutes after the slot ends before candidates are removed. 0: exactly at the end." type="number" min={0} max={60} defaultValue={String(roomOf(selected.id)?.grace_minutes ?? 0)} />
                         <SelectField
                           name="phone_camera"
                           label="Phone camera"
@@ -339,6 +340,7 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
                         defaultChecked={roomOf(selected.id)?.strict_fullscreen ?? true}
                       />
                     </AdminForm>
+                    {roomOf(selected.id)?.room_enabled && <RoomStatus dayId={selected.id} />}
                   </>
                 )}
               </Panel>

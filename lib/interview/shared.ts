@@ -22,7 +22,8 @@ export const EVENT_TYPES = [
   "phone_camera_joined",
   "phone_camera_left",
 ] as const;
-export type IntegrityType = (typeof EVENT_TYPES)[number];
+/** "removed_slot_ended" is written only by the server (migration 0024): the day room's clean-up removed them when their slot was over. */
+export type IntegrityType = (typeof EVENT_TYPES)[number] | "removed_slot_ended";
 
 /** What the panel sidebar calls each event. Neutral wording: a signal, not a verdict. */
 export const EVENT_LABELS: Record<IntegrityType, string> = {
@@ -42,6 +43,7 @@ export const EVENT_LABELS: Record<IntegrityType, string> = {
   rejoined: "Rejoined the room",
   phone_camera_joined: "Phone camera connected",
   phone_camera_left: "Phone camera disconnected",
+  removed_slot_ended: "Removed from the room (slot over)",
 };
 
 /** The ones the panel counts as flags (the "back" events are only shown in the timeline). */
@@ -68,6 +70,10 @@ export type PhoneCameraSetting = "off" | "optional" | "required";
 export type InterviewWindow = {
   booking_id: string;
   slot_id: string;
+  /** From migration 0024 on: the day (its one room), whether it is the interview date (IST), and the database's clock. */
+  day_id?: string;
+  today?: boolean;
+  now?: string;
   day: string;
   starts_at: string;
   ends_at: string;
@@ -102,6 +108,36 @@ export type SlotPerson = {
 
 /** The call identity of a candidate's phone camera: "p" and the booking id without dashes. */
 export const phoneUserId = (bookingId: string) => `p${bookingId.replace(/-/g, "")}`;
+
+/** interview_day_access (migration 0024): the panel's view of one interview day. */
+export type DayAccess = {
+  day_id: string;
+  cycle_id: string;
+  day: string;
+  mode: string;
+  role: "admin" | "reviewer";
+  all_hubs: boolean;
+  teams: string[] | null;
+  now: string;
+  room_name: string;
+  room_enabled: boolean;
+  early_join_minutes: number;
+  grace_minutes: number;
+  strict_fullscreen: boolean;
+  phone_camera: PhoneCameraSetting;
+  last_enforced_at: string | null;
+  removed_total: number;
+  slots: { id: string; starts_at: string; ends_at: string; booked: number }[];
+};
+
+/** The slot on now, else the next one, else the last (by the given clock). */
+export function currentSlot<T extends { starts_at: string; ends_at: string }>(slots: T[], now: number): T | null {
+  const live = slots.find((s) => now >= new Date(s.starts_at).getTime() && now < new Date(s.ends_at).getTime());
+  return live ?? slots.find((s) => new Date(s.starts_at).getTime() > now) ?? slots.at(-1) ?? null;
+}
+
+/** Is this call identity a candidate's phone camera (see phoneUserId)? */
+export const isPhoneIdentity = (identity: string) => /^p[0-9a-f]{32}$/i.test(identity);
 
 export const RUBRIC = [
   { key: "rubric_skills", label: "Skills" },

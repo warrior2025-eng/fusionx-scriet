@@ -6,8 +6,9 @@ import { saveReview } from "@/actions/review";
 import { fail, ok, zodFieldErrors, type ActionState } from "@/lib/admin/action-state";
 import { logAudit } from "@/lib/admin/audit";
 import { authorize, FORBIDDEN, getAdminContext, type AdminContext } from "@/lib/admin/guard";
-import { accessToken, roomConfigured } from "@/lib/interview/livekit";
-import type { IntegrityEvent } from "@/lib/interview/shared";
+import { bookingOf, cleanUpDayRoom } from "@/lib/interview/day-room";
+import { accessToken, listParticipants, roomConfigured, roomNameForDay } from "@/lib/interview/livekit";
+import type { DayAccess, IntegrityEvent } from "@/lib/interview/shared";
 import { friendlyDbError } from "@/lib/recruitment/data";
 
 /**
@@ -46,24 +47,103 @@ async function panel(slotId: string): Promise<{ ctx: AdminContext; access: Panel
   return { ctx: ctx as AdminContext, access: data as PanelAccess };
 }
 
-/** A room-admin token for the slot's room (panel members can open it an hour either side of the slot). */
-export async function joinAsPanel(slotId: string): Promise<Result<{ serverUrl: string; token: string }>> {
-  const p = await panel(slotId);
+/** The panel's access to a whole interview day (migration 0024), asked of the database each time. */
+async function dayPanel(dayId: string): Promise<{ ctx: AdminContext; access: DayAccess } | null> {
+  if (!uuid.safeParse(dayId).success) return null;
+  const ctx = await getAdminContext();
+  if (!ctx.user) return null;
+  const { data } = await ctx.supabase.rpc("interview_day_access", { p_day: dayId });
+  if (!data) return null;
+  return { ctx: ctx as AdminContext, access: data as DayAccess };
+}
+
+/**
+ * A room-admin token for the day's one room, for the panel. Valid all day:
+ * from half an hour before the first slot's join time until an hour after the
+ * last slot (panel members may set up early; candidates are never let in
+ * outside their own slot).
+ */
+export async function joinDayRoom(dayId: string): Promise<Result<{ serverUrl: string; token: string }>> {
+  const p = await dayPanel(dayId);
   if (!p) return { ok: false, message: "You don't have permission to do this." };
   const { ctx, access } = p;
+  if (!access.room_enabled) return { ok: false, message: "This day uses Google Meet. Switch it to the in-website room on the Interview slots page to use this call." };
+  const first = access.slots[0];
+  const last = access.slots.at(-1);
+  if (!first || !last) return { ok: false, message: "This day has no slots yet." };
+  const min = 60_000;
   try {
     const { serverUrl, token } = accessToken({
-      slotId,
+      room: roomNameForDay(dayId),
       kind: "panel",
       identity: `panel-${ctx.user.id}`,
       name: `${ctx.fullName || "Panel"} (Panel)`,
-      opensAt: new Date(new Date(access.starts_at).getTime() - 60 * 60_000).toISOString(),
-      closesAt: new Date(new Date(access.ends_at).getTime() + 60 * 60_000).toISOString(),
+      opensAt: new Date(new Date(first.starts_at).getTime() - (access.early_join_minutes + 30) * min).toISOString(),
+      closesAt: new Date(new Date(last.ends_at).getTime() + (access.grace_minutes + 60) * min).toISOString(),
     });
-    await logAudit(ctx, { action: "joined_interview_room", table: "recruitment_slots", id: slotId, note: access.role });
+    await logAudit(ctx, { action: "joined_interview_room", table: "recruitment_slot_days", id: dayId, note: access.role });
     return { ok: true, serverUrl, token };
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Could not open the interview room." };
+  }
+}
+
+/** The day room's token, opened from a slot's panel page (the slot's day has one room). */
+export async function joinAsPanel(slotId: string): Promise<Result<{ serverUrl: string; token: string }>> {
+  const p = await panel(slotId);
+  if (!p) return { ok: false, message: "You don't have permission to do this." };
+  return joinDayRoom(p.access.day_id);
+}
+
+export type DayRoomNow = { panel: number; candidates: number; phones: number; removed: number; at: string; live: boolean; present: string[] };
+
+/**
+ * Removes everyone whose slot is over (or not started, or whose day went back
+ * to Google Meet) from the day room. Run by every open panel screen every 15
+ * seconds and at each slot boundary, and by the admin's button. Each removal
+ * is logged by the database (integrity event + audit entry).
+ */
+export async function enforceDayRoom(dayId: string): Promise<Result<DayRoomNow>> {
+  const p = await dayPanel(dayId);
+  if (!p) return { ok: false, message: "You don't have permission to do this." };
+  try {
+    const r = await cleanUpDayRoom(p.ctx.supabase, dayId);
+    return {
+      ok: true,
+      panel: r.panel,
+      candidates: r.candidates,
+      phones: r.phones,
+      removed: r.removed,
+      at: new Date().toISOString(),
+      live: r.participants.length > 0,
+      present: r.participants.map((x) => x.identity),
+    };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Could not check the room." };
+  }
+}
+
+/** Who is in the day room now, and the last clean-up (for the admin's "Room status" box). Reads only. */
+export async function dayRoomStatus(dayId: string): Promise<Result<Omit<DayRoomNow, "removed" | "at" | "present"> & { lastRun: string | null; removedTotal: number }>> {
+  const ctx = await authorize("recruitment");
+  if (!ctx || !uuid.safeParse(dayId).success) return { ok: false, message: "You don't have permission to do this." };
+  if (!roomConfigured()) return { ok: false, message: "The LiveKit keys are not set on the server." };
+  const { data } = await ctx.supabase.rpc("interview_day_access", { p_day: dayId });
+  const access = data as DayAccess | null;
+  try {
+    const people = await listParticipants(roomNameForDay(dayId));
+    const kinds = people.map((x) => bookingOf(x)?.who ?? "panel");
+    return {
+      ok: true,
+      live: people.length > 0,
+      panel: kinds.filter((k) => k === "panel").length,
+      candidates: kinds.filter((k) => k === "candidate").length,
+      phones: kinds.filter((k) => k === "phone").length,
+      lastRun: access?.last_enforced_at ?? null,
+      removedTotal: access?.removed_total ?? 0,
+    };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Could not read the room." };
   }
 }
 
@@ -132,9 +212,9 @@ const settingsSchema = z.object({
 });
 
 /**
- * Interview mode for a day: Google Meet (default) or the in-website room, and
- * the room's settings. Switching on needs the LiveKit keys; booked candidates
- * are told either way. (LiveKit opens a slot's room on its first join.)
+ * Interview mode for a day: Google Meet (default) or the in-website room (one
+ * room for the whole day), and the room's settings. Switching on needs the
+ * LiveKit keys; booked candidates are told either way.
  */
 export async function saveRoomSettings(cycleId: string, dayId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
   const ctx = await authorize("recruitment");
@@ -146,8 +226,8 @@ export async function saveRoomSettings(cycleId: string, dayId: string, _prev: Ac
   };
   const parsed = settingsSchema.safeParse({
     room_enabled: text("interview_mode") === "room",
-    early_join_minutes: text("early_join_minutes") || "10",
-    grace_minutes: text("grace_minutes") || "10",
+    early_join_minutes: text("early_join_minutes") || "0",
+    grace_minutes: text("grace_minutes") || "0",
     strict_fullscreen: formData.get("strict_fullscreen") === "on",
     phone_camera: text("phone_camera") || "optional",
   });
@@ -167,7 +247,15 @@ export async function saveRoomSettings(cycleId: string, dayId: string, _prev: Ac
   if (error) return fail(friendlyDbError(error.message, "Could not save. Has migration 0023 been run?"));
   const told = (data as { notified?: number } | null)?.notified ?? 0;
 
-  // LiveKit opens a slot's room on the first join; nothing to create here.
+  // LiveKit opens the day's room on the first join; nothing to create here.
+  // Back on Google Meet: take the candidates out of the room now (the panel stays).
+  if (!v.room_enabled && roomConfigured()) {
+    try {
+      await cleanUpDayRoom(ctx.supabase, dayId);
+    } catch {
+      // Their own page moves them to Meet within 15 seconds anyway.
+    }
+  }
   revalidatePath(`/admin/recruitment/${cycleId}`, "layout");
   revalidatePath("/admin/interviews", "layout");
   revalidatePath("/recruitment/status");

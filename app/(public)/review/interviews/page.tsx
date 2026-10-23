@@ -23,16 +23,17 @@ export default async function ReviewerInterviewsPage() {
   const { data: ids } = await supabase.rpc("my_interview_panel_slots");
   const slotIds = (Array.isArray(ids) ? ids : []) as string[];
   const { data: slotRows } = slotIds.length
-    ? await supabase.from("recruitment_slots").select("id, starts_at, ends_at, recruitment_slot_days(date)").in("id", slotIds)
+    ? await supabase.from("recruitment_slots").select("id, day_id, starts_at, ends_at, recruitment_slot_days(date)").in("id", slotIds)
     : { data: [] };
   const slots: ListSlot[] = [];
-  for (const s of (slotRows ?? []) as unknown as { id: string; starts_at: string; ends_at: string; recruitment_slot_days: { date: string } | null }[]) {
+  for (const s of (slotRows ?? []) as unknown as { id: string; day_id: string; starts_at: string; ends_at: string; recruitment_slot_days: { date: string } | null }[]) {
     const [{ data: people }, { data: access }] = await Promise.all([
       supabase.rpc("interview_slot_people", { p_slot: s.id }),
       supabase.rpc("interview_panel_access", { p_slot: s.id }),
     ]);
     slots.push({
       id: s.id,
+      day_id: s.day_id,
       day: s.recruitment_slot_days?.date ?? s.starts_at.slice(0, 10),
       starts_at: s.starts_at,
       ends_at: s.ends_at,
