@@ -3,7 +3,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { headers } from "next/headers";
 import { z } from "zod";
-import { ensureRoom, meetingToken } from "@/lib/interview/daily";
+import { accessToken } from "@/lib/interview/livekit";
 import { EVENT_TYPES, type RevealedQuestion } from "@/lib/interview/shared";
 import { qrSvgPath } from "@/lib/events/qr";
 import { friendlyDbError } from "@/lib/recruitment/data";
@@ -12,8 +12,8 @@ import { createClient } from "@/lib/supabase/server";
 /**
  * The candidate's side of the FusionX Interview Room. Every call goes through
  * a database function that checks the booking is the caller's own, live, and
- * inside its time window (migration 0023); the Daily API key stays here on
- * the server.
+ * inside its time window (migration 0023); the LiveKit API secret stays here
+ * on the server.
  */
 
 const uuid = z.string().uuid();
@@ -38,19 +38,17 @@ export async function giveConsent(bookingId: string): Promise<Result<object>> {
   return { ok: true };
 }
 
-/** The room URL and the candidate's own short-lived token. */
-export async function joinInterview(bookingId: string): Promise<Result<{ url: string; token: string }>> {
+/** The video server and the candidate's own short-lived token. */
+export async function joinInterview(bookingId: string): Promise<Result<{ serverUrl: string; token: string }>> {
   if (!uuid.safeParse(bookingId).success) return { ok: false, message: "Interview not found." };
   const { supabase, user } = await signedIn();
   if (!user) return { ok: false, message: "Please sign in." };
   const { data, error } = await supabase.rpc("interview_join_info", { p_booking: bookingId });
   if (error || !data) return { ok: false, message: friendlyDbError(error?.message ?? "", "You can't join this interview.") };
-  const info = data as { slot_id: string; opens_at: string; closes_at: string; name: string; room_url: string | null };
+  const info = data as { slot_id: string; opens_at: string; closes_at: string; name: string };
   try {
-    const room = await ensureRoom(info.slot_id, info.closes_at);
-    if (room.url !== info.room_url) await supabase.rpc("record_interview_room", { p_slot: info.slot_id, p_url: room.url });
-    const token = await meetingToken({ room: room.name, kind: "candidate", userName: info.name, userId: bookingId, opensAt: info.opens_at, closesAt: info.closes_at });
-    return { ok: true, url: room.url, token };
+    const { serverUrl, token } = accessToken({ slotId: info.slot_id, kind: "candidate", identity: bookingId, name: info.name, opensAt: info.opens_at, closesAt: info.closes_at });
+    return { ok: true, serverUrl, token };
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Could not open the interview room." };
   }
