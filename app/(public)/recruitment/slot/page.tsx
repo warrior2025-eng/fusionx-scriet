@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/permissions";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -18,9 +19,7 @@ export const metadata: Metadata = { title: "Interview slot", robots: { index: fa
 /** Choosing or changing the interview slot after the application is in. */
 export default async function RecruitmentSlotPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect("/login?next=/recruitment/slot");
 
   const cycle = await getCurrentCycle();

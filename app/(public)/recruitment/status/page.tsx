@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/permissions";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { withdrawRecruitmentApplication } from "@/actions/recruitment";
@@ -11,6 +12,7 @@ import { istDateTime } from "@/lib/events/format";
 import { agreeToAnnouncement } from "@/actions/recruitment-results";
 import { InterviewCard } from "@/components/recruitment/interview-card";
 import { Checklist } from "@/components/interview/checklist";
+import { ReminderBanner } from "@/components/interview/reminder-banner";
 import type { InterviewAccess } from "@/lib/interview/shared";
 import { dayLabel, slotRange, slotTime } from "@/lib/recruitment/slots";
 import { ResultView } from "@/components/recruitment/result-view";
@@ -53,9 +55,7 @@ const ORDINALS = ["1st", "2nd", "3rd", "4th"];
 
 export default async function RecruitmentStatusPage({ searchParams }: { searchParams: Promise<{ submitted?: string }> }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect("/login?next=/recruitment/status");
   const { submitted } = await searchParams;
 
@@ -80,6 +80,8 @@ export default async function RecruitmentStatusPage({ searchParams }: { searchPa
       ? (((await supabase.rpc("my_interview_access", { p_cycle: cycle.id })).data ?? null) as InterviewAccess | null)
       : null;
   const roomCard = room && (room.state === "open" || room.state === "too_early") ? room : null;
+  // The day uses the in-website room (whatever the candidate's state in it): no Google Meet wording.
+  const inRoom = Boolean(room && "booking_id" in room);
 
   // The result: "pending" with the date until the publish time, then the decision (migration 0017).
   const result: MyResult = cycle && application?.status === "submitted" ? await getMyResult(cycle.id) : { state: "none" };
@@ -195,10 +197,19 @@ export default async function RecruitmentStatusPage({ searchParams }: { searchPa
           </div>
         )}
 
+        {!shown && roomCard && (
+          <ReminderBanner startsAt={roomCard.starts_at} serverNow={roomCard.now} minutes={roomCard.rules?.reminder_minutes ?? 5} href="/recruitment/interview" />
+        )}
+        {!shown && !roomCard && booking?.status === "booked" && booking.mode === "online_meet" && !inRoom && (
+          <ReminderBanner startsAt={booking.starts_at} room={false} />
+        )}
+
         {roomCard && !shown && (
           <CutCard className="h-auto border-accent">
             <p className="text-sm text-ink/65">Interview room</p>
-            <p className="mt-2 font-medium text-ink">Your interview is in the FusionX@SCRIET interview room, on this website</p>
+            <p className="mt-2 font-medium text-ink">
+              Your interview takes place on the FusionX@SCRIET website (in-website interview room), not on Google Meet
+            </p>
             <p className="mt-2 text-sm text-ink/75">
               {dayLabel(roomCard.day)}, {slotRange(roomCard.starts_at, roomCard.ends_at)} IST.
             </p>
@@ -226,6 +237,7 @@ export default async function RecruitmentStatusPage({ searchParams }: { searchPa
             reportingNote={cycle.reporting_note ?? null}
             hasSlots={slots.length > 0}
             changeHref={application?.status === "draft" ? (state === "open" ? "/recruitment/apply" : null) : "/recruitment/slot"}
+            room={inRoom}
           />
         )}
 

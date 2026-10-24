@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/permissions";
 import { notFound, redirect } from "next/navigation";
 import { DaySidebar } from "@/components/interview/day-sidebar";
 import { getDayAccess } from "@/lib/interview/day-access";
@@ -7,9 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 export default async function ReviewerDayRoomPage({ params, searchParams }: { params: Promise<{ dayId: string }>; searchParams: Promise<{ slot?: string }> }) {
   const [{ dayId }, { slot }] = await Promise.all([params, searchParams]);
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect(`/login?next=/review/interviews/day/${dayId}`);
   const access = await getDayAccess(dayId);
   if (!access) notFound();

@@ -28,6 +28,9 @@ export const EVENT_TYPES = [
   "reconnect",
   "fullscreen_unsupported",
   "device_info",
+  // migration 0027
+  "device_error",
+  "devices_fixed",
 ] as const;
 /**
  * Written only by the server: "removed_slot_ended" (0024, the day room's clean-up at the slot end),
@@ -60,6 +63,8 @@ export const EVENT_LABELS: Record<IntegrityType, string> = {
   reconnect: "Reconnected after a network drop (not counted)",
   fullscreen_unsupported: "Fullscreen not available on this device",
   device_info: "Joined from",
+  device_error: "Camera or microphone problem",
+  devices_fixed: "Pressed “Fix audio/video”",
   removed_left_screen: "Removed for leaving the interview screen",
   removed_by_panel: "Removed by the panel",
 };
@@ -123,11 +128,26 @@ export type RoomRules = {
   auto_remove_leaves: number;
   auto_remove_seconds: number;
   checklist: string | null;
+  /** From migration 0027 on. */
+  allow_no_camera?: boolean;
+  reminder_enabled?: boolean;
+  reminder_minutes?: number;
 };
-export const DEFAULT_RULES: RoomRules = { allow_phones: true, warn_on_leave: true, auto_remove: false, auto_remove_leaves: 3, auto_remove_seconds: 30, checklist: null };
+export const DEFAULT_RULES: RoomRules = {
+  allow_phones: true,
+  warn_on_leave: true,
+  auto_remove: false,
+  auto_remove_leaves: 3,
+  auto_remove_seconds: 30,
+  checklist: null,
+  allow_no_camera: false,
+  reminder_enabled: true,
+  reminder_minutes: 5,
+};
 
 /** What candidates are told before the interview (a day can change it in its settings). */
 export const DEFAULT_CHECKLIST = `Before your interview:
+- Your interview takes place on the FusionX@SCRIET website (in-website interview room), not on Google Meet.
 - Open the interview link in Chrome or Safari, not inside WhatsApp or Instagram.
 - A laptop is best; a phone also works.
 - Charge your device, use Wi-Fi, and keep your phone on a stand.

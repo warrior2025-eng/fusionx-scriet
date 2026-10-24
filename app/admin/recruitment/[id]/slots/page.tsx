@@ -35,6 +35,7 @@ import {
   dayLabel,
   slotCount,
   slotRange,
+  slotTime,
   todayIst,
   type Session,
 } from "@/lib/recruitment/slots";
@@ -100,6 +101,12 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
     ctx.supabase.from("recruitment_teams").select("id, name").eq("cycle_id", id),
   ]);
   const links = await loadMeetLinks(ctx.supabase, days.map((d) => d.id));
+  // Reminders sent before each slot (migration 0027; an error means it has not run, and nothing shows).
+  const bookingIds = board.flatMap((s) => s.bookings.map((b) => b.id));
+  const { data: reminderRows } = bookingIds.length
+    ? await ctx.supabase.from("recruitment_slot_bookings").select("id, reminder_sent_at").in("id", bookingIds).not("reminder_sent_at", "is", null)
+    : { data: [] };
+  const reminded = new Map(((reminderRows ?? []) as { id: string; reminder_sent_at: string }[]).map((r) => [r.id, r.reminder_sent_at]));
   // The in-website interview room (migration 0023): settings per day; an error means the migration has not run.
   const { data: roomRows, error: roomError } = days.length
     ? await ctx.supabase.from("recruitment_room_settings").select("*").in("day_id", days.map((d) => d.id))
@@ -118,6 +125,10 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
     auto_remove_leaves?: number;
     auto_remove_seconds?: number;
     candidate_checklist?: string | null;
+    // migration 0027 (absent before it)
+    allow_no_camera?: boolean;
+    reminder_enabled?: boolean;
+    reminder_minutes?: number;
   };
   const roomOf = (dayId: string) => ((roomRows ?? []) as RoomSettings[]).find((r) => r.day_id === dayId);
   const today = todayIst();
@@ -401,6 +412,26 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
                           />
                         </>
                       )}
+                      {"reminder_enabled" in (roomOf(selected.id) ?? { reminder_enabled: true }) && (
+                        <>
+                          <input type="hidden" name="extras" value="1" />
+                          <CheckboxField
+                            name="allow_no_camera"
+                            label="Allow joining without a camera"
+                            hint="Off: a candidate can join only after their camera shows a picture on the device check. On: they may continue with the microphone only."
+                            defaultChecked={roomOf(selected.id)?.allow_no_camera ?? false}
+                          />
+                          <div className="grid gap-5 sm:grid-cols-2 sm:items-end">
+                            <CheckboxField
+                              name="reminder_enabled"
+                              label="Remind each candidate before their slot"
+                              hint="An in-app notification (and email, when email is on in Settings) saying the interview is on the website, not Google Meet."
+                              defaultChecked={roomOf(selected.id)?.reminder_enabled ?? true}
+                            />
+                            <TextField name="reminder_minutes" label="Reminder minutes before" type="number" min={1} max={60} defaultValue={String(roomOf(selected.id)?.reminder_minutes ?? 5)} />
+                          </div>
+                        </>
+                      )}
                     </AdminForm>
                     {roomOf(selected.id)?.room_enabled && <RoomStatus dayId={selected.id} />}
                   </>
@@ -542,6 +573,11 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
                               <li key={b.id}>
                                 {b.full_name}
                                 {b.status !== "booked" && <span className="ml-1.5 text-xs text-ink/65">({BOOKING_LABEL[b.status]})</span>}
+                                {reminded.has(b.id) && (
+                                  <span className="ml-1.5 text-xs text-ink/65" title={`Reminder sent at ${slotTime(reminded.get(b.id)!)}`}>
+                                    · reminder sent
+                                  </span>
+                                )}
                               </li>
                             ))}
                           </ul>

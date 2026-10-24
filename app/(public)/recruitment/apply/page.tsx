@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/permissions";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ApplyForm, type ApplyDraft } from "@/components/recruitment/apply-form";
@@ -16,9 +17,7 @@ export default async function RecruitmentApplyPage({ searchParams }: { searchPar
   // From a hub page's "Apply to join this hub": that hub becomes the first choice of a new draft.
   const hub = String((await searchParams).hub ?? "").replace(/[^a-z0-9-]/g, "").slice(0, 80);
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(hub ? `/recruitment/apply?hub=${hub}` : "/recruitment/apply")}`);
 
   const cycle = await getCurrentCycle();

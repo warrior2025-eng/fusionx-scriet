@@ -52,13 +52,13 @@ export function useIntegrity(
     if (res?.ok && res.removed) onRemoved?.(res.removed);
   }, [bookingId, onRemoved]);
 
-  /** `every`: no "same event within 1.5 seconds" merging (each absence counts). */
+  /** `every`: no "same event within 1.5 seconds" merging (each absence counts). `at`: when it happened, if not now. */
   const record = useCallback(
-    (type: IntegrityType, detail?: Queued["detail"], every = false) => {
+    (type: IntegrityType, detail?: Queued["detail"], every = false, at?: number) => {
       const now = Date.now();
       if (!every && now - (last.current[type] ?? 0) < 1500) return;
       last.current[type] = now;
-      queue.current.push({ type, at: new Date(now).toISOString(), ...(detail ? { detail } : {}) });
+      queue.current.push({ type, at: new Date(at ?? now).toISOString(), ...(detail ? { detail } : {}) });
       if (queue.current.length >= 20) void flush();
     },
     [flush],
@@ -73,6 +73,7 @@ export function useIntegrity(
     // Leaving fullscreen counts only after the candidate has been in it (joining by itself from the
     // waiting room cannot enter fullscreen; the page asks them to tap "Return to fullscreen").
     let wasFullscreen = Boolean(fullscreenElement());
+    let closing = false;
 
     const awayNow = () => {
       if (fullscreenElement()) wasFullscreen = true;
@@ -89,7 +90,7 @@ export function useIntegrity(
       if (state.logged) return;
       state.logged = true;
       if (state.prompt) return; // logged as permission_prompt on return
-      record("left_screen", { cause: state.cause }, true);
+      record("left_screen", { cause: state.cause }, true, state.since);
       void flush();
     };
 
@@ -101,9 +102,10 @@ export function useIntegrity(
         const prompt = !document.hidden && now - joinedAt < 30_000;
         away = { since: now, cause, logged: false, prompt };
         const state = away;
-        // Hidden: log at once (a phone may pause the page). Only unfocused: wait a second (short focus blips are ignored).
-        if (document.hidden) start(state);
-        else pending = window.setTimeout(() => away === state && start(state), 1000);
+        // Hidden: log after a moment, unless the page is closing (closing a tab hides it first): that is
+        // "left the room", not an absence. Only unfocused: wait a second (short focus blips are ignored).
+        // A phone that pauses the page sends it on return, with the time it started.
+        pending = window.setTimeout(() => away === state && !closing && start(state), document.hidden ? 400 : 1000);
       } else if (!cause && away) {
         window.clearTimeout(pending);
         const state = away;
@@ -122,6 +124,28 @@ export function useIntegrity(
     };
 
     const onVisibility = () => check();
+    // The tab or browser is closing (or the page is left): the panel sees "Left the room", not "away".
+    // Sent with sendBeacon, which still goes out while the page closes.
+    const onPageHide = () => {
+      if (closing) return;
+      closing = true;
+      window.clearTimeout(pending);
+      if (away && !away.logged) away = null;
+      record("left_room", { reason: "closed" }, true);
+      const batch = queue.current.splice(0, 50);
+      try {
+        const sent = navigator.sendBeacon?.("/api/interview/beacon", JSON.stringify({ booking: bookingId, events: batch }));
+        if (!sent) queue.current = [...batch, ...queue.current];
+      } catch {
+        queue.current = [...batch, ...queue.current];
+      }
+    };
+    // Back from the browser cache (not closed after all).
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (!e.persisted) return;
+      closing = false;
+      record("rejoined", { reason: "page restored" }, true);
+    };
     const onFullscreen = () => {
       if (!fullscreenElement() && strictFullscreen) {
         record("fullscreen_exit");
@@ -147,7 +171,8 @@ export function useIntegrity(
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("blur", check);
     window.addEventListener("focus", check);
-    window.addEventListener("pagehide", check);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("pageshow", onPageShow);
     const offFullscreen = onFullscreenChange(onFullscreen);
     document.addEventListener("copy", onCopy);
     document.addEventListener("paste", onPaste);
@@ -166,7 +191,8 @@ export function useIntegrity(
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("blur", check);
       window.removeEventListener("focus", check);
-      window.removeEventListener("pagehide", check);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("pageshow", onPageShow);
       offFullscreen();
       document.removeEventListener("copy", onCopy);
       document.removeEventListener("paste", onPaste);
@@ -181,7 +207,7 @@ export function useIntegrity(
       window.clearInterval(flushTimer);
       void flush();
     };
-  }, [active, record, flush, strictFullscreen, onFullscreenExit, onReturn]);
+  }, [active, record, flush, strictFullscreen, onFullscreenExit, onReturn, bookingId]);
 
   return { record, flush };
 }

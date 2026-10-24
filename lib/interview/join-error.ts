@@ -8,7 +8,7 @@ export function joinErrorText(error: unknown, who: "panel" | "candidate"): strin
   if (raw.includes("quota") || raw.includes("limit") || raw.includes("payment")) {
     return who === "panel"
       ? "The video service has reached its free limit for this month. Use Google Meet for this day."
-      : "The interview room is not available right now. Please wait: the panel will move your interview to Google Meet.";
+      : "The interview room is not available right now. Please stay on this page: the panel will tell you how to continue.";
   }
   if (raw.includes("expired") || raw.includes("not valid yet") || raw.includes("nbf") || raw.includes("401") || raw.includes("unauthorized")) {
     return "This room is not open right now (it opens shortly before the slot and closes after it).";

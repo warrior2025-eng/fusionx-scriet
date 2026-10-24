@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LiveKitStage } from "@/components/interview/livekit-stage";
+import { LiveKitStage } from "@/components/interview/livekit-stage-lazy";
 import { countdownText, useServerClock } from "@/components/interview/use-server-clock";
 import { Button } from "@/components/ui/button";
 import { slotTime } from "@/lib/recruitment/slots";

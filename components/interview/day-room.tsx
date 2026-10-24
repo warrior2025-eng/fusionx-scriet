@@ -2,9 +2,10 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Video } from "lucide-react";
+import { PanelRightClose, PanelRightOpen, Video } from "lucide-react";
 import { enforceDayRoom, joinDayRoom, type DayRoomNow } from "@/actions/interview-panel";
-import { LiveKitStage } from "@/components/interview/livekit-stage";
+import type { ParticipantStatus, StageControls } from "@/components/interview/livekit-stage";
+import { LiveKitStage } from "@/components/interview/livekit-stage-lazy";
 import { countdownText, useServerClock } from "@/components/interview/use-server-clock";
 import { Button } from "@/components/ui/button";
 import { currentSlot, type DayAccess } from "@/lib/interview/shared";
@@ -12,8 +13,19 @@ import { joinErrorText } from "@/lib/interview/join-error";
 import { slotRange, slotTime } from "@/lib/recruitment/slots";
 import { cn } from "@/lib/utils";
 
-/** Who is in the day's room now (call identities), and whether this screen is in the call. Read by the slot sidebar. */
-type Presence = { present: Set<string>; seen: Set<string>; inCall: boolean; now: number | null };
+/**
+ * Who is in the day's room now (call identities), whether this screen is in the call, each person's camera /
+ * microphone / connection (while in the call), and a way to ask a candidate to re-check their devices.
+ * Read by the slot sidebar.
+ */
+type Presence = {
+  present: Set<string>;
+  seen: Set<string>;
+  inCall: boolean;
+  now: number | null;
+  status: Record<string, ParticipantStatus>;
+  ask: ((identity: string) => Promise<void>) | null;
+};
 const PresenceContext = createContext<Presence | null>(null);
 
 export function useDayPresence(): Presence | null {
@@ -39,6 +51,9 @@ export function DayRoomShell({ access, children }: { access: DayAccess; children
   const [callPresent, setCallPresent] = useState<string[]>([]);
   const [room, setRoom] = useState<(DayRoomNow & { ok: true }) | null>(null);
   const [checkError, setCheckError] = useState("");
+  const [status, setStatus] = useState<Record<string, ParticipantStatus>>({});
+  const [controls, setControls] = useState<StageControls | null>(null);
+  const [sideOpen, setSideOpen] = useState(true);
   // Everyone seen in the room today (to tell "left" from "not joined yet").
   const [seen, setSeen] = useState<Set<string>>(() => new Set());
   const addSeen = useCallback((ids: string[]) => setSeen((prev) => (ids.every((id) => prev.has(id)) ? prev : new Set([...prev, ...ids]))), []);
@@ -113,18 +128,26 @@ export function DayRoomShell({ access, children }: { access: DayAccess; children
     [addSeen],
   );
 
+  const ask = useMemo(() => (controls ? (identity: string) => controls.send(identity, "recheck") : null), [controls]);
   const presence = useMemo<Presence>(
-    () => ({ present: new Set(joined === "joined" ? callPresent : (room?.present ?? [])), seen, inCall: joined === "joined", now: tick }),
-    [joined, callPresent, room, seen, tick],
+    () => ({
+      present: new Set(joined === "joined" ? callPresent : (room?.present ?? [])),
+      seen,
+      inCall: joined === "joined",
+      now: tick,
+      status: joined === "joined" ? status : {},
+      ask: joined === "joined" ? ask : null,
+    }),
+    [joined, callPresent, room, seen, tick, status, ask],
   );
 
   return (
     <PresenceContext.Provider value={presence}>
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_28rem]">
-        <div className="min-w-0 space-y-4">
+      <div className={cn("grid gap-4", sideOpen && "lg:grid-cols-[minmax(0,7fr)_minmax(19rem,3fr)]")}>
+        <div className="min-w-0 space-y-3">
           <div
             className={cn(
-              "flex flex-wrap items-center justify-between gap-3 border bg-surface px-4 py-3 text-sm",
+              "flex flex-wrap items-center gap-x-5 gap-y-2 border bg-surface px-4 py-2.5 text-sm",
               left !== null && left <= 2 * 60_000 ? "border-accent" : "border-line",
             )}
             role="status"
@@ -150,10 +173,26 @@ export function DayRoomShell({ access, children }: { access: DayAccess; children
             {!live && slot && tick !== null && tick < new Date(slot.starts_at).getTime() && (
               <p className="tabular-nums text-ink/80">Starts in {countdownText(new Date(slot.starts_at).getTime() - tick)}</p>
             )}
+            {access.room_enabled && room && (
+              <p className="text-ink/75">
+                In the room: {room.panel} panel · {room.candidates} candidate{room.candidates === 1 ? "" : "s"}
+                {room.phones ? ` · ${room.phones} phone${room.phones === 1 ? "" : "s"}` : ""}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => setSideOpen((o) => !o)}
+              className="ml-auto hidden items-center gap-1.5 text-ink/80 hover:text-ink lg:inline-flex"
+              aria-expanded={sideOpen}
+              aria-controls="day-room-sidebar"
+            >
+              {sideOpen ? <PanelRightClose size={16} aria-hidden /> : <PanelRightOpen size={16} aria-hidden />}
+              {sideOpen ? "Hide sidebar" : "Show sidebar"}
+            </button>
           </div>
 
-          {/* Tall enough for the whole slot in one grid: the panel, 4 candidates and their phones. */}
-          <div className="relative h-[70vh] min-h-[22rem] w-full bg-black">
+          {/* The video fits a laptop screen: the candidates large, the panel in a strip, controls at the bottom. */}
+          <div className="relative h-[min(72vh,calc(100dvh-12rem))] min-h-[22rem] w-full bg-black">
             {conn && (
               <div className="absolute inset-0">
                 <LiveKitStage
@@ -164,6 +203,8 @@ export function DayRoomShell({ access, children }: { access: DayAccess; children
                   onDisconnected={onDisconnected}
                   onError={onCallError}
                   onPeople={onPeople}
+                  onStatus={setStatus}
+                  onControls={setControls}
                 />
               </div>
             )}
@@ -187,16 +228,14 @@ export function DayRoomShell({ access, children }: { access: DayAccess; children
 
           {access.room_enabled && (
             <p className="text-xs text-ink/70">
-              {room
-                ? `In the room now: ${room.panel} panel, ${room.candidates} candidate${room.candidates === 1 ? "" : "s"}, ${room.phones} phone camera${room.phones === 1 ? "" : "s"}. Checked ${slotTime(room.at)}${room.removed ? `; ${room.removed} removed (slot over)` : ""}.`
-                : "Checking the room…"}{" "}
-              Candidates are let in for their own slot only and removed when it ends.
+              {room ? `Checked ${slotTime(room.at)}${room.removed ? `; ${room.removed} removed (slot over)` : ""}.` : "Checking the room…"} Candidates are let in for
+              their own slot only and removed when it ends.
               {checkError && <span className="block text-ink">{checkError}</span>}
             </p>
           )}
         </div>
 
-        <aside aria-label="Candidates" className="min-w-0">
+        <aside id="day-room-sidebar" aria-label="Candidates" className={cn("min-w-0", !sideOpen && "lg:hidden")}>
           {children}
         </aside>
       </div>

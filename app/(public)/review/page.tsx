@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/permissions";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -18,9 +19,7 @@ export const metadata: Metadata = { title: "Review applications", robots: { inde
  */
 export default async function ReviewPage({ searchParams }: { searchParams: Promise<{ team?: string }> }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect("/login?next=/review");
   const { team: wanted } = await searchParams;
 

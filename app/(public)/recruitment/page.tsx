@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/permissions";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
@@ -28,9 +29,7 @@ export default async function RecruitmentPage() {
   const [page, cycle] = await Promise.all([getContent("recruitment.page"), getCurrentCycle()]);
   const state = cycleState(cycle);
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   const teams = cycle ? await getVisibleTeams(cycle.id) : [];
   const { data: mine } =

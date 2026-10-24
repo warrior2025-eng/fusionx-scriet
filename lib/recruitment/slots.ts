@@ -51,12 +51,12 @@ export const DEFAULT_SESSIONS: Session[] = [
   { label: "Afternoon", start: "15:00", end: "18:00" },
 ];
 export const DEFAULT_INSTRUCTIONS =
-  "Your interview will be held online on Google Meet. The meeting link will be shared on the day of your interview. Please join on time with a stable internet connection, your camera on, and a working microphone.";
+  "Your interview takes place on the FusionX@SCRIET website (in-website interview room), not on Google Meet. Open your status page a few minutes before your slot, allow your camera and microphone, and join from Chrome or Safari with a stable internet connection.";
 /** What a calendar entry says instead of the link. */
-export const CALENDAR_LOCATION = "Online (Google Meet). Link will be shared on the interview day";
+export const CALENDAR_LOCATION = "Online, on the FusionX@SCRIET website (fxscriet.com, your status page), not Google Meet";
 export const MEET_URL = /^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/;
 
-export const MODE_LABELS: Record<SlotMode, string> = { online_meet: "Online (Google Meet)", offline: "In person" };
+export const MODE_LABELS: Record<SlotMode, string> = { online_meet: "Online, on the FusionX@SCRIET website", offline: "In person" };
 export const STATE_LABELS: Record<SlotState, string> = { available: "Available", full: "Full", blocked: "Unavailable", closed: "Closed" };
 
 // Recent browsers put a narrow no-break space before AM/PM; the site uses a plain one.

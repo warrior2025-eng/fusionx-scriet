@@ -10,6 +10,11 @@ import { bookingOf, cleanUpDayRoom } from "@/lib/interview/day-room";
 import { accessToken, listParticipants, roomConfigured, roomNameForDay } from "@/lib/interview/livekit";
 import { DEFAULT_CHECKLIST, type DayAccess, type IntegrityEvent } from "@/lib/interview/shared";
 import { friendlyDbError } from "@/lib/recruitment/data";
+import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
+
+// The panel screens are open all interview day: each one also sends the due reminders and their emails
+// (at most every 30 seconds per server), in case the pg_cron job is not set up.
+let lastReminderRun = 0;
 
 /**
  * The interview panel: admins ("recruitment"), and a hub's reviewers for the
@@ -106,6 +111,12 @@ export type DayRoomNow = { panel: number; candidates: number; phones: number; re
 export async function enforceDayRoom(dayId: string): Promise<Result<DayRoomNow>> {
   const p = await dayPanel(dayId);
   if (!p) return { ok: false, message: "You don't have permission to do this." };
+  if (Date.now() - lastReminderRun > 30_000 && p.ctx.caps.includes("recruitment")) {
+    lastReminderRun = Date.now();
+    await p.ctx.supabase.rpc("send_interview_reminders");
+    // Also the emails of reminders the pg_cron job wrote (sent after the response; nothing to do when none wait).
+    deliverEmailsAfterResponse();
+  }
   try {
     const r = await cleanUpDayRoom(p.ctx.supabase, dayId);
     return {
@@ -303,6 +314,19 @@ export async function saveRoomSettings(cycleId: string, dayId: string, _prev: Ac
       p_checklist: r.candidate_checklist === DEFAULT_CHECKLIST ? "" : r.candidate_checklist,
     });
     if (rulesError) return fail(friendlyDbError(rulesError.message, "The mode was saved, but not the rules for leaving the screen. Has migration 0025 been run?"));
+  }
+
+  // Joining without a camera and the reminder before each slot (migration 0027).
+  if (formData.has("extras")) {
+    const minutes = z.coerce.number({ message: "Enter a number" }).int("Whole minutes").min(1, "At least 1").max(60, "At most 60").safeParse(text("reminder_minutes") || "5");
+    if (!minutes.success) return fail("Please fix the highlighted fields.", { reminder_minutes: minutes.error.issues[0]?.message ?? "1 to 60" });
+    const { error: extrasError } = await ctx.supabase.rpc("set_interview_room_extras", {
+      p_day: dayId,
+      p_no_camera: formData.get("allow_no_camera") === "on",
+      p_reminder: formData.get("reminder_enabled") === "on",
+      p_minutes: minutes.data,
+    });
+    if (extrasError) return fail(friendlyDbError(extrasError.message, "The mode was saved, but not the reminder settings. Has migration 0027 been run?"));
   }
 
   // LiveKit opens the day's room on the first join; nothing to create here.

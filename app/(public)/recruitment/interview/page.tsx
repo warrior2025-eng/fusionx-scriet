@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/permissions";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { CandidateRoom } from "@/components/interview/candidate-room";
@@ -23,9 +24,7 @@ export const metadata: Metadata = { title: "Interview room", robots: { index: fa
  */
 export default async function InterviewRoomPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect("/login?next=/recruitment/interview");
 
   const cycle = await getCurrentCycle();

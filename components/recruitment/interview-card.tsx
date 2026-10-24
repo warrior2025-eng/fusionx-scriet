@@ -6,9 +6,10 @@ import { MODE_LABELS, dayLabel, slotRange, type MeetLinkState, type MyBooking } 
 
 /**
  * The candidate's interview on the status page: the booked slot in IST, how
- * it is held, the instructions, and where the Google Meet link will appear.
- * The link itself is rendered only when the database handed it over (on the
- * day, once published, until an hour after the slot).
+ * it is held, the instructions, and where to join. On a day in the website's
+ * interview room (`room`), it says so (not Google Meet); the room card above
+ * has the Join button. On a Google Meet day, the link is rendered only when the
+ * database handed it over (on the day, once published, until an hour after the slot).
  */
 export function InterviewCard({
   booking,
@@ -17,6 +18,7 @@ export function InterviewCard({
   reportingNote,
   hasSlots,
   changeHref,
+  room = false,
 }: {
   booking: MyBooking | null;
   meet: MeetLinkState;
@@ -26,6 +28,8 @@ export function InterviewCard({
   hasSlots: boolean;
   /** Where to choose or change a slot; null when that is not possible now. */
   changeHref: string | null;
+  /** The day uses the in-website interview room. */
+  room?: boolean;
 }) {
   if (!booking) {
     if (!hasSlots) return null;
@@ -52,7 +56,7 @@ export function InterviewCard({
       <p className="mt-1 text-ink">{slotRange(booking.starts_at, booking.ends_at)} IST</p>
       <dl className="mt-4 grid gap-1 text-sm sm:grid-cols-[8rem_1fr]">
         <dt className="text-ink/65">Mode</dt>
-        <dd className="text-ink">{MODE_LABELS[booking.mode]}</dd>
+        <dd className="text-ink">{online && room ? "Online, on the FusionX@SCRIET website (interview room), not Google Meet" : MODE_LABELS[booking.mode]}</dd>
         {!online && (
           <>
             <dt className="text-ink/65">Venue</dt>
@@ -70,7 +74,13 @@ export function InterviewCard({
       {online && <p className="mt-4 border border-line bg-accent-soft px-4 py-3 text-sm leading-relaxed text-ink">{instructions}</p>}
       {reportingNote && <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-ink/80">{reportingNote}</p>}
 
-      {online && (
+      {online && room && (
+        <p className="mt-5 border-t border-line pt-5 text-sm text-ink">
+          Your interview takes place on this website (in-website interview room), not on Google Meet. On {dayLabel(booking.day, "long")}, open this page a few
+          minutes before your slot and press &ldquo;Join interview room&rdquo;.
+        </p>
+      )}
+      {online && !room && (
         <div className="mt-5 border-t border-line pt-5" aria-live="polite">
           {meet.state === "available" ? (
             <>
