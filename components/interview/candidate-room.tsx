@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Camera, CheckCircle2, ChevronDown, ChevronUp, Clock, Copy, Maximize, Mic, Smartphone, TriangleAlert } from "lucide-react";
+import { Camera, CheckCircle2, ChevronDown, ChevronUp, Clock, Copy, Maximize, Mic, RefreshCw, Smartphone, SwitchCamera, TriangleAlert } from "lucide-react";
 import { giveConsent, joinInterview, myInterviewQuestions, myRemoval, phoneCameraLink, roomStillOn } from "@/actions/interview";
 import { Checklist } from "@/components/interview/checklist";
-import { LiveKitStage } from "@/components/interview/livekit-stage";
+import { DEVICE_KEYS, LiveKitStage, type DeviceErrorKind, type StageControls } from "@/components/interview/livekit-stage";
 import { useIntegrity } from "@/components/interview/use-integrity";
 import { countdownText, useServerClock } from "@/components/interview/use-server-clock";
 import { Button, LinkButton } from "@/components/ui/button";
@@ -56,37 +56,127 @@ function OpenInBrowser() {
   );
 }
 
-/** Why camera access failed, in words for the device in hand. */
-function permissionHelp(device: DeviceInfo | null): string {
-  if (device?.ios)
-    return "Camera or microphone access was blocked. On iPhone or iPad: open Settings → Safari (or Chrome) → Camera and Microphone → Allow, or tap \"aA\" in the address bar → Website Settings → Allow. Then reload this page.";
-  if (device && device.kind !== "laptop")
-    return "Camera or microphone access was blocked. On Android: tap the lock icon in the address bar → Permissions → allow Camera and Microphone, then reload this page.";
-  return "Please allow the camera and microphone for this site (the camera icon in the address bar), then try again.";
+/** Why the camera or microphone could not start, in words for the device in hand, with the fix. */
+export function mediaHelp(kind: DeviceErrorKind | "insecure", device: DeviceInfo | null): string {
+  if (kind === "insecure") return "This page must be opened over a secure link (https://fxscriet.com). Open the interview link from your status page.";
+  if (kind === "device_in_use")
+    return "Your camera or microphone is being used by another app. Close Zoom, Google Meet, Teams, WhatsApp calls or the Camera app (and other browser tabs using the camera), then press Test again.";
+  if (kind === "no_device") return "No camera or microphone was found. Connect one (or use a phone), then press Test again.";
+  if (kind === "permission_denied") {
+    if (device?.ios)
+      return 'Camera or microphone access is blocked. On iPhone or iPad: tap "aA" in the address bar → Website Settings → Camera and Microphone → Allow (or Settings → Safari → Camera / Microphone → Allow). Then reload this page.';
+    if (device && device.kind !== "laptop")
+      return "Camera or microphone access is blocked. In Chrome on Android: tap the lock icon in the address bar → Permissions → allow Camera and Microphone (if they are blocked for Chrome itself: Android Settings → Apps → Chrome → Permissions). Then reload this page.";
+    return "Camera or microphone access is blocked. In Chrome or Edge: click the camera icon (or the lock) in the address bar → allow Camera and Microphone → reload this page. On Windows, also check Settings → Privacy → Camera / Microphone.";
+  }
+  return "The camera or microphone could not start. Close other apps that may use them, then press Test again. If it still fails, restart the browser.";
 }
 
-/** Camera and microphone test, before joining. Nothing is recorded or sent. */
-function DeviceCheck({ allowPhones, checklist, onReady }: { allowPhones: boolean; checklist?: string | null; onReady: () => void }) {
+const mediaErrorKind = (e: unknown): DeviceErrorKind => {
+  const name = e instanceof Error ? e.name : "";
+  return /NotAllowed|Security|Permission/i.test(name)
+    ? "permission_denied"
+    : /NotReadable|TrackStart|Abort/i.test(name)
+      ? "device_in_use"
+      : /NotFound|DevicesNotFound|Overconstrained/i.test(name)
+        ? "no_device"
+        : "other";
+};
+
+const store = (key: string, value: string) => {
+  try {
+    if (value) sessionStorage.setItem(key, value);
+    else sessionStorage.removeItem(key);
+  } catch {}
+};
+const stored = (key: string) => {
+  try {
+    return sessionStorage.getItem(key) ?? "";
+  } catch {
+    return "";
+  }
+};
+
+type DeviceLists = { camera: MediaDeviceInfo[]; microphone: MediaDeviceInfo[]; speaker: MediaDeviceInfo[] };
+
+/**
+ * Camera and microphone test, before joining. Nothing is recorded or sent.
+ * The browser is asked inside the tap (iPhone needs that). The candidate can
+ * pick the camera, microphone and (where the browser can) speaker; the room
+ * then uses the same ones. "Next" opens only once a camera picture and a
+ * microphone sound have both been seen ("Continue without camera" only if the
+ * day allows it).
+ */
+function DeviceCheck({
+  allowPhones,
+  allowNoCamera,
+  checklist,
+  onReady,
+}: {
+  allowPhones: boolean;
+  allowNoCamera: boolean;
+  checklist?: string | null;
+  onReady: () => void;
+}) {
   const video = useRef<HTMLVideoElement>(null);
   const device = useDevice();
-  const [permissionIssue, setPermissionIssue] = useState<string | null>(null);
+  const [issue, setIssue] = useState<string | null>(null);
   const [level, setLevel] = useState(0);
   const [cameraOk, setCameraOk] = useState(false);
+  const [micOk, setMicOk] = useState(false);
   const [started, setStarted] = useState(false);
+  const [lists, setLists] = useState<DeviceLists>({ camera: [], microphone: [], speaker: [] });
+  const [picked, setPicked] = useState({ camera: "", microphone: "", speaker: "" });
+  const live = useRef<{ stream: MediaStream | null; raf: number; audio: AudioContext | null }>({ stream: null, raf: 0, audio: null });
   const mobile = device ? device.kind !== "laptop" : false;
+  const canPickSpeaker = typeof HTMLMediaElement !== "undefined" && "setSinkId" in HTMLMediaElement.prototype;
 
-  useEffect(() => {
-    if (!started) return;
-    let stream: MediaStream | null = null;
-    let raf = 0;
-    let audio: AudioContext | null = null;
-    (async () => {
+  const stopAll = useCallback(() => {
+    cancelAnimationFrame(live.current.raf);
+    live.current.stream?.getTracks().forEach((t) => t.stop());
+    void live.current.audio?.close().catch(() => {});
+    live.current = { stream: null, raf: 0, audio: null };
+  }, []);
+  useEffect(() => stopAll, [stopAll]);
+
+  // Called from the tap (a user gesture) and when a device is picked.
+  const test = useCallback(
+    async (choice?: { camera?: string; microphone?: string }) => {
+      stopAll();
+      setStarted(true);
+      setIssue(null);
+      setCameraOk(false);
+      setMicOk(false);
+      setLevel(0);
+      if (!window.isSecureContext) {
+        setIssue(mediaHelp("insecure", deviceSnapshot()));
+        return;
+      }
+      // The audio meter is made in the tap too, so Safari lets it run.
+      let audio: AudioContext | null = null;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: true });
+        audio = new AudioContext();
+      } catch {}
+      const cam = choice?.camera ?? stored(DEVICE_KEYS.camera);
+      const mic = choice?.microphone ?? stored(DEVICE_KEYS.microphone);
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: cam ? { deviceId: { exact: cam } } : { facingMode: "user" },
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, ...(mic ? { deviceId: { exact: mic } } : {}) },
+        });
+        live.current.stream = stream;
         if (video.current) video.current.srcObject = stream;
-        setCameraOk(stream.getVideoTracks().length > 0);
-        try {
-          audio = new AudioContext();
+        const all = await navigator.mediaDevices.enumerateDevices().catch(() => [] as MediaDeviceInfo[]);
+        setLists({
+          camera: all.filter((d) => d.kind === "videoinput"),
+          microphone: all.filter((d) => d.kind === "audioinput"),
+          speaker: all.filter((d) => d.kind === "audiooutput"),
+        });
+        const vt = stream.getVideoTracks()[0];
+        const at = stream.getAudioTracks()[0];
+        setPicked((p) => ({ ...p, camera: vt?.getSettings().deviceId ?? "", microphone: at?.getSettings().deviceId ?? "" }));
+        if (audio && at) {
+          live.current.audio = audio;
           void audio.resume().catch(() => {});
           const analyser = audio.createAnalyser();
           analyser.fftSize = 256;
@@ -94,23 +184,40 @@ function DeviceCheck({ allowPhones, checklist, onReady }: { allowPhones: boolean
           const data = new Uint8Array(analyser.frequencyBinCount);
           const tick = () => {
             analyser.getByteFrequencyData(data);
-            setLevel(Math.min(1, data.reduce((a, b) => a + b, 0) / data.length / 60));
-            raf = requestAnimationFrame(tick);
+            const v = Math.min(1, data.reduce((x, y) => x + y, 0) / data.length / 60);
+            setLevel(v);
+            if (v > 0.08) setMicOk(true);
+            live.current.raf = requestAnimationFrame(tick);
           };
           tick();
-        } catch {
-          // No level meter on this browser; the camera test still counts.
+        } else if (at) {
+          // No level meter on this browser: a live microphone track has to do.
+          setMicOk(at.readyState === "live");
         }
-      } catch {
-        setPermissionIssue(permissionHelp(deviceSnapshot()));
+      } catch (e) {
+        void audio?.close().catch(() => {});
+        setIssue(mediaHelp(mediaErrorKind(e), deviceSnapshot()));
       }
-    })();
-    return () => {
-      cancelAnimationFrame(raf);
-      stream?.getTracks().forEach((t) => t.stop());
-      void audio?.close().catch(() => {});
-    };
-  }, [started]);
+    },
+    [stopAll],
+  );
+
+  const pick = (kind: "camera" | "microphone" | "speaker", id: string) => {
+    setPicked((p) => ({ ...p, [kind]: id }));
+    if (kind === "speaker") {
+      store(DEVICE_KEYS.speaker, id);
+      const el = video.current as (HTMLVideoElement & { setSinkId?: (id: string) => Promise<void> }) | null;
+      void el?.setSinkId?.(id).catch(() => {});
+      return;
+    }
+    void test({ [kind]: id });
+  };
+  const next = () => {
+    store(DEVICE_KEYS.camera, picked.camera);
+    store(DEVICE_KEYS.microphone, picked.microphone);
+    stopAll();
+    onReady();
+  };
 
   if (device?.inApp) return <OpenInBrowser />;
   const problem = !device
@@ -130,36 +237,77 @@ function DeviceCheck({ allowPhones, checklist, onReady }: { allowPhones: boolean
       </CutCard>
     );
   }
+  const select = (kind: keyof DeviceLists, label: string) =>
+    lists[kind].length > 1 && (
+      <label className="block text-sm text-ink">
+        <span className="mb-1 block text-xs text-ink/70">{label}</span>
+        <select value={picked[kind]} onChange={(e) => pick(kind, e.target.value)} className="w-full border border-line bg-paper px-2 py-2 text-sm text-ink">
+          {lists[kind].map((d, i) => (
+            <option key={d.deviceId || i} value={d.deviceId}>
+              {d.label || `${label} ${i + 1}`}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
   return (
     <div className="space-y-6">
       <CutCard className="h-auto">
         <h2 className="font-serif text-xl text-ink">1. Check your camera and microphone</h2>
         <p className="mt-2 text-sm text-ink/75">
+          Your interview takes place here, on the FusionX@SCRIET website (in-website interview room), not on Google Meet.{" "}
           {mobile ? "Use your phone's front camera, on a stand, in a quiet place with good light." : "Use a quiet place with good light."} Nothing is recorded.
         </p>
         {!started ? (
-          <Button className="mt-5 w-full sm:w-auto" size="lg" onClick={() => setStarted(true)}>
+          <Button className="mt-5 w-full sm:w-auto" size="lg" onClick={() => void test()}>
             <Camera size={16} aria-hidden /> Test camera and microphone
           </Button>
         ) : (
-          <div className="mt-5 grid gap-5 sm:grid-cols-[1fr_14rem] sm:items-start">
-            <video ref={video} autoPlay playsInline muted className="aspect-video w-full bg-black object-cover" aria-label="Your camera preview" />
+          <div className="mt-5 grid gap-5 sm:grid-cols-[1fr_16rem] sm:items-start">
+            <video
+              ref={video}
+              autoPlay
+              playsInline
+              muted
+              onLoadedData={(e) => setCameraOk(e.currentTarget.videoWidth > 0)}
+              onResize={(e) => setCameraOk(e.currentTarget.videoWidth > 0)}
+              className="aspect-video w-full bg-black object-cover"
+              aria-label="Your camera preview"
+            />
             <div className="space-y-4 text-sm">
               <p className="flex items-center gap-2 text-ink">
-                <Camera size={16} aria-hidden /> Camera: {cameraOk ? "working" : "waiting…"}
+                <Camera size={16} aria-hidden /> Camera: {cameraOk ? "working" : issue ? "not working" : "waiting for a picture…"}
               </p>
               <div>
                 <p className="flex items-center gap-2 text-ink">
-                  <Mic size={16} aria-hidden /> Microphone: say something
+                  <Mic size={16} aria-hidden /> Microphone: {micOk ? "working" : "say something…"}
                 </p>
                 <div className="mt-2 h-2 w-full bg-ink/10" role="meter" aria-label="Microphone level" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(level * 100)}>
                   <div className="h-2 bg-accent transition-[width] duration-100" style={{ width: `${Math.round(level * 100)}%` }} />
                 </div>
               </div>
-              {permissionIssue && <p className="text-sm leading-relaxed text-ink">{permissionIssue}</p>}
-              <Button className="w-full sm:w-auto" size="lg" disabled={!cameraOk} onClick={onReady}>
-                Next
-              </Button>
+              {select("camera", "Camera")}
+              {select("microphone", "Microphone")}
+              {canPickSpeaker && select("speaker", "Speaker")}
+              {issue && (
+                <p role="alert" className="border border-red-500/50 bg-red-500/10 p-3 text-sm leading-relaxed text-ink">
+                  {issue}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button className="w-full sm:w-auto" size="lg" disabled={!cameraOk || !micOk} onClick={next}>
+                  Next
+                </Button>
+                <Button variant="secondary" className="w-full sm:w-auto" onClick={() => void test()}>
+                  Test again
+                </Button>
+              </div>
+              {(!cameraOk || !micOk) && !issue && <p className="text-xs text-ink/70">Next opens when your camera shows a picture and the microphone hears you.</p>}
+              {allowNoCamera && !cameraOk && micOk && (
+                <Button variant="ghost" onClick={next}>
+                  Continue without camera
+                </Button>
+              )}
             </div>
           </div>
         )}
@@ -360,6 +508,11 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
   const [removed, setRemoved] = useState<"left_screen" | "panel" | null>(null);
   const [warning, setWarning] = useState<{ seconds: number; times: number } | null>(null);
   const [sheetOpen, setSheetOpen] = useState(true);
+  // Camera / microphone inside the call: the controls, a problem to show, the panel's "please re-check" request.
+  const [controls, setControls] = useState<StageControls | null>(null);
+  const [mediaIssue, setMediaIssue] = useState<{ kind: DeviceErrorKind; device: "camera" | "microphone" } | null>(null);
+  const [recheck, setRecheck] = useState(false);
+  const [fixing, setFixing] = useState(false);
   const endedRef = useRef(false);
   const shell = useRef<HTMLDivElement>(null);
   // The call: its server and token while connected (null = not in the call).
@@ -429,6 +582,15 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
       setError("");
       // Fullscreen needs a tap; when the waiting room connects by itself, the "Return to fullscreen" screen asks for it.
       if (strictFs && !auto) await enterFullscreen(shell.current);
+      // The camera and microphone are asked for inside the tap (iPhone needs that); the room then opens them again.
+      if (!auto) {
+        try {
+          const warm = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          warm.getTracks().forEach((t) => t.stop());
+        } catch {
+          // The room reports it with the right help.
+        }
+      }
       let res = await joinInterview(access.booking_id);
       // A device clock a few seconds fast: the server says "not yet"; try again shortly.
       for (let i = 0; auto && !res.ok && /room opens at/i.test(res.message) && i < 5; i++) {
@@ -507,6 +669,27 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
   const onJoined = useCallback((id: string) => id === phoneId && record("phone_camera_joined"), [phoneId, record]);
   const onLeft = useCallback((id: string) => id === phoneId && record("phone_camera_left"), [phoneId, record]);
   const onLocalOff = useCallback((kind: "camera" | "microphone") => record(kind === "camera" ? "camera_off" : "mic_off"), [record]);
+  const onDeviceError = useCallback(
+    (kind: DeviceErrorKind, which: "camera" | "microphone") => {
+      setMediaIssue({ kind, device: which });
+      record("device_error", { kind, device: which });
+    },
+    [record],
+  );
+  const onMessage = useCallback((message: string) => {
+    if (message === "recheck") setRecheck(true);
+  }, []);
+  const fixDevices = async () => {
+    if (!controls) return;
+    setFixing(true);
+    const ok = await controls.fix();
+    setFixing(false);
+    record("devices_fixed", { ok });
+    if (ok) {
+      setMediaIssue(null);
+      setRecheck(false);
+    }
+  };
   const rejoin = async () => {
     setError("");
     const res = await joinInterview(access.booking_id);
@@ -533,7 +716,9 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
     <div ref={shell} className={cn(inRoom && "bg-paper", inRoom && "fixed inset-0 z-50 flex flex-col")}>
       {!inRoom && (
         <div className="space-y-6">
-          {step === "device" && <DeviceCheck allowPhones={rules.allow_phones} checklist={rules.checklist} onReady={() => setStep("consent")} />}
+          {step === "device" && (
+            <DeviceCheck allowPhones={rules.allow_phones} allowNoCamera={Boolean(rules.allow_no_camera)} checklist={rules.checklist} onReady={() => setStep("consent")} />
+          )}
           {step === "consent" && <Consent access={access} mobile={mobile} onAgreed={() => setStep("ready")} />}
           {step === "ready" && ended && (
             <CutCard className="h-auto">
@@ -617,6 +802,49 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
               </button>
             </div>
           )}
+          {(mediaIssue || recheck) && conn && (
+            <div role="alert" className="absolute inset-x-2 top-16 z-30 border border-amber-500/70 bg-paper p-3 text-sm text-ink shadow-lg sm:inset-x-auto sm:left-1/2 sm:w-[34rem] sm:-translate-x-1/2">
+              <p className="font-semibold">{recheck && !mediaIssue ? "The panel asks you to check your camera and microphone." : `Your ${mediaIssue?.device ?? "camera"} is not working.`}</p>
+              {mediaIssue && <p className="mt-1 leading-relaxed text-ink/80">{mediaHelp(mediaIssue.kind, device)}</p>}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" disabled={fixing || !controls} onClick={() => void fixDevices()}>
+                  <RefreshCw size={14} aria-hidden /> {fixing ? "Fixing…" : "Fix audio/video"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setMediaIssue(null);
+                    setRecheck(false);
+                  }}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+          {conn && controls && (
+            <div className="absolute left-2 top-2 z-20 flex gap-2">
+              <button
+                type="button"
+                onClick={() => void fixDevices()}
+                disabled={fixing}
+                className="inline-flex items-center gap-1.5 rounded bg-black/70 px-3 py-2 text-xs font-medium text-white hover:bg-black/85"
+                title="Turn camera and microphone off and on again, and unblock sound"
+              >
+                <RefreshCw size={14} aria-hidden /> {fixing ? "Fixing…" : "Fix audio/video"}
+              </button>
+              {mobile && (
+                <button
+                  type="button"
+                  onClick={() => void controls.flip()}
+                  className="inline-flex items-center gap-1.5 rounded bg-black/70 px-3 py-2 text-xs font-medium text-white hover:bg-black/85"
+                >
+                  <SwitchCamera size={14} aria-hidden /> Switch camera
+                </button>
+              )}
+            </div>
+          )}
           <div data-interview-frame className="relative min-h-0 flex-1 bg-black">
             {conn ? (
               <LiveKitStage
@@ -624,6 +852,7 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
                 token={conn.token}
                 mode="candidate"
                 hold={hold}
+                small={mobile}
                 onConnected={onConnected}
                 onDisconnected={onDisconnected}
                 onError={onCallError}
@@ -632,6 +861,9 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
                 onLeft={onLeft}
                 onLocalOff={onLocalOff}
                 onReconnected={onReconnected}
+                onDeviceError={onDeviceError}
+                onControls={setControls}
+                onMessage={onMessage}
               />
             ) : (
               !moved &&

@@ -39,23 +39,15 @@ export async function PanelView({ supabase, access, userId, dayMode = false }: {
   const bank: BankItem[] = ((bankRows ?? []) as { id: string; team_id: string; body: string }[]).map((q) => ({ id: q.id, hub: hubName[q.team_id] ?? "", body: q.body }));
 
   const details: Record<string, React.ReactNode> = {};
+  const scores: Record<string, React.ReactNode> = {};
   for (const person of people) {
     const detail = await loadApplicationDetail(supabase, person.application_id);
     const scorable = (person.hubs ?? []).filter((h) => access.role === "admin" || (access.teams ?? []).includes(h.team_id));
     const asked = detail ? questionsFor(detail.questions, detail.application.preferences) : [];
     const links = detail ? Object.entries(detail.application.links).filter(([, v]) => /^https?:\/\//i.test(v)) : [];
-    details[person.booking_id] = (
+    scores[person.booking_id] = (
       <div className="space-y-4">
-        {access.role === "admin" && (
-          <div className="flex flex-wrap gap-2 border border-line bg-surface p-4">
-            <span className="mr-2 self-center text-sm font-medium text-ink">Attendance</span>
-            <ActionButton action={setBookingStatus.bind(null, access.cycle_id, person.booking_id, "attended")}>Attended</ActionButton>
-            <ActionButton variant="ghost" action={setBookingStatus.bind(null, access.cycle_id, person.booking_id, "no_show")}>
-              No-show
-            </ActionButton>
-          </div>
-        )}
-
+        {scorable.length === 0 && <p className="text-sm text-ink/70">Nothing to score for you here.</p>}
         {scorable.map((hub) => {
           const mine = detail?.reviews.find((r) => r.team_id === hub.team_id && r.reviewer_id === userId);
           const avg = mine ? rubricAverage(mine) : null;
@@ -77,7 +69,19 @@ export async function PanelView({ supabase, access, userId, dayMode = false }: {
             </div>
           );
         })}
-
+      </div>
+    );
+    details[person.booking_id] = (
+      <div className="space-y-4">
+        {access.role === "admin" && (
+          <div className="flex flex-wrap gap-2 border border-line bg-surface p-4">
+            <span className="mr-2 self-center text-sm font-medium text-ink">Attendance</span>
+            <ActionButton action={setBookingStatus.bind(null, access.cycle_id, person.booking_id, "attended")}>Attended</ActionButton>
+            <ActionButton variant="ghost" action={setBookingStatus.bind(null, access.cycle_id, person.booking_id, "no_show")}>
+              No-show
+            </ActionButton>
+          </div>
+        )}
         <details className="border border-line bg-surface p-5" open>
           <summary className="cursor-pointer text-sm font-semibold text-ink">Application</summary>
           {detail ? (
@@ -139,6 +143,7 @@ export async function PanelView({ supabase, access, userId, dayMode = false }: {
         role={access.role}
         people={panelPeople}
         details={details}
+        scores={scores}
         initialEvents={(eventRows ?? []) as IntegrityEvent[]}
         bank={bank}
         initialRevealed={(revealRows ?? []).map((r) => r.question_id as string)}

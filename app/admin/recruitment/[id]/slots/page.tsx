@@ -118,6 +118,10 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
     auto_remove_leaves?: number;
     auto_remove_seconds?: number;
     candidate_checklist?: string | null;
+    // migration 0027 (absent before it)
+    allow_no_camera?: boolean;
+    reminder_enabled?: boolean;
+    reminder_minutes?: number;
   };
   const roomOf = (dayId: string) => ((roomRows ?? []) as RoomSettings[]).find((r) => r.day_id === dayId);
   const today = todayIst();
@@ -399,6 +403,26 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
                             max={2000}
                             defaultValue={roomOf(selected.id)?.candidate_checklist || DEFAULT_CHECKLIST}
                           />
+                        </>
+                      )}
+                      {"reminder_enabled" in (roomOf(selected.id) ?? { reminder_enabled: true }) && (
+                        <>
+                          <input type="hidden" name="extras" value="1" />
+                          <CheckboxField
+                            name="allow_no_camera"
+                            label="Allow joining without a camera"
+                            hint="Off: a candidate can join only after their camera shows a picture on the device check. On: they may continue with the microphone only."
+                            defaultChecked={roomOf(selected.id)?.allow_no_camera ?? false}
+                          />
+                          <div className="grid gap-5 sm:grid-cols-2 sm:items-end">
+                            <CheckboxField
+                              name="reminder_enabled"
+                              label="Remind each candidate before their slot"
+                              hint="An in-app notification (and email, when email is on in Settings) saying the interview is on the website, not Google Meet."
+                              defaultChecked={roomOf(selected.id)?.reminder_enabled ?? true}
+                            />
+                            <TextField name="reminder_minutes" label="Reminder minutes before" type="number" min={1} max={60} defaultValue={String(roomOf(selected.id)?.reminder_minutes ?? 5)} />
+                          </div>
                         </>
                       )}
                     </AdminForm>

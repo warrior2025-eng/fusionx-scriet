@@ -305,6 +305,19 @@ export async function saveRoomSettings(cycleId: string, dayId: string, _prev: Ac
     if (rulesError) return fail(friendlyDbError(rulesError.message, "The mode was saved, but not the rules for leaving the screen. Has migration 0025 been run?"));
   }
 
+  // Joining without a camera and the reminder before each slot (migration 0027).
+  if (formData.has("extras")) {
+    const minutes = z.coerce.number({ message: "Enter a number" }).int("Whole minutes").min(1, "At least 1").max(60, "At most 60").safeParse(text("reminder_minutes") || "5");
+    if (!minutes.success) return fail("Please fix the highlighted fields.", { reminder_minutes: minutes.error.issues[0]?.message ?? "1 to 60" });
+    const { error: extrasError } = await ctx.supabase.rpc("set_interview_room_extras", {
+      p_day: dayId,
+      p_no_camera: formData.get("allow_no_camera") === "on",
+      p_reminder: formData.get("reminder_enabled") === "on",
+      p_minutes: minutes.data,
+    });
+    if (extrasError) return fail(friendlyDbError(extrasError.message, "The mode was saved, but not the reminder settings. Has migration 0027 been run?"));
+  }
+
   // LiveKit opens the day's room on the first join; nothing to create here.
   // Back on Google Meet: take the candidates out of the room now (the panel stays).
   if (!v.room_enabled && roomConfigured()) {
