@@ -1,15 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
-import { Camera, CheckCircle2, Maximize, Mic, Smartphone, TriangleAlert } from "lucide-react";
+import { Camera, CheckCircle2, Clock, Maximize, Mic, Smartphone, TriangleAlert } from "lucide-react";
 import { giveConsent, joinInterview, myInterviewQuestions, phoneCameraLink, roomStillOn } from "@/actions/interview";
 import { LiveKitStage } from "@/components/interview/livekit-stage";
 import { useIntegrity } from "@/components/interview/use-integrity";
+import { countdownText, useServerClock } from "@/components/interview/use-server-clock";
 import { Button, LinkButton } from "@/components/ui/button";
 import { CutCard } from "@/components/ui/cut-card";
 import { phoneUserId, type InterviewWindow, type RevealedQuestion } from "@/lib/interview/shared";
-import { slotRange } from "@/lib/recruitment/slots";
+import { slotRange, slotTime } from "@/lib/recruitment/slots";
 import { joinErrorText } from "@/lib/interview/join-error";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -244,15 +244,22 @@ function PhoneQr({ access, connected }: { access: Open; connected: boolean }) {
  * The FusionX Interview Room for a candidate: device check → consent → the
  * call (LiveKit), in fullscreen when the day asks for it,
  * with the revealed questions and the phone-camera QR beside it.
+ *
+ * The day has one room; a candidate is in it for their own slot only. Opened
+ * early on the day, the page waits ("Waiting room", with a countdown) and
+ * connects by itself when the slot's join time comes. When the slot ends
+ * (by the database's clock) the call closes and cannot be joined again; the
+ * server also removes anyone still connected.
  */
-export function CandidateRoom({ access }: { access: Open }) {
-  const router = useRouter();
+export function CandidateRoom({ access }: { access: Open & { state?: string } }) {
   const [step, setStep] = useState<Step>(access.consented_at ? "ready" : "device");
   const [error, setError] = useState("");
   const [joining, setJoining] = useState(false);
   const [fullscreen, setFullscreen] = useState(true);
   const [phoneConnected, setPhoneConnected] = useState(false);
   const [moved, setMoved] = useState(false);
+  const [ended, setEnded] = useState(false);
+  const endedRef = useRef(false);
   const shell = useRef<HTMLDivElement>(null);
   // The call: its server and token while connected (null = not in the call).
   const [conn, setConn] = useState<{ serverUrl: string; token: string } | null>(null);
@@ -263,12 +270,27 @@ export function CandidateRoom({ access }: { access: Open }) {
   const { record } = useIntegrity(access.booking_id, inRoom, { strictFullscreen: access.strict_fullscreen, onFullscreenExit });
   const questions = useRevealedQuestions(access.booking_id, access.slot_id, inRoom);
 
-  // The room closes at the end of the window: back to the page, which then says the slot has ended.
+  const { now, tick } = useServerClock(access.now);
+  const opensAt = new Date(access.opens_at).getTime();
+  const startsAt = new Date(access.starts_at).getTime();
+  const closesAt = new Date(access.closes_at).getTime();
+  const waiting = tick === null ? access.state === "too_early" : tick < opensAt;
+  // Let in early (when the day allows it): camera and microphone stay off, and nobody is seen or heard, until the slot starts.
+  const hold = tick !== null && tick < startsAt;
+
+  // The slot is over: leave the call, say thank you, no way back in (the server refuses a new token too).
   useEffect(() => {
-    const ms = new Date(access.closes_at).getTime() - Date.now();
-    const timer = window.setTimeout(() => router.refresh(), Math.max(ms, 0) + 1000);
+    const timer = window.setTimeout(
+      () => {
+        endedRef.current = true;
+        setEnded(true);
+        setConn(null);
+        if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+      },
+      Math.max(closesAt - now(), 0) + 500,
+    );
     return () => window.clearTimeout(timer);
-  }, [access.closes_at, router]);
+  }, [closesAt, now]);
 
   useEffect(() => {
     const onChange = () => setFullscreen(Boolean(document.fullscreenElement));
@@ -288,27 +310,43 @@ export function CandidateRoom({ access }: { access: Open }) {
     return () => window.clearInterval(timer);
   }, [inRoom, moved, access.booking_id]);
 
-  const enterFullscreen = async () => {
-    if (!access.strict_fullscreen) return;
-    try {
-      await shell.current?.requestFullscreen();
-    } catch {}
-  };
-
-  const join = async () => {
-    setJoining(true);
-    setError("");
-    await enterFullscreen();
-    const res = await joinInterview(access.booking_id);
-    if (!res.ok) {
+  const join = useCallback(
+    async (auto = false) => {
+      setJoining(true);
+      setError("");
+      // Fullscreen needs a click; when the waiting room connects by itself, the "Return to fullscreen" screen asks for it.
+      if (access.strict_fullscreen && !auto) {
+        try {
+          await shell.current?.requestFullscreen();
+        } catch {}
+      }
+      let res = await joinInterview(access.booking_id);
+      // A device clock a few seconds fast: the server says "not yet"; try again shortly.
+      for (let i = 0; auto && !res.ok && /room opens at/i.test(res.message) && i < 5; i++) {
+        await new Promise((r) => window.setTimeout(r, 3000));
+        res = await joinInterview(access.booking_id);
+      }
       setJoining(false);
-      setError(res.message);
-      return;
-    }
-    setConn({ serverUrl: res.serverUrl, token: res.token });
-    setStep("room");
-    setJoining(false);
-  };
+      if (!res.ok) {
+        setError(res.message);
+        return;
+      }
+      if (endedRef.current) return;
+      setConn({ serverUrl: res.serverUrl, token: res.token });
+      setStep("room");
+      setFullscreen(Boolean(document.fullscreenElement));
+    },
+    [access.booking_id, access.strict_fullscreen],
+  );
+
+  // Waiting room: connect by itself at the slot's join time.
+  useEffect(() => {
+    if (step !== "ready") return;
+    const ms = opensAt - now();
+    if (ms <= 0) return;
+    const timer = window.setTimeout(() => void join(true), ms + 300);
+    return () => window.clearTimeout(timer);
+  }, [step, opensAt, now, join]);
 
   // Call events → integrity events (the room's own signals).
   const onConnected = useCallback(() => {
@@ -316,10 +354,30 @@ export function CandidateRoom({ access }: { access: Open }) {
     joinedOnce.current = true;
     setError("");
   }, [record]);
-  const onDisconnected = useCallback(() => {
-    record("left_room");
-    setConn(null);
-  }, [record]);
+  const onDisconnected = useCallback(
+    (removed: boolean) => {
+      setConn(null);
+      // Removed by the server (slot over, or the day moved to Google Meet), or closed by the timer: not "left".
+      if (removed || endedRef.current) {
+        if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+        if (endedRef.current) {
+          setEnded(true);
+          return;
+        }
+        void roomStillOn(access.booking_id)
+          .catch(() => true)
+          .then((on) => {
+            if (on) {
+              endedRef.current = true;
+              setEnded(true);
+            } else setMoved(true);
+          });
+        return;
+      }
+      record("left_room");
+    },
+    [record, access.booking_id],
+  );
   const onCallError = useCallback((message: string) => {
     setError(joinErrorText(message, "candidate"));
   }, []);
@@ -340,7 +398,49 @@ export function CandidateRoom({ access }: { access: Open }) {
         <div className="space-y-6">
           {step === "device" && <DeviceCheck onReady={() => setStep("consent")} />}
           {step === "consent" && <Consent access={access} onAgreed={() => setStep("ready")} />}
-          {step === "ready" && (
+          {step === "ready" && ended && (
+            <CutCard className="h-auto">
+              <h2 className="font-serif text-xl text-ink">Your interview slot has ended</h2>
+              <p className="mt-2 text-sm text-ink/75">The interview room for your slot has closed. Missed interviews cannot be rescheduled.</p>
+              <LinkButton href="/recruitment/status" variant="secondary" size="sm" className="mt-5">
+                Go to your status page
+              </LinkButton>
+            </CutCard>
+          )}
+          {step === "ready" && !ended && waiting && (
+            <CutCard className="h-auto">
+              <h2 className="flex items-center gap-2 font-serif text-xl text-ink">
+                <Clock size={18} aria-hidden /> Waiting room
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-ink/75">
+                Your slot: {slotRange(access.starts_at, access.ends_at)} IST. You will be connected to the interview room by itself at{" "}
+                {slotTime(access.opens_at)}. Keep this page open
+                {access.strict_fullscreen ? "; the interview then runs in fullscreen" : ""}.
+              </p>
+              {tick !== null && (
+                <p className="mt-5 font-serif text-4xl tabular-nums text-ink" role="timer" aria-live="off">
+                  {countdownText(opensAt - tick)}
+                </p>
+              )}
+              {access.phone_camera !== "off" && (
+                <div className="mt-6 border-t border-line pt-5">
+                  {tick !== null && tick >= opensAt - 30 * 60_000 ? (
+                    <PhoneQr access={access} connected={false} />
+                  ) : (
+                    <p className="flex items-center gap-2 text-sm text-ink/75">
+                      <Smartphone size={16} aria-hidden /> The QR code for your phone camera appears here 30 minutes before your slot.
+                    </p>
+                  )}
+                </div>
+              )}
+              {error && (
+                <p role="alert" className="mt-3 text-sm text-ink">
+                  {error}
+                </p>
+              )}
+            </CutCard>
+          )}
+          {step === "ready" && !ended && !waiting && (
             <CutCard className="h-auto">
               <h2 className="font-serif text-xl text-ink">3. Join your interview</h2>
               <p className="mt-2 text-sm text-ink/75">
@@ -352,7 +452,7 @@ export function CandidateRoom({ access }: { access: Open }) {
                   {error}
                 </p>
               )}
-              <Button className="mt-5" disabled={joining} onClick={join}>
+              <Button className="mt-5" disabled={joining} onClick={() => void join()}>
                 <Maximize size={16} aria-hidden /> {joining ? "Opening the room…" : "Join the interview room"}
               </Button>
             </CutCard>
@@ -368,6 +468,7 @@ export function CandidateRoom({ access }: { access: Open }) {
                 serverUrl={conn.serverUrl}
                 token={conn.token}
                 mode="candidate"
+                hold={hold}
                 onConnected={onConnected}
                 onDisconnected={onDisconnected}
                 onError={onCallError}
@@ -377,7 +478,8 @@ export function CandidateRoom({ access }: { access: Open }) {
                 onLocalOff={onLocalOff}
               />
             ) : (
-              !moved && (
+              !moved &&
+              !ended && (
                 <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
                   <p className="text-sm text-white/85">You are not in the call.</p>
                   <Button onClick={rejoin}>Rejoin the call</Button>
@@ -387,6 +489,11 @@ export function CandidateRoom({ access }: { access: Open }) {
           </div>
           <aside className="w-full shrink-0 overflow-y-auto border-t border-line bg-surface p-5 lg:w-96 lg:border-l lg:border-t-0" aria-label="Interview questions and phone camera">
             <p className="text-xs text-ink/70">FusionX@SCRIET interview room · {slotRange(access.starts_at, access.ends_at)} IST</p>
+            {tick !== null && !ended && (
+              <p className="mt-2 text-sm tabular-nums text-ink" role="timer" aria-live="off">
+                {hold ? `Your slot starts in ${countdownText(startsAt - tick)}. Camera and microphone turn on then.` : `Your slot ends in ${countdownText(closesAt - tick)}`}
+              </p>
+            )}
             <h2 className="mt-4 font-serif text-lg text-ink">Questions</h2>
             {questions.length === 0 ? (
               <p className="mt-2 text-sm text-ink/70">The panel will show questions here during the interview.</p>
@@ -428,13 +535,27 @@ export function CandidateRoom({ access }: { access: Open }) {
             </div>
           )}
 
-          {access.strict_fullscreen && !fullscreen && !moved && (
+          {ended && !moved && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-paper p-6" role="alertdialog" aria-modal="true" aria-labelledby="ended-title">
+              <div className="max-w-md text-center">
+                <h2 id="ended-title" className="font-serif text-2xl text-ink">
+                  Your interview slot has ended. Thank you!
+                </h2>
+                <p className="mt-3 text-sm text-ink/75">The panel will share the results on your status page.</p>
+                <LinkButton href="/recruitment/status" className="mt-5">
+                  Go to your status page
+                </LinkButton>
+              </div>
+            </div>
+          )}
+
+          {access.strict_fullscreen && !fullscreen && !moved && !ended && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-paper/95 p-6" role="dialog" aria-modal="true" aria-labelledby="fs-title">
               <div className="max-w-md text-center">
                 <h2 id="fs-title" className="font-serif text-2xl text-ink">
                   Return to fullscreen
                 </h2>
-                <p className="mt-3 text-sm text-ink/75">The interview continues in fullscreen. Leaving fullscreen has been noted for the panel.</p>
+                <p className="mt-3 text-sm text-ink/75">The interview runs in fullscreen. Each time it is left, the panel is told.</p>
                 <Button
                   className="mt-5"
                   onClick={async () => {

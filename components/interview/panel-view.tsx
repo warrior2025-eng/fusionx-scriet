@@ -20,7 +20,7 @@ const scoreOptions = [{ value: "", label: "Not scored" }, ...[1, 2, 3, 4, 5].map
  * (only their teams' candidates, their own scores). Admins also get the
  * question bank and the attendance buttons.
  */
-export async function PanelView({ supabase, access, userId }: { supabase: Supabase; access: PanelAccess; userId: string }) {
+export async function PanelView({ supabase, access, userId, dayMode = false }: { supabase: Supabase; access: PanelAccess; userId: string; dayMode?: boolean }) {
   const slotId = access.slot_id;
   const [{ data: peopleRows }, { data: eventRows }, { data: revealRows }] = await Promise.all([
     supabase.rpc("interview_slot_people", { p_slot: slotId }),
@@ -129,11 +129,12 @@ export async function PanelView({ supabase, access, userId }: { supabase: Supaba
 
   return (
     <>
-      <p className="mb-4 text-sm text-ink/75">
+      <p className={dayMode ? "mb-4 text-xs text-ink/70" : "mb-4 text-sm text-ink/75"}>
         {dayLabel(access.day)} · {slotRange(access.starts_at, access.ends_at)} IST ·{" "}
         {access.room_enabled ? "In-website room" : "Google Meet day"} · phone camera {access.phone_camera} · fullscreen {access.strict_fullscreen ? "strict" : "off"}
       </p>
       <PanelRoom
+        key={slotId}
         slotId={slotId}
         role={access.role}
         people={panelPeople}
@@ -143,6 +144,8 @@ export async function PanelView({ supabase, access, userId }: { supabase: Supaba
         initialRevealed={(revealRows ?? []).map((r) => r.question_id as string)}
         phoneSetting={access.phone_camera}
         roomEnabled={access.room_enabled}
+        dayMode={dayMode}
+        slotStartsAt={access.starts_at}
       />
     </>
   );

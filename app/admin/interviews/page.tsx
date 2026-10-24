@@ -32,6 +32,7 @@ export default async function InterviewsPage() {
     .filter((s) => s.bookings.length > 0)
     .map((s) => ({
       id: s.id,
+      day_id: s.day_id,
       day: days.find((d) => d.id === s.day_id)?.date ?? s.starts_at.slice(0, 10),
       starts_at: s.starts_at,
       ends_at: s.ends_at,

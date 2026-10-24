@@ -11,7 +11,7 @@ import { istDateTime } from "@/lib/events/format";
 import { agreeToAnnouncement } from "@/actions/recruitment-results";
 import { InterviewCard } from "@/components/recruitment/interview-card";
 import type { InterviewAccess } from "@/lib/interview/shared";
-import { dayLabel, slotRange } from "@/lib/recruitment/slots";
+import { dayLabel, slotRange, slotTime } from "@/lib/recruitment/slots";
 import { ResultView } from "@/components/recruitment/result-view";
 import { ResultsCountdown } from "@/components/recruitment/results-countdown";
 import { StageTimeline } from "@/components/recruitment/stage-timeline";
@@ -202,11 +202,18 @@ export default async function RecruitmentStatusPage({ searchParams }: { searchPa
               {dayLabel(roomCard.day)}, {slotRange(roomCard.starts_at, roomCard.ends_at)} IST. Use a laptop or desktop with Chrome or Edge, and keep
               your phone ready as a second camera.
             </p>
-            <div className="mt-5">
-              <LinkButton href="/recruitment/interview" size="sm">
-                {roomCard.state === "open" ? "Open the interview room" : "See when the room opens"}
-              </LinkButton>
-            </div>
+            {/* The room link only on the interview date (IST); before it, when it opens. */}
+            {roomCard.state === "open" || roomCard.today !== false ? (
+              <div className="mt-5">
+                <LinkButton href="/recruitment/interview" size="sm">
+                  Join interview room
+                </LinkButton>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm font-medium text-ink">
+                Your interview room opens on {dayLabel(roomCard.day)} at {slotTime(roomCard.opens_at)}.
+              </p>
+            )}
           </CutCard>
         )}
 

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { PhoneCamera } from "@/components/interview/phone-camera";
 import { CutCard } from "@/components/ui/cut-card";
 import { Section } from "@/components/ui/section";
-import { accessToken } from "@/lib/interview/livekit";
+import { accessToken, roomNameForDay } from "@/lib/interview/livekit";
 import { phoneUserId } from "@/lib/interview/shared";
 import { slotRange } from "@/lib/recruitment/slots";
 import { createClient } from "@/lib/supabase/server";
@@ -14,7 +14,8 @@ export const metadata: Metadata = { title: "Phone camera", robots: { index: fals
  * The phone's second camera, opened from the QR code on the candidate's
  * screen (no sign-in). The link carries a random token; the database keeps
  * only its hash, for 10 minutes, tied to that one booking. The phone joins the
- * slot's room camera-only and muted, as "<name> (phone)".
+ * day's room camera-only and muted, as "<name> (phone)", for the candidate's
+ * own slot only (scanned early, it waits for the slot to open).
  */
 export default async function PhoneCameraPage({ searchParams }: { searchParams: Promise<{ t?: string }> }) {
   const token = String((await searchParams).t ?? "");
@@ -31,8 +32,19 @@ export default async function PhoneCameraPage({ searchParams }: { searchParams: 
   const supabase = await createClient();
   const { data } = await supabase.rpc("phone_link_info", { p_hash: createHash("sha256").update(token).digest("hex") });
   if (!data) return invalid;
-  const info = data as { booking_id: string; slot_id: string; name: string; starts_at: string; ends_at: string; opens_at: string; closes_at: string; open: boolean };
-  if (!info.open) {
+  const info = data as {
+    booking_id: string;
+    slot_id: string;
+    day_id?: string;
+    name: string;
+    starts_at: string;
+    ends_at: string;
+    opens_at: string;
+    closes_at: string;
+    open: boolean;
+    now?: string;
+  };
+  if (!info.open && !info.day_id) {
     return (
       <Section className="max-w-lg pt-12">
         <CutCard className="h-auto">
@@ -45,13 +57,15 @@ export default async function PhoneCameraPage({ searchParams }: { searchParams: 
 
   let join: { serverUrl: string; token: string } | null = null;
   try {
+    if (!info.day_id) throw new Error("migration 0024 not run");
     join = accessToken({
-      slotId: info.slot_id,
+      room: roomNameForDay(info.day_id),
       kind: "phone",
       identity: phoneUserId(info.booking_id),
       name: `${info.name} (phone)`,
       opensAt: info.opens_at,
       closesAt: info.closes_at,
+      meta: { booking_id: info.booking_id, slot_id: info.slot_id, slot_ends_at: info.ends_at },
     });
   } catch {
     join = null;
@@ -64,7 +78,7 @@ export default async function PhoneCameraPage({ searchParams }: { searchParams: 
         {info.name} · {slotRange(info.starts_at, info.ends_at)} IST
       </p>
       {join ? (
-        <PhoneCamera serverUrl={join.serverUrl} token={join.token} />
+        <PhoneCamera serverUrl={join.serverUrl} token={join.token} opensAt={info.opens_at} closesAt={info.closes_at} serverNow={info.now} />
       ) : (
         <CutCard className="mt-6 h-auto">
           <p className="text-sm text-ink">Could not open the camera link. Please scan the QR code again in a moment.</p>

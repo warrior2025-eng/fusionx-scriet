@@ -439,6 +439,59 @@ export async function removeReviewer(cycleId: string, teamId: string, userId: st
   return ok("Reviewer removed.");
 }
 
+// ── interview reviewers (all hubs) ─────────────────────────────────────
+// One list per cycle (migration 0024); the database keeps each person on
+// every hub's reviewer list, so /review and the interview room work as for
+// any hub reviewer. The database functions write the audit entries.
+const emailList = z.array(z.string().max(320)).min(1, "Add at least one email").max(200, "Add at most 200 emails at a time");
+
+export async function addCycleReviewers(cycleId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
+  const ctx = await authorize("recruitment");
+  if (!ctx) return FORBIDDEN;
+  if (!uuid.safeParse(cycleId).success) return fail("Recruitment not found.");
+  const parsed = emailList.safeParse(lines(text(formData, "emails").replace(/\s+/g, "\n")));
+  if (!parsed.success) return fail("Please fix the highlighted fields.", { emails: parsed.error.issues[0]?.message ?? "Check the emails" });
+  const { data, error } = await ctx.supabase.rpc("add_cycle_reviewers", { p_cycle: cycleId, p_emails: parsed.data });
+  if (error) return fail(friendlyDbError(error.message, "Could not add the reviewers. Has migration 0024 been run?"));
+  const rows = (data ?? []) as { email: string; result: "added" | "already" | "invited" | "deactivated" | "invalid" }[];
+  const count = (r: string) => rows.filter((x) => x.result === r).length;
+  const invalid = rows.filter((x) => x.result === "invalid").map((x) => x.email);
+  const deactivated = rows.filter((x) => x.result === "deactivated").map((x) => x.email);
+  const parts = [
+    `${count("added")} added`,
+    count("already") && `${count("already")} already a reviewer`,
+    count("invited") && `${count("invited")} invited (gets access on sign-up with this email)`,
+    deactivated.length && `${deactivated.length} deactivated account${deactivated.length === 1 ? "" : "s"}: ${deactivated.join(", ")}`,
+    invalid.length && `${invalid.length} invalid: ${invalid.join(", ")}`,
+  ].filter(Boolean);
+  deliverEmailsAfterResponse();
+  revalidatePath(`/admin/recruitment/${cycleId}`, "layout");
+  revalidatePath("/review");
+  return ok(`${parts.join(", ")}.`);
+}
+
+export async function removeCycleReviewer(cycleId: string, userId: string): Promise<ActionState> {
+  const ctx = await authorize("recruitment");
+  if (!ctx) return FORBIDDEN;
+  if (!uuid.safeParse(cycleId).success || !uuid.safeParse(userId).success) return fail("Reviewer not found.");
+  const { error } = await ctx.supabase.rpc("remove_cycle_reviewer", { p_cycle: cycleId, p_user: userId });
+  if (error) return fail(friendlyDbError(error.message, "Could not remove this reviewer."));
+  revalidatePath(`/admin/recruitment/${cycleId}`, "layout");
+  revalidatePath("/review");
+  return ok("Reviewer removed from every hub. Their scores and notes stay.");
+}
+
+export async function cancelCycleReviewerInvite(cycleId: string, email: string): Promise<ActionState> {
+  const ctx = await authorize("recruitment");
+  if (!ctx) return FORBIDDEN;
+  const parsed = z.email().safeParse(email);
+  if (!uuid.safeParse(cycleId).success || !parsed.success) return fail("Invite not found.");
+  const { error } = await ctx.supabase.rpc("remove_cycle_reviewer_invite", { p_cycle: cycleId, p_email: parsed.data });
+  if (error) return fail(friendlyDbError(error.message, "Could not cancel the invite."));
+  revalidatePath(`/admin/recruitment/${cycleId}`, "layout");
+  return ok("Invite cancelled.");
+}
+
 // ── applications ───────────────────────────────────────────────────────
 /** Moves the ticked applications to one stage for one team. Each move is logged by the database function. */
 export async function bulkStage(cycleId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {

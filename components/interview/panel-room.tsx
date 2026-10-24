@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Eye, EyeOff, Smartphone, Video } from "lucide-react";
 import { hideQuestion, joinAsPanel, revealQuestion, revealedIds, slotEvents } from "@/actions/interview-panel";
 import { ActionButton } from "@/components/admin/action-button";
+import { useDayPresence } from "@/components/interview/day-room";
 import { LiveKitStage } from "@/components/interview/livekit-stage";
 import { Pill } from "@/components/admin/ui";
 import { Button } from "@/components/ui/button";
@@ -75,6 +76,9 @@ function Summary({ events }: { events: IntegrityEvent[] }) {
  * sidebar per candidate, each candidate's summary and scoring (rendered on
  * the server, passed in as `details`), and, for admins, the question bank.
  * Signals are for the panel's judgement: they show what happened, not why.
+ *
+ * `dayMode`: the sidebar of the day room (the call is the day's, in
+ * DayRoomShell); who is in the room comes from there.
  */
 export function PanelRoom({
   slotId,
@@ -86,6 +90,8 @@ export function PanelRoom({
   initialRevealed,
   phoneSetting,
   roomEnabled,
+  dayMode = false,
+  slotStartsAt,
 }: {
   slotId: string;
   role: "admin" | "reviewer";
@@ -96,7 +102,10 @@ export function PanelRoom({
   initialRevealed: string[];
   phoneSetting: PhoneCameraSetting;
   roomEnabled: boolean;
+  dayMode?: boolean;
+  slotStartsAt?: string;
 }) {
+  const day = useDayPresence();
   const events = useSlotEvents(slotId, initialEvents);
   const [selected, setSelected] = useState(people[0]?.booking_id ?? "");
   const [joined, setJoined] = useState<"idle" | "joining" | "joined">("idle");
@@ -121,6 +130,7 @@ export function PanelRoom({
 
   /** Phone camera: live from the call when the panel is in it, otherwise the last join/leave event. */
   const phoneOn = (bookingId: string) => {
+    if (dayMode && day) return day.present.has(phoneUserId(bookingId));
     if (joined === "joined") return present.has(phoneUserId(bookingId));
     const last = [...(byPerson[bookingId] ?? [])].reverse().find((e) => e.type === "phone_camera_joined" || e.type === "phone_camera_left");
     return last?.type === "phone_camera_joined";
@@ -152,9 +162,19 @@ export function PanelRoom({
   const person = people.find((p) => p.booking_id === selected);
   const mine = byPerson[selected] ?? [];
 
+  /** Day room: in the room now, left, or not joined yet (highlighted from 5 minutes into the slot, to mark a no-show). */
+  const roomState = (p: PanelPerson): { label: string; tone: "good" | "neutral" | "bad" } | null => {
+    if (!dayMode || !day) return null;
+    if (day.present.has(p.booking_id)) return { label: "In the room", tone: "good" };
+    if (day.seen.has(p.booking_id)) return { label: "Left the room", tone: "neutral" };
+    const late = slotStartsAt && day.now !== null && day.now > new Date(slotStartsAt).getTime() + 5 * 60_000;
+    return late && p.status === "booked" ? { label: "Not joined yet", tone: "bad" } : { label: "Not in the room yet", tone: "neutral" };
+  };
+
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_26rem]">
-      <div className="min-w-0 space-y-4">
+    <div className={cn("grid gap-6", !dayMode && "xl:grid-cols-[minmax(0,1fr)_26rem]")}>
+      <div className={cn("min-w-0 space-y-4", dayMode && "order-last")}>
+        {!dayMode && (
         <div className="relative aspect-video w-full bg-black">
           {conn && (
             <div className="absolute inset-0">
@@ -186,6 +206,7 @@ export function PanelRoom({
             </div>
           )}
         </div>
+        )}
 
         {role === "admin" && bank.length > 0 && (
           <section aria-labelledby="bank-title" className="border border-line bg-surface p-5">
@@ -236,6 +257,7 @@ export function PanelRoom({
         <div className="flex flex-wrap gap-2" role="tablist" aria-label="Candidates in this slot">
           {people.map((p) => {
             const flags = (byPerson[p.booking_id] ?? []).filter((e) => FLAG_TYPES.includes(e.type as IntegrityType)).length;
+            const missing = roomState(p)?.tone === "bad";
             return (
               <button
                 key={p.booking_id}
@@ -246,10 +268,12 @@ export function PanelRoom({
                 className={cn(
                   "border px-3 py-1.5 text-left text-sm",
                   p.booking_id === selected ? "border-accent bg-accent text-white" : "border-ink/25 text-ink hover:border-ink/60",
+                  missing && p.booking_id !== selected && "border-dashed border-accent",
                 )}
               >
                 {p.name}
                 {flags > 0 && <span className="ml-1.5 tabular-nums">({flags})</span>}
+                {missing && <span className="ml-1.5 text-xs">· not joined</span>}
               </button>
             );
           })}
@@ -264,7 +288,11 @@ export function PanelRoom({
                 <Pill tone={person.status === "attended" ? "good" : person.status === "no_show" ? "bad" : "neutral"}>
                   {person.status === "attended" ? "Attended" : person.status === "no_show" ? "No-show" : "Booked"}
                 </Pill>
-                {person.consented_at ? <Pill tone="good">Agreed to the rules {slotTime(person.consented_at)}</Pill> : <Pill tone="warn">Not joined yet</Pill>}
+                {person.consented_at ? <Pill tone="good">Agreed to the rules {slotTime(person.consented_at)}</Pill> : !dayMode && <Pill tone="warn">Not joined yet</Pill>}
+                {(() => {
+                  const s = roomState(person);
+                  return s && <Pill tone={s.tone}>{s.label}</Pill>;
+                })()}
                 {phoneSetting !== "off" &&
                   (phoneOn(person.booking_id) ? (
                     <Pill tone="good">

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { CandidateRoom } from "@/components/interview/candidate-room";
-import { ResultsCountdown } from "@/components/recruitment/results-countdown";
+import { RoomCountdown } from "@/components/interview/room-countdown";
 import { LinkButton } from "@/components/ui/button";
 import { CutCard } from "@/components/ui/cut-card";
 import { Eyebrow } from "@/components/ui/eyebrow";
@@ -17,6 +17,9 @@ export const metadata: Metadata = { title: "Interview room", robots: { index: fa
  * The FusionX Interview Room, for a candidate. The database decides (from its
  * own clock) whether they may be here: a live booking, on a day switched to
  * the in-website room, inside the window. Everyone else is sent the right way.
+ * On the interview date a candidate who comes early gets the room page in its
+ * waiting state (device check, rules, phone QR, then a countdown); before the
+ * date, only the date and a countdown.
  */
 export default async function InterviewRoomPage() {
   const supabase = await createClient();
@@ -47,16 +50,17 @@ export default async function InterviewRoomPage() {
       <Eyebrow>Recruitment</Eyebrow>
       <h1 className="font-serif text-3xl tracking-tight text-ink md:text-4xl">Interview room</h1>
       <div className="mt-8">
-        {access.state === "open" ? (
+        {access.state === "open" || (access.state === "too_early" && access.today) ? (
           <CandidateRoom access={access} />
         ) : access.state === "too_early" ? (
           <CutCard className="h-auto">
-            <p className="font-medium text-ink">Your interview room opens soon</p>
-            <p className="mt-2 text-sm text-ink/75">
-              {dayLabel(access.day)}, {slotRange(access.starts_at, access.ends_at)} IST. You can join from{" "}
-              {slotTime(access.opens_at)}. This page opens the room by itself.
+            <p className="font-medium text-ink">
+              Your interview room opens on {dayLabel(access.day)} at {slotTime(access.opens_at)}
             </p>
-            <ResultsCountdown until={access.opens_at} className="mt-5" />
+            <p className="mt-2 text-sm text-ink/75">
+              Your slot: {slotRange(access.starts_at, access.ends_at)} IST. Come back to this page on the day; it opens the room by itself.
+            </p>
+            <RoomCountdown until={access.opens_at} serverNow={access.now} className="mt-5" />
           </CutCard>
         ) : access.state === "ended" ? (
           message("Your slot has ended", "The interview room for your slot has closed. Missed interviews cannot be rescheduled.", back)

@@ -1,10 +1,13 @@
 import Link from "next/link";
+import { Video } from "lucide-react";
 import { Panel, Pill } from "@/components/admin/ui";
 import { slotPhase } from "@/lib/interview/shared";
 import { dayLabel, slotRange } from "@/lib/recruitment/slots";
 
 export type ListSlot = {
   id: string;
+  /** The day (its one room, migration 0024). */
+  day_id?: string;
   day: string;
   starts_at: string;
   ends_at: string;
@@ -16,7 +19,7 @@ const PHASE = { upcoming: "Upcoming", live: "Live", done: "Done" } as const;
 const PHASE_TONE = { upcoming: "neutral", live: "good", done: "neutral" } as const;
 const STATUS = { booked: "Booked", attended: "Attended", no_show: "No-show" } as const;
 
-/** Interview slots by date, with each slot's candidates, for the panel to pick one. */
+/** Interview slots by date, with each slot's candidates, for the panel to pick one. A room day leads to its one room. */
 export function SlotList({ slots, base }: { slots: ListSlot[]; base: string }) {
   if (slots.length === 0) return <Panel title="No interviews">{<p className="text-sm text-ink/70">No booked interview slots yet.</p>}</Panel>;
   const days = [...new Set(slots.map((s) => s.day))].sort();
@@ -24,6 +27,19 @@ export function SlotList({ slots, base }: { slots: ListSlot[]; base: string }) {
     <div className="space-y-6">
       {days.map((day) => (
         <Panel key={day} title={dayLabel(day, "long")}>
+          {(() => {
+            const room = slots.find((s) => s.day === day && s.room && s.day_id);
+            return (
+              room && (
+                <Link
+                  href={`${base}/day/${room.day_id}`}
+                  className="mb-4 inline-flex items-center gap-2 border border-accent bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                >
+                  <Video size={16} aria-hidden /> Open the interview room (whole day)
+                </Link>
+              )
+            );
+          })()}
           <ul className="divide-y divide-line">
             {slots
               .filter((s) => s.day === day)

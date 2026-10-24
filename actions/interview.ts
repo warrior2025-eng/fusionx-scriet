@@ -2,8 +2,10 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { z } from "zod";
-import { accessToken } from "@/lib/interview/livekit";
+import { cleanUpDayRoom } from "@/lib/interview/day-room";
+import { accessToken, roomNameForDay } from "@/lib/interview/livekit";
 import { EVENT_TYPES, type RevealedQuestion } from "@/lib/interview/shared";
 import { qrSvgPath } from "@/lib/events/qr";
 import { friendlyDbError } from "@/lib/recruitment/data";
@@ -12,8 +14,8 @@ import { createClient } from "@/lib/supabase/server";
 /**
  * The candidate's side of the FusionX Interview Room. Every call goes through
  * a database function that checks the booking is the caller's own, live, and
- * inside its time window (migration 0023); the LiveKit API secret stays here
- * on the server.
+ * inside its time window (migrations 0023 and 0024); the LiveKit API secret
+ * stays here on the server.
  */
 
 const uuid = z.string().uuid();
@@ -38,16 +40,38 @@ export async function giveConsent(bookingId: string): Promise<Result<object>> {
   return { ok: true };
 }
 
-/** The video server and the candidate's own short-lived token. */
+/**
+ * The video server and the candidate's own short-lived token for the day's
+ * room: valid from their slot's join time until it ends, refused outside it.
+ * Each join also runs the day room's clean-up once (after the response), so
+ * the previous slot's candidates are gone even if no panel screen is open.
+ */
 export async function joinInterview(bookingId: string): Promise<Result<{ serverUrl: string; token: string }>> {
   if (!uuid.safeParse(bookingId).success) return { ok: false, message: "Interview not found." };
   const { supabase, user } = await signedIn();
   if (!user) return { ok: false, message: "Please sign in." };
   const { data, error } = await supabase.rpc("interview_join_info", { p_booking: bookingId });
   if (error || !data) return { ok: false, message: friendlyDbError(error?.message ?? "", "You can't join this interview.") };
-  const info = data as { slot_id: string; opens_at: string; closes_at: string; name: string };
+  const info = data as { slot_id: string; day_id?: string; ends_at: string; opens_at: string; closes_at: string; name: string };
+  if (!info.day_id) return { ok: false, message: "The interview room is being updated (database migration 0024). Please wait for the panel." };
+  const dayId = info.day_id;
   try {
-    const { serverUrl, token } = accessToken({ slotId: info.slot_id, kind: "candidate", identity: bookingId, name: info.name, opensAt: info.opens_at, closesAt: info.closes_at });
+    const { serverUrl, token } = accessToken({
+      room: roomNameForDay(dayId),
+      kind: "candidate",
+      identity: bookingId,
+      name: info.name,
+      opensAt: info.opens_at,
+      closesAt: info.closes_at,
+      meta: { booking_id: bookingId, slot_id: info.slot_id, slot_ends_at: info.ends_at },
+    });
+    after(async () => {
+      try {
+        await cleanUpDayRoom(await createClient(), dayId);
+      } catch (e) {
+        console.error("day room clean-up failed:", e instanceof Error ? e.message : e);
+      }
+    });
     return { ok: true, serverUrl, token };
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Could not open the interview room." };
