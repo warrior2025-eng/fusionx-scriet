@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { Camera, CheckCircle2, ChevronDown, ChevronUp, Clock, Copy, Maximize, Mic, RefreshCw, Smartphone, SwitchCamera, TriangleAlert } from "lucide-react";
 import { giveConsent, joinInterview, myInterviewQuestions, myRemoval, phoneCameraLink, roomStillOn } from "@/actions/interview";
 import { Checklist } from "@/components/interview/checklist";
+import { ReminderBanner } from "@/components/interview/reminder-banner";
 import { DEVICE_KEYS, LiveKitStage, type DeviceErrorKind, type StageControls } from "@/components/interview/livekit-stage";
 import { useIntegrity } from "@/components/interview/use-integrity";
 import { countdownText, useServerClock } from "@/components/interview/use-server-clock";
@@ -731,6 +732,7 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
           )}
           {step === "ready" && !ended && waiting && (
             <>
+              <ReminderBanner startsAt={access.starts_at} serverNow={access.now} minutes={rules.reminder_minutes ?? 5} />
               <CutCard className="h-auto">
                 <h2 className="flex items-center gap-2 font-serif text-xl text-ink">
                   <Clock size={18} aria-hidden /> Waiting room

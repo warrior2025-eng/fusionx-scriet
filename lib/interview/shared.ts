@@ -147,6 +147,7 @@ export const DEFAULT_RULES: RoomRules = {
 
 /** What candidates are told before the interview (a day can change it in its settings). */
 export const DEFAULT_CHECKLIST = `Before your interview:
+- Your interview takes place on the FusionX@SCRIET website (in-website interview room), not on Google Meet.
 - Open the interview link in Chrome or Safari, not inside WhatsApp or Instagram.
 - A laptop is best; a phone also works.
 - Charge your device, use Wi-Fi, and keep your phone on a stand.

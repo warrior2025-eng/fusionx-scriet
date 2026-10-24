@@ -10,6 +10,11 @@ import { bookingOf, cleanUpDayRoom } from "@/lib/interview/day-room";
 import { accessToken, listParticipants, roomConfigured, roomNameForDay } from "@/lib/interview/livekit";
 import { DEFAULT_CHECKLIST, type DayAccess, type IntegrityEvent } from "@/lib/interview/shared";
 import { friendlyDbError } from "@/lib/recruitment/data";
+import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
+
+// The panel screens are open all interview day: each one also sends the due reminders and their emails
+// (at most every 30 seconds per server), in case the pg_cron job is not set up.
+let lastReminderRun = 0;
 
 /**
  * The interview panel: admins ("recruitment"), and a hub's reviewers for the
@@ -106,6 +111,12 @@ export type DayRoomNow = { panel: number; candidates: number; phones: number; re
 export async function enforceDayRoom(dayId: string): Promise<Result<DayRoomNow>> {
   const p = await dayPanel(dayId);
   if (!p) return { ok: false, message: "You don't have permission to do this." };
+  if (Date.now() - lastReminderRun > 30_000 && p.ctx.caps.includes("recruitment")) {
+    lastReminderRun = Date.now();
+    await p.ctx.supabase.rpc("send_interview_reminders");
+    // Also the emails of reminders the pg_cron job wrote (sent after the response; nothing to do when none wait).
+    deliverEmailsAfterResponse();
+  }
   try {
     const r = await cleanUpDayRoom(p.ctx.supabase, dayId);
     return {
