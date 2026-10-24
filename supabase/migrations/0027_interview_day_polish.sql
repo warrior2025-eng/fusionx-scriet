@@ -86,7 +86,7 @@ returns table (leaves integer, seconds numeric) language sql security definer st
   select
     -- a "leave" that ends in leaving the room within 10 seconds is the page closing
     (select count(*)::integer from ev
-     where type = 'left_screen' and not (next_type = 'left_room' and next_at <= occurred_at + interval '10 seconds')),
+     where type = 'left_screen' and not coalesce(next_type = 'left_room' and next_at <= occurred_at + interval '10 seconds', false)),
     coalesce((select sum(least(600, greatest(0, (detail ->> 'seconds')::numeric))) from ev
               where type = 'returned_screen' and jsonb_typeof(detail -> 'seconds') = 'number'), 0)
     -- an absence still going on, only while it is the last thing that happened (not after leaving the room)

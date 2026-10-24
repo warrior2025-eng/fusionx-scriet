@@ -65,6 +65,12 @@ begin
   select * into r from recruitment_screen_leaves(bk[4], now() - interval '1 hour');
   if r.leaves <> 1 or r.seconds <> 10 then raise exception 'FAIL closing the tab counted as away: %', r; end if;
   raise notice 'ok   closing the tab (leave then left the room) is not counted; the open absence stops: 1 leave, 10 s';
+  -- A leave that is the last thing that happened is counted (and its time runs).
+  perform log_interview_events(bk[4], jsonb_build_array(jsonb_build_object('type', 'rejoined', 'at', now() - interval '20 seconds'),
+    jsonb_build_object('type', 'left_screen', 'at', now() - interval '15 seconds')));
+  select * into r from recruitment_screen_leaves(bk[4], now() - interval '1 hour');
+  if r.leaves <> 2 or r.seconds < 24 then raise exception 'FAIL an open leave as the last event: %', r; end if;
+  raise notice 'ok   a leave still going on is counted, with its time so far (2 leaves, % s)', round(r.seconds);
   perform log_interview_events(bk[4], jsonb_build_array(
     jsonb_build_object('type', 'device_error', 'detail', jsonb_build_object('kind', 'permission_denied', 'device', 'camera')),
     jsonb_build_object('type', 'devices_fixed')));
