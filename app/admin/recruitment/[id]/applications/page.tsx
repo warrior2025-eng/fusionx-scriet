@@ -131,7 +131,13 @@ export default async function CycleApplicationsPage({ params, searchParams }: { 
         </Table>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <SelectField name="bulk_team" label="For team" defaultValue={filters.team} options={[{ value: "", label: "Choose a team" }, ...teams.map((t) => ({ value: t.id, label: t.name }))]} />
+          {/* A stage always belongs to one team: no empty choice. The team in the filter, else the first. */}
+          <SelectField
+            name="bulk_team"
+            label="For team"
+            defaultValue={teams.some((t) => t.id === filters.team) ? filters.team : (teams[0]?.id ?? "")}
+            options={teams.map((t) => ({ value: t.id, label: t.name }))}
+          />
           <SelectField
             name="bulk_stage"
             label="Move to stage"
