@@ -287,7 +287,8 @@ export async function saveRoomSettings(cycleId: string, dayId: string, _prev: Ac
       auto_remove: formData.get("auto_remove") === "on",
       auto_remove_leaves: text("auto_remove_leaves") || "3",
       auto_remove_seconds: text("auto_remove_seconds") || "30",
-      candidate_checklist: text("candidate_checklist"),
+      // Browsers send textarea lines as CR LF; the default text uses LF.
+      candidate_checklist: text("candidate_checklist").replace(/\r\n?/g, "\n"),
     });
     if (!rules.success) return fail("Please fix the highlighted fields.", zodFieldErrors(rules.error));
     const r = rules.data;

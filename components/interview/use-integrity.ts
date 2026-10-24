@@ -70,9 +70,20 @@ export function useIntegrity(
     let away: { since: number; cause: string; logged: boolean; prompt: boolean } | null = null;
     let times = 0;
     let pending = 0;
+    // Leaving fullscreen counts only after the candidate has been in it (joining by itself from the
+    // waiting room cannot enter fullscreen; the page asks them to tap "Return to fullscreen").
+    let wasFullscreen = Boolean(fullscreenElement());
 
-    const awayNow = () =>
-      document.hidden ? "tab or app switched" : !document.hasFocus() ? "window lost focus" : strictFullscreen && !fullscreenElement() ? "left fullscreen" : null;
+    const awayNow = () => {
+      if (fullscreenElement()) wasFullscreen = true;
+      return document.hidden
+        ? "tab or app switched"
+        : !document.hasFocus()
+          ? "window lost focus"
+          : strictFullscreen && wasFullscreen && !fullscreenElement()
+            ? "left fullscreen"
+            : null;
+    };
 
     const start = (state: NonNullable<typeof away>) => {
       if (state.logged) return;
