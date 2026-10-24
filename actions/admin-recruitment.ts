@@ -501,7 +501,7 @@ export async function bulkStage(cycleId: string, _prev: ActionState, formData: F
   const team = text(formData, "bulk_team");
   const stage = z.enum(STAGES as [string, ...string[]]).safeParse(text(formData, "bulk_stage"));
   if (ids.length === 0) return fail("Tick at least one application.");
-  if (!uuid.safeParse(team).success) return fail("Please fix the highlighted fields.", { bulk_team: "Choose the team" });
+  if (!uuid.safeParse(team).success) return fail("First choose a team in the Team filter above, then tick the applications.");
   if (!stage.success) return fail("Please fix the highlighted fields.", { bulk_stage: "Choose the stage" });
   if (stage.data === "interview") return fail("Schedule interviews one by one, so each has its time and place.");
 
