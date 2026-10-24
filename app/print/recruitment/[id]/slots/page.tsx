@@ -36,6 +36,8 @@ export default async function PrintSlotsPage({ params, searchParams }: { params:
     <main className="print-sheet mx-auto w-full max-w-[210mm] bg-white px-6 py-8 text-black">
       <style>{`
         @page { size: A4 portrait; margin: 12mm; }
+        /* White paper in both themes (the site's dark scrim on <main> must not cover it). */
+        .print-sheet { background: #fff !important; }
         .print-sheet, .print-sheet * { color: #000 !important; border-color: #555 !important; }
         .print-sheet table { width: 100%; border-collapse: collapse; font-size: 11px; }
         .print-sheet th, .print-sheet td { border: 1px solid #555; padding: 4px 6px; text-align: left; vertical-align: top; }

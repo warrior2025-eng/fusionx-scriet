@@ -659,4 +659,20 @@ a:hover > .arrow-nudge {
   body {
     background: #ffffff !important;
   }
+  /* Paper is white: print (and "Save as PDF") always uses the light colours,
+     whatever theme is on screen, so dark-theme text never prints white on white. */
+  :root,
+  .on-navy {
+    --color-paper: #ffffff;
+    --color-surface: #ffffff;
+    --color-ink: #0a1230;
+    --color-accent-soft: #e3ebff;
+    --color-accent-text: #004df6;
+    --color-line: rgba(10, 18, 48, 0.25);
+    color-scheme: light;
+  }
+  .on-navy,
+  .particle-field ~ main {
+    background: #ffffff !important;
+  }
 }
