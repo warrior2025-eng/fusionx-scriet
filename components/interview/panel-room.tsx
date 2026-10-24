@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Eye, EyeOff, Smartphone, Video } from "lucide-react";
-import { hideQuestion, joinAsPanel, revealQuestion, revealedIds, slotEvents } from "@/actions/interview-panel";
+import { hideQuestion, joinAsPanel, removeFromRoom, revealQuestion, revealedIds, slotEvents } from "@/actions/interview-panel";
 import { ActionButton } from "@/components/admin/action-button";
 import { useDayPresence } from "@/components/interview/day-room";
 import { LiveKitStage } from "@/components/interview/livekit-stage";
@@ -72,6 +72,78 @@ function Summary({ events }: { events: IntegrityEvent[] }) {
 }
 
 /**
+ * From a candidate's events: the device they joined on, whether they are away
+ * from the interview screen right now, how often and how long they left, and
+ * whether they were removed.
+ */
+function screenState(events: IntegrityEvent[], now: number) {
+  let device: Record<string, unknown> | null = null;
+  let away: IntegrityEvent | null = null;
+  let leaves = 0;
+  let seconds = 0;
+  let removed: string | null = null;
+  for (const e of events) {
+    if (e.type === "device_info") device = e.detail;
+    if (e.type === "left_screen") {
+      leaves += 1;
+      away = e;
+    }
+    if (e.type === "returned_screen") {
+      away = null;
+      seconds += Math.max(0, Number(e.detail?.seconds ?? 0));
+    }
+    if (e.type === "removed_left_screen") removed = "Removed for leaving the interview screen";
+    if (e.type === "removed_by_panel") removed = `Removed by the panel${e.detail?.reason ? `: ${String(e.detail.reason)}` : ""}`;
+  }
+  const awayFor = away ? Math.max(0, Math.round((now - new Date(away.occurred_at).getTime()) / 1000)) : 0;
+  return { device, away, awayFor, leaves, seconds: Math.round(seconds + awayFor), removed };
+}
+
+const nth = (n: number) => (n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`);
+
+/** The panel takes a candidate out of the room for the rest of their slot, with a reason (logged). */
+function RemoveFromRoom({ bookingId, name }: { bookingId: string; name: string }) {
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  return (
+    <details className="mt-4 border-t border-line pt-3">
+      <summary className="cursor-pointer text-sm font-medium text-ink">Remove from the room…</summary>
+      <label className="mt-3 block text-sm text-ink" htmlFor={`reason-${bookingId}`}>
+        Reason (shown in the timeline and the audit log)
+      </label>
+      <input
+        id={`reason-${bookingId}`}
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        maxLength={300}
+        className="mt-1 w-full border border-line bg-paper px-3 py-2 text-sm text-ink"
+      />
+      <Button
+        className="mt-3"
+        variant="secondary"
+        size="sm"
+        disabled={busy || reason.trim().length < 3}
+        onClick={async () => {
+          if (!window.confirm(`Remove ${name} from the room? They cannot rejoin this slot.`)) return;
+          setBusy(true);
+          const res = await removeFromRoom(bookingId, reason);
+          setBusy(false);
+          setMessage(res.message);
+        }}
+      >
+        Remove {name}
+      </Button>
+      {message && (
+        <p className="mt-2 text-sm text-ink" role="status">
+          {message}
+        </p>
+      )}
+    </details>
+  );
+}
+
+/**
  * The interview panel for one slot: the call (owner token), a live integrity
  * sidebar per candidate, each candidate's summary and scoring (rendered on
  * the server, passed in as `details`), and, for admins, the question bank.
@@ -113,6 +185,17 @@ export function PanelRoom({
   const [present, setPresent] = useState<Set<string>>(new Set());
   const [revealed, setRevealed] = useState(new Set(initialRevealed));
   const [conn, setConn] = useState<{ serverUrl: string; token: string } | null>(null);
+  // A clock for "away for 12 s" (ticks every second).
+  const [clock, setClock] = useState<number | null>(null);
+  useEffect(() => {
+    const tick = () => setClock(Date.now());
+    const first = window.setTimeout(tick, 0);
+    const timer = window.setInterval(tick, 1000);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(timer);
+    };
+  }, []);
   // Another panel member may reveal or hide too.
   useEffect(() => {
     const timer = window.setInterval(async () => {
@@ -161,6 +244,7 @@ export function PanelRoom({
 
   const person = people.find((p) => p.booking_id === selected);
   const mine = byPerson[selected] ?? [];
+  const screen = screenState(mine, clock ?? 0);
 
   /** Day room: in the room now, left, or not joined yet (highlighted from 5 minutes into the slot, to mark a no-show). */
   const roomState = (p: PanelPerson): { label: string; tone: "good" | "neutral" | "bad" } | null => {
@@ -258,6 +342,7 @@ export function PanelRoom({
           {people.map((p) => {
             const flags = (byPerson[p.booking_id] ?? []).filter((e) => FLAG_TYPES.includes(e.type as IntegrityType)).length;
             const missing = roomState(p)?.tone === "bad";
+            const away = clock !== null && screenState(byPerson[p.booking_id] ?? [], clock).away;
             return (
               <button
                 key={p.booking_id}
@@ -269,11 +354,13 @@ export function PanelRoom({
                   "border px-3 py-1.5 text-left text-sm",
                   p.booking_id === selected ? "border-accent bg-accent text-white" : "border-ink/25 text-ink hover:border-ink/60",
                   missing && p.booking_id !== selected && "border-dashed border-accent",
+                  away && "border-red-500 bg-red-500/15 text-ink",
                 )}
               >
                 {p.name}
                 {flags > 0 && <span className="ml-1.5 tabular-nums">({flags})</span>}
                 {missing && <span className="ml-1.5 text-xs">· not joined</span>}
+                {away && <span className="ml-1.5 text-xs font-semibold">· away</span>}
               </button>
             );
           })}
@@ -284,6 +371,12 @@ export function PanelRoom({
             <div className="border border-line bg-surface p-5">
               <h2 className="font-serif text-lg text-ink">{person.name}</h2>
               <p className="mt-1 text-xs text-ink/70">{person.hubs}</p>
+              {screen.away && (
+                <p role="alert" className="mt-3 border border-red-500/60 bg-red-500/15 px-3 py-2 text-sm font-semibold text-ink">
+                  Left the interview screen · {screen.awayFor}s · {nth(screen.leaves)} time
+                </p>
+              )}
+              {screen.removed && <p className="mt-3 border border-red-500/60 px-3 py-2 text-sm font-semibold text-ink">{screen.removed}</p>}
               <p className="mt-3 flex flex-wrap items-center gap-2 text-sm">
                 <Pill tone={person.status === "attended" ? "good" : person.status === "no_show" ? "bad" : "neutral"}>
                   {person.status === "attended" ? "Attended" : person.status === "no_show" ? "No-show" : "Booked"}
@@ -293,7 +386,16 @@ export function PanelRoom({
                   const s = roomState(person);
                   return s && <Pill tone={s.tone}>{s.label}</Pill>;
                 })()}
+                {screen.device && (
+                  <Pill>
+                    {String(screen.device.device ?? "Device")}
+                    {screen.device.browser ? ` · ${String(screen.device.browser)}` : ""}
+                  </Pill>
+                )}
+                {screen.device && screen.device.fullscreen === false && <Pill tone="warn">Fullscreen not available</Pill>}
+                {phoneSetting !== "off" && screen.device?.phone_camera === false && <Pill tone="neutral">Phone-only: no second camera</Pill>}
                 {phoneSetting !== "off" &&
+                  screen.device?.phone_camera !== false &&
                   (phoneOn(person.booking_id) ? (
                     <Pill tone="good">
                       <Smartphone size={12} aria-hidden /> Phone camera on
@@ -306,6 +408,11 @@ export function PanelRoom({
               </p>
               <h3 className="mt-5 text-sm font-semibold text-ink">Integrity</h3>
               <p className="mb-2 text-xs text-ink/65">Signals to help the panel judge. They show what happened, not why.</p>
+              {screen.leaves > 0 && (
+                <p className="mb-2 text-sm font-medium text-ink">
+                  Time away from the interview screen: {screen.seconds}s in total ({screen.leaves}×)
+                </p>
+              )}
               <Summary events={mine} />
               {mine.length > 0 && (
                 <details className="mt-3">
@@ -322,6 +429,11 @@ export function PanelRoom({
               )}
             </div>
             {details[person.booking_id]}
+            {dayMode && !screen.removed && (
+              <div className="border border-line bg-surface p-4">
+                <RemoveFromRoom key={person.booking_id} bookingId={person.booking_id} name={person.name} />
+              </div>
+            )}
           </div>
         ) : (
           <p className="text-sm text-ink/70">No candidates in this slot.</p>

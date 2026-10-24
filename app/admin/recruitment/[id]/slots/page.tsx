@@ -18,6 +18,7 @@ import {
   setSlotCapacity,
 } from "@/actions/admin-slots";
 import { saveRoomSettings } from "@/actions/interview-panel";
+import { DEFAULT_CHECKLIST } from "@/lib/interview/shared";
 import { RoomStatus } from "@/components/interview/room-status";
 import { ActionButton } from "@/components/admin/action-button";
 import { AdminForm, CheckboxField, SelectField, TextField, TextareaField } from "@/components/admin/admin-form";
@@ -103,7 +104,21 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
   const { data: roomRows, error: roomError } = days.length
     ? await ctx.supabase.from("recruitment_room_settings").select("*").in("day_id", days.map((d) => d.id))
     : { data: [], error: null };
-  type RoomSettings = { day_id: string; room_enabled: boolean; early_join_minutes: number; grace_minutes: number; strict_fullscreen: boolean; phone_camera: string };
+  type RoomSettings = {
+    day_id: string;
+    room_enabled: boolean;
+    early_join_minutes: number;
+    grace_minutes: number;
+    strict_fullscreen: boolean;
+    phone_camera: string;
+    // migration 0025 (absent before it)
+    allow_phones?: boolean;
+    warn_on_leave?: boolean;
+    auto_remove?: boolean;
+    auto_remove_leaves?: number;
+    auto_remove_seconds?: number;
+    candidate_checklist?: string | null;
+  };
   const roomOf = (dayId: string) => ((roomRows ?? []) as RoomSettings[]).find((r) => r.day_id === dayId);
   const today = todayIst();
   const selected = days.find((d) => d.id === param(query, "day")) ?? days.find((d) => d.date >= today) ?? days[0] ?? null;
@@ -336,9 +351,44 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
                       <CheckboxField
                         name="strict_fullscreen"
                         label="Strict fullscreen"
-                        hint="The interview shows only in fullscreen; leaving it is flagged to the panel."
+                        hint="On laptops and Android. Where a device has no fullscreen (iPhone), it is skipped and the panel sees “Fullscreen not available”."
                         defaultChecked={roomOf(selected.id)?.strict_fullscreen ?? true}
                       />
+                      {"allow_phones" in (roomOf(selected.id) ?? { allow_phones: true }) && (
+                        <>
+                          <input type="hidden" name="rules" value="1" />
+                          <CheckboxField
+                            name="allow_phones"
+                            label="Allow candidates to join from phones"
+                            hint="Phones and tablets join with their front camera (no second camera). Off: laptops and desktops only."
+                            defaultChecked={roomOf(selected.id)?.allow_phones ?? true}
+                          />
+                          <CheckboxField
+                            name="warn_on_leave"
+                            label="Warn the candidate after each leave"
+                            hint="When they come back to the interview screen: “Leaving the interview screen is recorded and shown to the panel.” The panel always sees each leave, live."
+                            defaultChecked={roomOf(selected.id)?.warn_on_leave ?? true}
+                          />
+                          <CheckboxField
+                            name="auto_remove"
+                            label="Auto-remove after too many leaves"
+                            hint="Removes the candidate (and their phone camera) from the room for the rest of their slot, with no rejoin, after the number of leaves or the seconds away in total below, whichever comes first."
+                            defaultChecked={roomOf(selected.id)?.auto_remove ?? false}
+                          />
+                          <div className="grid gap-5 sm:grid-cols-2">
+                            <TextField name="auto_remove_leaves" label="Leaves allowed (auto-remove)" type="number" min={1} max={20} defaultValue={String(roomOf(selected.id)?.auto_remove_leaves ?? 3)} />
+                            <TextField name="auto_remove_seconds" label="Seconds away in total (auto-remove)" type="number" min={5} max={600} defaultValue={String(roomOf(selected.id)?.auto_remove_seconds ?? 30)} />
+                          </div>
+                          <TextareaField
+                            name="candidate_checklist"
+                            label="What candidates are told before the interview"
+                            hint="Shown on their status page, the device check and the waiting room. Lines ending in “:” are headings; lines starting with “-” are points."
+                            rows={10}
+                            max={2000}
+                            defaultValue={roomOf(selected.id)?.candidate_checklist || DEFAULT_CHECKLIST}
+                          />
+                        </>
+                      )}
                     </AdminForm>
                     {roomOf(selected.id)?.room_enabled && <RoomStatus dayId={selected.id} />}
                   </>

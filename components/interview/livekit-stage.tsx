@@ -20,18 +20,29 @@ export type StageEvents = {
   onLeft?: (identity: string) => void;
   /** The local camera or microphone was turned off. */
   onLocalOff?: (kind: "camera" | "microphone") => void;
+  /** Back after a network drop (the call reconnected by itself). */
+  onReconnected?: () => void;
 };
 
 // One room all day: small tiles get small video (adaptive stream), unused layers are not sent (dynacast).
-// Keeps the free plan's data transfer low. Fixed object: a new one would make a new room.
+// Keeps the free plan's data transfer low. Fixed objects: a new one would make a new room.
+// The front camera for people, the back camera for the phone that shows the desk.
 const ROOM_OPTIONS: RoomOptions = {
   adaptiveStream: true,
   dynacast: true,
-  videoCaptureDefaults: { resolution: VideoPresets.h540.resolution },
+  videoCaptureDefaults: { resolution: VideoPresets.h540.resolution, facingMode: "user" },
+};
+const PHONE_OPTIONS: RoomOptions = {
+  adaptiveStream: true,
+  dynacast: true,
+  videoCaptureDefaults: { resolution: VideoPresets.h540.resolution, facingMode: "environment" },
 };
 
-/** `onlyLocal`: the phone, and a candidate waiting for their slot to start, see only themselves. */
-function Tiles({ onlyLocal, hidePhones }: { onlyLocal: boolean; hidePhones: boolean }) {
+/**
+ * `onlyLocal`: the phone, and a candidate waiting for their slot to start, see only themselves.
+ * `pip` (candidates): the panel and the others large, their own camera small in a corner.
+ */
+function Tiles({ onlyLocal, hidePhones, pip }: { onlyLocal: boolean; hidePhones: boolean; pip: boolean }) {
   const all = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
@@ -39,17 +50,23 @@ function Tiles({ onlyLocal, hidePhones }: { onlyLocal: boolean; hidePhones: bool
     ],
     { onlySubscribed: false },
   );
-  const tracks = onlyLocal ? all.filter((t) => t.participant.isLocal) : hidePhones ? all.filter((t) => !isPhoneIdentity(t.participant.identity)) : all;
+  const shown = onlyLocal ? all.filter((t) => t.participant.isLocal) : hidePhones ? all.filter((t) => !isPhoneIdentity(t.participant.identity)) : all;
+  const self = pip && !onlyLocal ? shown.find((t) => t.participant.isLocal && t.source === Track.Source.Camera) : undefined;
+  const tracks = self ? shown.filter((t) => t !== self) : shown;
   // Everyone on one screen (no pages): the panel sees the whole slot at once.
   const cols = Math.max(1, Math.ceil(Math.sqrt(tracks.length)));
   return (
-    <div
-      className="grid auto-rows-fr gap-1 overflow-y-auto p-1"
-      style={{ height: "calc(100% - var(--lk-control-bar-height))", gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
-    >
-      <TrackLoop tracks={tracks}>
-        <ParticipantTile />
-      </TrackLoop>
+    <div className="relative" style={{ height: "calc(100% - var(--lk-control-bar-height))" }}>
+      <div className="grid h-full auto-rows-fr gap-1 overflow-y-auto p-1" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+        <TrackLoop tracks={tracks}>
+          <ParticipantTile />
+        </TrackLoop>
+      </div>
+      {self && (
+        <div className="absolute bottom-2 right-2 z-10 aspect-[3/4] w-24 overflow-hidden rounded border border-white/40 shadow-lg sm:w-36" aria-label="Your camera">
+          <ParticipantTile trackRef={self} />
+        </div>
+      )}
     </div>
   );
 }
@@ -57,7 +74,7 @@ function Tiles({ onlyLocal, hidePhones }: { onlyLocal: boolean; hidePhones: bool
 /** Room events, passed up as plain callbacks. */
 function Watcher({ hold, ...events }: StageEvents & { hold: boolean }) {
   const room = useRoomContext();
-  const { onPeople, onJoined, onLeft, onLocalOff } = events;
+  const { onPeople, onJoined, onLeft, onLocalOff, onReconnected } = events;
   useEffect(() => {
     const people = () => onPeople?.([room.localParticipant.identity, ...[...room.remoteParticipants.values()].map((p) => p.identity)]);
     const joined = (p: Participant) => {
@@ -67,6 +84,10 @@ function Watcher({ hold, ...events }: StageEvents & { hold: boolean }) {
     const left = (p: Participant) => {
       onLeft?.(p.identity);
       people();
+    };
+    const back = () => {
+      people();
+      onReconnected?.();
     };
     const muted = (pub: { source?: Track.Source }, p: Participant) => {
       if (!p.isLocal) return;
@@ -79,7 +100,7 @@ function Watcher({ hold, ...events }: StageEvents & { hold: boolean }) {
       .on(RoomEvent.ParticipantDisconnected, left)
       .on(RoomEvent.TrackMuted, muted)
       .on(RoomEvent.Connected, people)
-      .on(RoomEvent.Reconnected, people);
+      .on(RoomEvent.Reconnected, back);
     people();
     return () => {
       room
@@ -87,9 +108,9 @@ function Watcher({ hold, ...events }: StageEvents & { hold: boolean }) {
         .off(RoomEvent.ParticipantDisconnected, left)
         .off(RoomEvent.TrackMuted, muted)
         .off(RoomEvent.Connected, people)
-        .off(RoomEvent.Reconnected, people);
+        .off(RoomEvent.Reconnected, back);
     };
-  }, [room, onPeople, onJoined, onLeft, onLocalOff]);
+  }, [room, onPeople, onJoined, onLeft, onLocalOff, onReconnected]);
 
   // A candidate let in before their slot starts waits with camera and microphone off; at the start both turn on.
   const held = useRef(hold);
@@ -138,7 +159,7 @@ export function LiveKitStage({
       connect
       video={!hold}
       audio={mode !== "phone" && !hold}
-      options={ROOM_OPTIONS}
+      options={mode === "phone" ? PHONE_OPTIONS : ROOM_OPTIONS}
       data-lk-theme="default"
       style={{ height: "100%" }}
       connectOptions={mode === "phone" ? { autoSubscribe: false } : undefined}
@@ -146,7 +167,7 @@ export function LiveKitStage({
       onDisconnected={(reason) => events.onDisconnected?.(reason === DisconnectReason.PARTICIPANT_REMOVED)}
       onError={(e) => events.onError?.(e.message)}
     >
-      <Tiles onlyLocal={quiet} hidePhones={mode === "candidate"} />
+      <Tiles onlyLocal={quiet} hidePhones={mode === "candidate"} pip={mode === "candidate"} />
       {!quiet && <RoomAudioRenderer />}
       <ControlBar controls={{ chat: false, screenShare: mode === "panel", microphone: mode !== "phone", camera: true, leave: true, settings: false }} />
       <Watcher hold={hold} {...events} />

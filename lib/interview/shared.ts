@@ -21,9 +21,19 @@ export const EVENT_TYPES = [
   "rejoined",
   "phone_camera_joined",
   "phone_camera_left",
+  // migration 0025
+  "left_screen",
+  "returned_screen",
+  "permission_prompt",
+  "reconnect",
+  "fullscreen_unsupported",
+  "device_info",
 ] as const;
-/** "removed_slot_ended" is written only by the server (migration 0024): the day room's clean-up removed them when their slot was over. */
-export type IntegrityType = (typeof EVENT_TYPES)[number] | "removed_slot_ended";
+/**
+ * Written only by the server: "removed_slot_ended" (0024, the day room's clean-up at the slot end),
+ * "removed_left_screen" (0025, the day's limit for leaving the screen) and "removed_by_panel" (0025).
+ */
+export type IntegrityType = (typeof EVENT_TYPES)[number] | "removed_slot_ended" | "removed_left_screen" | "removed_by_panel";
 
 /** What the panel sidebar calls each event. Neutral wording: a signal, not a verdict. */
 export const EVENT_LABELS: Record<IntegrityType, string> = {
@@ -44,10 +54,19 @@ export const EVENT_LABELS: Record<IntegrityType, string> = {
   phone_camera_joined: "Phone camera connected",
   phone_camera_left: "Phone camera disconnected",
   removed_slot_ended: "Removed from the room (slot over)",
+  left_screen: "Left the interview screen",
+  returned_screen: "Back on the interview screen",
+  permission_prompt: "Browser permission prompt (not counted)",
+  reconnect: "Reconnected after a network drop (not counted)",
+  fullscreen_unsupported: "Fullscreen not available on this device",
+  device_info: "Joined from",
+  removed_left_screen: "Removed for leaving the interview screen",
+  removed_by_panel: "Removed by the panel",
 };
 
 /** The ones the panel counts as flags (the "back" events are only shown in the timeline). */
 export const FLAG_TYPES: IntegrityType[] = [
+  "left_screen",
   "tab_hidden",
   "window_blur",
   "fullscreen_exit",
@@ -60,6 +79,8 @@ export const FLAG_TYPES: IntegrityType[] = [
   "mic_off",
   "left_room",
   "phone_camera_left",
+  "removed_left_screen",
+  "removed_by_panel",
 ];
 
 export type IntegrityEvent = { id: number; booking_id: string; type: IntegrityType; occurred_at: string; detail: Record<string, unknown> | null };
@@ -83,13 +104,37 @@ export type InterviewWindow = {
   phone_camera: PhoneCameraSetting;
   name: string;
   consented_at: string | null;
+  /** From migration 0025 on: the day's rules, and why they were taken out of this slot (if they were). */
+  rules?: RoomRules;
+  removed_reason?: "left_screen" | "panel" | null;
 };
 
 /** my_interview_access */
 export type InterviewAccess =
   | { state: "signed_out" | "none" | "ended" }
   | { state: "meet" | "offline"; day: string }
-  | (InterviewWindow & { state: "too_early" | "open" | "ended" });
+  | (InterviewWindow & { state: "too_early" | "open" | "ended" | "removed" });
+
+/** A day's rules for candidates (migration 0025; before it, these defaults). */
+export type RoomRules = {
+  allow_phones: boolean;
+  warn_on_leave: boolean;
+  auto_remove: boolean;
+  auto_remove_leaves: number;
+  auto_remove_seconds: number;
+  checklist: string | null;
+};
+export const DEFAULT_RULES: RoomRules = { allow_phones: true, warn_on_leave: true, auto_remove: false, auto_remove_leaves: 3, auto_remove_seconds: 30, checklist: null };
+
+/** What candidates are told before the interview (a day can change it in its settings). */
+export const DEFAULT_CHECKLIST = `Before your interview:
+- Open the interview link in Chrome or Safari, not inside WhatsApp or Instagram.
+- A laptop is best; a phone also works.
+- Charge your device, use Wi-Fi, and keep your phone on a stand.
+- Sign in and allow camera and microphone before your slot.
+During the interview:
+- Don't open any other app or tab. Leaving the interview screen is recorded and shown to the panel immediately.
+- Your slot is 20 minutes. When it ends, you'll leave the room automatically.`;
 
 export type RevealedQuestion = { id: string; body: string; hub: string; revealed_at: string };
 

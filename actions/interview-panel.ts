@@ -8,7 +8,7 @@ import { logAudit } from "@/lib/admin/audit";
 import { authorize, FORBIDDEN, getAdminContext, type AdminContext } from "@/lib/admin/guard";
 import { bookingOf, cleanUpDayRoom } from "@/lib/interview/day-room";
 import { accessToken, listParticipants, roomConfigured, roomNameForDay } from "@/lib/interview/livekit";
-import type { DayAccess, IntegrityEvent } from "@/lib/interview/shared";
+import { DEFAULT_CHECKLIST, type DayAccess, type IntegrityEvent } from "@/lib/interview/shared";
 import { friendlyDbError } from "@/lib/recruitment/data";
 
 /**
@@ -123,6 +123,29 @@ export async function enforceDayRoom(dayId: string): Promise<Result<DayRoomNow>>
   }
 }
 
+/**
+ * The panel takes a candidate (and their phone camera) out of the day room for
+ * the rest of their slot, with a reason; they cannot rejoin. The database
+ * checks the caller is on that day's panel and writes the timeline entry and
+ * the audit log (migration 0025).
+ */
+export async function removeFromRoom(bookingId: string, reason: string): Promise<{ ok: boolean; message: string }> {
+  const parsed = z.object({ booking: uuid, reason: z.string().trim().min(3, "Give a reason").max(300) }).safeParse({ booking: bookingId, reason });
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Give a reason." };
+  const ctx = await getAdminContext();
+  if (!ctx.user) return { ok: false, message: "Please sign in." };
+  const { data: dayId, error } = await ctx.supabase.rpc("panel_remove_candidate", { p_booking: parsed.data.booking, p_reason: parsed.data.reason });
+  if (error || !dayId) return { ok: false, message: friendlyDbError(error?.message ?? "", "Could not remove this candidate. Has migration 0025 been run?") };
+  try {
+    await cleanUpDayRoom(ctx.supabase, String(dayId));
+  } catch {
+    // The next clean-up (within 15 seconds) takes them out.
+  }
+  revalidatePath("/admin/interviews", "layout");
+  revalidatePath("/review/interviews", "layout");
+  return { ok: true, message: "Removed. They cannot rejoin this slot." };
+}
+
 /** Who is in the day room now, and the last clean-up (for the admin's "Room status" box). Reads only. */
 export async function dayRoomStatus(dayId: string): Promise<Result<Omit<DayRoomNow, "removed" | "at" | "present"> & { lastRun: string | null; removedTotal: number }>> {
   const ctx = await authorize("recruitment");
@@ -211,6 +234,16 @@ const settingsSchema = z.object({
   phone_camera: z.enum(["off", "optional", "required"]),
 });
 
+// The day's rules for candidates (migration 0025).
+const rulesSchema = z.object({
+  allow_phones: z.boolean(),
+  warn_on_leave: z.boolean(),
+  auto_remove: z.boolean(),
+  auto_remove_leaves: z.coerce.number({ message: "Enter a number" }).int("A whole number").min(1, "At least 1").max(20, "At most 20"),
+  auto_remove_seconds: z.coerce.number({ message: "Enter a number" }).int("Whole seconds").min(5, "At least 5").max(600, "At most 600"),
+  candidate_checklist: z.string().trim().max(2000, "Keep it under 2000 characters"),
+});
+
 /**
  * Interview mode for a day: Google Meet (default) or the in-website room (one
  * room for the whole day), and the room's settings. Switching on needs the
@@ -246,6 +279,31 @@ export async function saveRoomSettings(cycleId: string, dayId: string, _prev: Ac
   });
   if (error) return fail(friendlyDbError(error.message, "Could not save. Has migration 0023 been run?"));
   const told = (data as { notified?: number } | null)?.notified ?? 0;
+
+  if (formData.has("rules")) {
+    const rules = rulesSchema.safeParse({
+      allow_phones: formData.get("allow_phones") === "on",
+      warn_on_leave: formData.get("warn_on_leave") === "on",
+      auto_remove: formData.get("auto_remove") === "on",
+      auto_remove_leaves: text("auto_remove_leaves") || "3",
+      auto_remove_seconds: text("auto_remove_seconds") || "30",
+      // Browsers send textarea lines as CR LF; the default text uses LF.
+      candidate_checklist: text("candidate_checklist").replace(/\r\n?/g, "\n"),
+    });
+    if (!rules.success) return fail("Please fix the highlighted fields.", zodFieldErrors(rules.error));
+    const r = rules.data;
+    const { error: rulesError } = await ctx.supabase.rpc("set_interview_room_rules", {
+      p_day: dayId,
+      p_allow_phones: r.allow_phones,
+      p_warn: r.warn_on_leave,
+      p_auto: r.auto_remove,
+      p_leaves: r.auto_remove_leaves,
+      p_seconds: r.auto_remove_seconds,
+      // The default text is kept as "no text" so a later change of the default reaches this day too.
+      p_checklist: r.candidate_checklist === DEFAULT_CHECKLIST ? "" : r.candidate_checklist,
+    });
+    if (rulesError) return fail(friendlyDbError(rulesError.message, "The mode was saved, but not the rules for leaving the screen. Has migration 0025 been run?"));
+  }
 
   // LiveKit opens the day's room on the first join; nothing to create here.
   // Back on Google Meet: take the candidates out of the room now (the panel stays).
