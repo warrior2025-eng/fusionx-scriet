@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { X } from "lucide-react";
-import { addCycleReviewers, addReviewer, cancelCycleReviewerInvite, removeCycleReviewer, removeReviewer } from "@/actions/admin-recruitment";
+import { addCycleReviewers, cancelCycleReviewerInvite, removeCycleReviewer, removeReviewer } from "@/actions/admin-recruitment";
 import { ActionButton } from "@/components/admin/action-button";
-import { AdminForm, TextareaField, TextField } from "@/components/admin/admin-form";
+import { AdminForm, TextareaField } from "@/components/admin/admin-form";
 import { CycleTabs } from "@/components/admin/recruitment-parts";
 import { AdminPage, Panel, formatDate } from "@/components/admin/ui";
 import { requireCapability } from "@/lib/admin/guard";
@@ -30,6 +30,8 @@ export default async function CycleReviewersPage({ params }: { params: Promise<{
   ]);
   const cycleReviewers = (cycleRows ?? []) as { user_id: string; created_at: string }[];
   const invites = (inviteRows ?? []) as { email: string; created_at: string }[];
+  const onList = new Set(cycleReviewers.map((r) => r.user_id));
+  const hubOnly = reviewers.filter((r) => !onList.has(r.user_id));
 
   const ids = [...new Set([...reviewers.map((r) => r.user_id), ...cycleReviewers.map((r) => r.user_id)])];
   const { data: people } = ids.length ? await ctx.supabase.from("profiles").select("id, full_name").in("id", ids) : { data: [] };
@@ -120,43 +122,29 @@ export default async function CycleReviewersPage({ params }: { params: Promise<{
           )}
         </Panel>
 
-        <details className="border border-line bg-surface p-5 sm:p-6">
-          <summary className="cursor-pointer font-serif text-lg text-ink">Per-hub reviewers (advanced)</summary>
-          <p className="mt-2 text-sm text-ink/65">A reviewer added here sees only the applications that list that hub. Interview reviewers (above) are on every hub.</p>
-          {teams.length === 0 && <p className="mt-4 text-sm text-ink/65">Add teams first.</p>}
-          <div className="mt-5 space-y-6">
-            {teams.map((team) => {
-              const own = reviewers.filter((r) => r.team_id === team.id);
-              return (
-                <Panel key={team.id} title={team.name}>
-                  {own.length > 0 ? (
-                    <ul className="mb-5 divide-y divide-line border border-line">
-                      {own.map((r) => (
-                        <li key={r.user_id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm text-ink">
-                          {names[r.user_id] ?? "Member"}
-                          <ActionButton
-                            bare
-                            danger
-                            title={`Remove ${names[r.user_id] ?? "this reviewer"}`}
-                            action={removeReviewer.bind(null, id, team.id, r.user_id)}
-                            confirm={{ title: "Remove this reviewer?", body: "They lose access to this team's applications.", confirmLabel: "Remove" }}
-                          >
-                            <X size={15} />
-                          </ActionButton>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="mb-5 text-sm text-ink/65">No reviewers yet.</p>
-                  )}
-                  <AdminForm action={addReviewer.bind(null, id, team.id)} submitLabel="Add reviewer" warnUnsaved={false}>
-                    <TextField name="email" label="Member's email" type="email" autoComplete="off" className="max-w-sm" />
-                  </AdminForm>
-                </Panel>
-              );
-            })}
-          </div>
-        </details>
+        {/* Reviewers added to a single hub earlier (before the one list above): shown so they can be removed. */}
+        {hubOnly.length > 0 && (
+          <Panel title="Added to one hub earlier" description="These people review only the hub named. Add them above to give them every hub, or remove them here.">
+            <ul className="divide-y divide-line border border-line">
+              {hubOnly.map((r) => (
+                <li key={`${r.team_id}-${r.user_id}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm text-ink">
+                  <span>
+                    {names[r.user_id] ?? "Member"} <span className="text-ink/65">· {teams.find((t) => t.id === r.team_id)?.name ?? "Hub"}</span>
+                  </span>
+                  <ActionButton
+                    bare
+                    danger
+                    title={`Remove ${names[r.user_id] ?? "this reviewer"}`}
+                    action={removeReviewer.bind(null, id, r.team_id, r.user_id)}
+                    confirm={{ title: "Remove this reviewer?", body: "They lose access to this hub's applications.", confirmLabel: "Remove" }}
+                  >
+                    <X size={15} />
+                  </ActionButton>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        )}
       </div>
     </AdminPage>
   );
