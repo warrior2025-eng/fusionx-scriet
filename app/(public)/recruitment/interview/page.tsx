@@ -62,6 +62,12 @@ export default async function InterviewRoomPage() {
             </p>
             <RoomCountdown until={access.opens_at} serverNow={access.now} className="mt-5" />
           </CutCard>
+        ) : access.state === "removed" ? (
+          message(
+            access.removed_reason === "panel" ? "The panel removed you from this interview" : "You were removed for leaving the interview screen",
+            "You can't rejoin this slot. The panel has been told and will decide on your application.",
+            back,
+          )
         ) : access.state === "ended" ? (
           message("Your slot has ended", "The interview room for your slot has closed. Missed interviews cannot be rescheduled.", back)
         ) : access.state === "meet" ? (

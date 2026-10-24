@@ -8,6 +8,7 @@ import { fail, ok, zodFieldErrors, type ActionState } from "@/lib/admin/action-s
 import { ALL_ROLES, ROLE_LABELS } from "@/lib/permissions/capabilities";
 import type { AppRole } from "@/types/database";
 import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
+import { getCurrentCycle } from "@/lib/recruitment/data";
 
 const uuid = z.uuid();
 
@@ -79,9 +80,10 @@ export async function deleteMessage(id: string): Promise<ActionState> {
 // ── broadcast ───────────────────────────────────────────────────────────
 
 const broadcastSchema = z.object({
-  audience: z.enum(["all", ...ALL_ROLES] as [string, ...string[]]),
+  // "interview_booked": candidates with a live interview booking in the current recruitment.
+  audience: z.enum(["all", "interview_booked", ...ALL_ROLES] as [string, ...string[]]),
   title: z.string().trim().min(3, "Add a title").max(120, "Keep the title under 120 characters"),
-  body: z.string().trim().min(3, "Write the message").max(600, "Keep the message under 600 characters"),
+  body: z.string().trim().min(3, "Write the message").max(1000, "Keep the message under 1000 characters"),
   link: z
     .string()
     .trim()
@@ -107,7 +109,16 @@ export async function sendBroadcast(_prev: ActionState, formData: FormData): Pro
   if (profilesError || !profiles) return fail("Could not load the recipients.");
   let recipients = profiles.filter((p) => p.is_active !== false).map((p) => p.id as string);
 
-  if (audience !== "all") {
+  if (audience === "interview_booked") {
+    // Bookings are read under the recruitment rules: only admins with "recruitment" see them all.
+    if (!ctx.caps.includes("recruitment")) return fail("Only recruitment admins can message the interview candidates.");
+    const cycle = await getCurrentCycle();
+    if (!cycle) return fail("There is no recruitment right now.");
+    const { data: booked, error } = await ctx.supabase.from("recruitment_slot_bookings").select("user_id").eq("cycle_id", cycle.id).eq("status", "booked");
+    if (error || !booked) return fail("Could not load the recipients.");
+    const has = new Set(booked.map((b) => b.user_id as string));
+    recipients = recipients.filter((id) => has.has(id));
+  } else if (audience !== "all") {
     const { data: holders, error } = await ctx.supabase.from("user_roles").select("user_id").eq("role", audience);
     if (error || !holders) return fail("Could not load the recipients.");
     const has = new Set(holders.map((h) => h.user_id as string));
@@ -125,7 +136,12 @@ export async function sendBroadcast(_prev: ActionState, formData: FormData): Pro
     }
   }
 
-  const label = audience === "all" ? "all members" : `everyone with the ${ROLE_LABELS[audience as AppRole]} role`;
+  const label =
+    audience === "all"
+      ? "all members"
+      : audience === "interview_booked"
+        ? "candidates with an interview booking"
+        : `everyone with the ${ROLE_LABELS[audience as AppRole]} role`;
   await logAudit(ctx, {
     action: "sent_broadcast",
     table: "notifications",

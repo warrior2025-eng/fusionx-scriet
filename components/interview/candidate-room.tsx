@@ -1,14 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Camera, CheckCircle2, Clock, Maximize, Mic, Smartphone, TriangleAlert } from "lucide-react";
-import { giveConsent, joinInterview, myInterviewQuestions, phoneCameraLink, roomStillOn } from "@/actions/interview";
+import { Camera, CheckCircle2, ChevronDown, ChevronUp, Clock, Copy, Maximize, Mic, Smartphone, TriangleAlert } from "lucide-react";
+import { giveConsent, joinInterview, myInterviewQuestions, myRemoval, phoneCameraLink, roomStillOn } from "@/actions/interview";
+import { Checklist } from "@/components/interview/checklist";
 import { LiveKitStage } from "@/components/interview/livekit-stage";
 import { useIntegrity } from "@/components/interview/use-integrity";
 import { countdownText, useServerClock } from "@/components/interview/use-server-clock";
 import { Button, LinkButton } from "@/components/ui/button";
 import { CutCard } from "@/components/ui/cut-card";
-import { phoneUserId, type InterviewWindow, type RevealedQuestion } from "@/lib/interview/shared";
+import { DEVICE_LABEL, enterFullscreen, exitFullscreen, fullscreenElement, onFullscreenChange, readDevice, type DeviceInfo } from "@/lib/interview/device";
+import { DEFAULT_RULES, phoneUserId, type InterviewWindow, type RevealedQuestion } from "@/lib/interview/shared";
 import { slotRange, slotTime } from "@/lib/recruitment/slots";
 import { joinErrorText } from "@/lib/interview/join-error";
 import { createClient } from "@/lib/supabase/client";
@@ -17,30 +19,61 @@ import { cn } from "@/lib/utils";
 type Open = InterviewWindow;
 type Step = "device" | "consent" | "ready" | "room";
 
-/** Laptop or desktop Chrome / Edge only: what the room is tested on, and where the integrity signals work. */
-function deviceProblem(): string | null {
-  const ua = navigator.userAgent;
-  const data = (navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData;
-  const mobile = data?.mobile ?? /Android|iPhone|iPad|iPod|Mobi/i.test(ua);
-  if (mobile) return "Please join from a laptop or desktop computer. Your phone is only used as the second camera (you will get a QR code inside).";
-  const chromium = /Chrome\/\d+/.test(ua) && !/OPR\/|SamsungBrowser|YaBrowser/.test(ua);
-  if (!chromium) return "Please open this page in Google Chrome or Microsoft Edge on your laptop or desktop.";
-  if (!navigator.mediaDevices?.getUserMedia) return "This browser cannot use a camera here. Please update Chrome or Edge.";
-  return null;
+// The device, read once in the browser (null while rendering on the server).
+const noSubscribe = () => () => {};
+let deviceCache: DeviceInfo | null = null;
+const deviceSnapshot = () => (deviceCache ??= readDevice());
+function useDevice(): DeviceInfo | null {
+  return useSyncExternalStore(noSubscribe, deviceSnapshot, () => null);
+}
+
+/** In-app browsers (WhatsApp, Instagram, …) cannot be trusted with the camera: open the link in Chrome or Safari. */
+function OpenInBrowser() {
+  const [copied, setCopied] = useState(false);
+  return (
+    <CutCard className="h-auto">
+      <p className="flex items-center gap-2 font-medium text-ink">
+        <TriangleAlert size={18} aria-hidden /> Open this link in Chrome or Safari
+      </p>
+      <p className="mt-2 text-sm leading-relaxed text-ink/75">
+        This page is open inside another app (like WhatsApp or Instagram), which can&rsquo;t use the camera and microphone for the interview. Copy the
+        link, then open it in Chrome (Android) or Safari (iPhone), or use the app&rsquo;s &ldquo;Open in browser&rdquo; option.
+      </p>
+      <Button
+        className="mt-5"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(window.location.href);
+            setCopied(true);
+          } catch {
+            window.prompt("Copy this link:", window.location.href);
+          }
+        }}
+      >
+        <Copy size={16} aria-hidden /> {copied ? "Link copied" : "Copy link"}
+      </Button>
+    </CutCard>
+  );
+}
+
+/** Why camera access failed, in words for the device in hand. */
+function permissionHelp(device: DeviceInfo | null): string {
+  if (device?.ios)
+    return "Camera or microphone access was blocked. On iPhone or iPad: open Settings → Safari (or Chrome) → Camera and Microphone → Allow, or tap \"aA\" in the address bar → Website Settings → Allow. Then reload this page.";
+  if (device && device.kind !== "laptop")
+    return "Camera or microphone access was blocked. On Android: tap the lock icon in the address bar → Permissions → allow Camera and Microphone, then reload this page.";
+  return "Please allow the camera and microphone for this site (the camera icon in the address bar), then try again.";
 }
 
 /** Camera and microphone test, before joining. Nothing is recorded or sent. */
-const noSubscribe = () => () => {};
-
-function DeviceCheck({ onReady }: { onReady: () => void }) {
+function DeviceCheck({ allowPhones, checklist, onReady }: { allowPhones: boolean; checklist?: string | null; onReady: () => void }) {
   const video = useRef<HTMLVideoElement>(null);
-  // Read from the browser once it is there (null while rendering on the server).
-  const deviceIssue = useSyncExternalStore(noSubscribe, deviceProblem, () => null);
+  const device = useDevice();
   const [permissionIssue, setPermissionIssue] = useState<string | null>(null);
-  const problem = deviceIssue ?? permissionIssue;
   const [level, setLevel] = useState(0);
   const [cameraOk, setCameraOk] = useState(false);
   const [started, setStarted] = useState(false);
+  const mobile = device ? device.kind !== "laptop" : false;
 
   useEffect(() => {
     if (!started) return;
@@ -49,32 +82,45 @@ function DeviceCheck({ onReady }: { onReady: () => void }) {
     let audio: AudioContext | null = null;
     (async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: true });
         if (video.current) video.current.srcObject = stream;
         setCameraOk(stream.getVideoTracks().length > 0);
-        audio = new AudioContext();
-        const analyser = audio.createAnalyser();
-        analyser.fftSize = 256;
-        audio.createMediaStreamSource(stream).connect(analyser);
-        const data = new Uint8Array(analyser.frequencyBinCount);
-        const tick = () => {
-          analyser.getByteFrequencyData(data);
-          setLevel(Math.min(1, data.reduce((a, b) => a + b, 0) / data.length / 60));
-          raf = requestAnimationFrame(tick);
-        };
-        tick();
+        try {
+          audio = new AudioContext();
+          void audio.resume().catch(() => {});
+          const analyser = audio.createAnalyser();
+          analyser.fftSize = 256;
+          audio.createMediaStreamSource(stream).connect(analyser);
+          const data = new Uint8Array(analyser.frequencyBinCount);
+          const tick = () => {
+            analyser.getByteFrequencyData(data);
+            setLevel(Math.min(1, data.reduce((a, b) => a + b, 0) / data.length / 60));
+            raf = requestAnimationFrame(tick);
+          };
+          tick();
+        } catch {
+          // No level meter on this browser; the camera test still counts.
+        }
       } catch {
-        setPermissionIssue("Please allow the camera and microphone for this site (the camera icon in the address bar), then try again.");
+        setPermissionIssue(permissionHelp(deviceSnapshot()));
       }
     })();
     return () => {
       cancelAnimationFrame(raf);
       stream?.getTracks().forEach((t) => t.stop());
-      void audio?.close();
+      void audio?.close().catch(() => {});
     };
   }, [started]);
 
-  if (problem && !started) {
+  if (device?.inApp) return <OpenInBrowser />;
+  const problem = !device
+    ? null
+    : !device.media
+      ? "This browser can't use a camera here. Please open the link in Chrome or Safari (and update it if it is old)."
+      : mobile && !allowPhones
+        ? "Please join from a laptop or desktop computer. Your phone is only used as the second camera (you will get a QR code inside)."
+        : null;
+  if (problem) {
     return (
       <CutCard className="h-auto">
         <p className="flex items-center gap-2 font-medium text-ink">
@@ -85,41 +131,48 @@ function DeviceCheck({ onReady }: { onReady: () => void }) {
     );
   }
   return (
-    <CutCard className="h-auto">
-      <h2 className="font-serif text-xl text-ink">1. Check your camera and microphone</h2>
-      <p className="mt-2 text-sm text-ink/75">Use a laptop or desktop with Chrome or Edge, in a quiet place with good light. Nothing is recorded.</p>
-      {!started ? (
-        <Button className="mt-5" onClick={() => setStarted(true)}>
-          <Camera size={16} aria-hidden /> Test camera and microphone
-        </Button>
-      ) : (
-        <div className="mt-5 grid gap-5 sm:grid-cols-[1fr_14rem] sm:items-start">
-          <video ref={video} autoPlay playsInline muted className="aspect-video w-full bg-black object-cover" aria-label="Your camera preview" />
-          <div className="space-y-4 text-sm">
-            <p className="flex items-center gap-2 text-ink">
-              <Camera size={16} aria-hidden /> Camera: {cameraOk ? "working" : "waiting…"}
-            </p>
-            <div>
+    <div className="space-y-6">
+      <CutCard className="h-auto">
+        <h2 className="font-serif text-xl text-ink">1. Check your camera and microphone</h2>
+        <p className="mt-2 text-sm text-ink/75">
+          {mobile ? "Use your phone's front camera, on a stand, in a quiet place with good light." : "Use a quiet place with good light."} Nothing is recorded.
+        </p>
+        {!started ? (
+          <Button className="mt-5 w-full sm:w-auto" size="lg" onClick={() => setStarted(true)}>
+            <Camera size={16} aria-hidden /> Test camera and microphone
+          </Button>
+        ) : (
+          <div className="mt-5 grid gap-5 sm:grid-cols-[1fr_14rem] sm:items-start">
+            <video ref={video} autoPlay playsInline muted className="aspect-video w-full bg-black object-cover" aria-label="Your camera preview" />
+            <div className="space-y-4 text-sm">
               <p className="flex items-center gap-2 text-ink">
-                <Mic size={16} aria-hidden /> Microphone: say something
+                <Camera size={16} aria-hidden /> Camera: {cameraOk ? "working" : "waiting…"}
               </p>
-              <div className="mt-2 h-2 w-full bg-ink/10" role="meter" aria-label="Microphone level" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(level * 100)}>
-                <div className="h-2 bg-accent transition-[width] duration-100" style={{ width: `${Math.round(level * 100)}%` }} />
+              <div>
+                <p className="flex items-center gap-2 text-ink">
+                  <Mic size={16} aria-hidden /> Microphone: say something
+                </p>
+                <div className="mt-2 h-2 w-full bg-ink/10" role="meter" aria-label="Microphone level" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(level * 100)}>
+                  <div className="h-2 bg-accent transition-[width] duration-100" style={{ width: `${Math.round(level * 100)}%` }} />
+                </div>
               </div>
+              {permissionIssue && <p className="text-sm leading-relaxed text-ink">{permissionIssue}</p>}
+              <Button className="w-full sm:w-auto" size="lg" disabled={!cameraOk} onClick={onReady}>
+                Next
+              </Button>
             </div>
-            {problem && <p className="text-sm text-ink">{problem}</p>}
-            <Button disabled={!cameraOk} onClick={onReady}>
-              Next
-            </Button>
           </div>
-        </div>
-      )}
-    </CutCard>
+        )}
+      </CutCard>
+      <CutCard className="h-auto">
+        <Checklist text={checklist} />
+      </CutCard>
+    </div>
   );
 }
 
 /** The plain-language notice of what is monitored, and the "I agree". */
-function Consent({ access, onAgreed }: { access: Open; onAgreed: () => void }) {
+function Consent({ access, mobile, onAgreed }: { access: Open; mobile: boolean; onAgreed: () => void }) {
   const [agree, setAgree] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -128,24 +181,27 @@ function Consent({ access, onAgreed }: { access: Open; onAgreed: () => void }) {
       <h2 className="font-serif text-xl text-ink">2. What the interview room watches</h2>
       <p className="mt-2 text-sm leading-relaxed text-ink/75">
         To keep the interview fair for everyone, FusionX@SCRIET&rsquo;s interview room notices the following and shows it to your interview
-        panel. It can&rsquo;t read your screen and does not record anything.
+        panel. It can&rsquo;t see other apps or your screen, and does not record anything.
       </p>
       <ul className="mt-4 list-disc space-y-1.5 pl-5 text-sm text-ink">
         <li>Your camera and microphone, live to the panel (and to the other candidates in your slot).</li>
-        {access.phone_camera !== "off" && (
+        {access.phone_camera !== "off" && !mobile && (
           <li>
             Your phone as a second camera showing your desk and hands
             {access.phone_camera === "required" ? " (required)" : " (if you connect it)"}.
           </li>
         )}
-        <li>When you switch tabs, leave this window, or leave fullscreen.</li>
+        <li>
+          Each time you leave the interview screen (another app or tab, the home screen{mobile ? "" : ", another window or leaving fullscreen"}), and for how
+          long. The panel sees it at once.
+        </li>
         <li>Copy, paste, cut and right-click: these are blocked, and each try is noted.</li>
-        <li>If your computer is using a second screen (on browsers that can tell).</li>
+        {!mobile && <li>If your computer is using a second screen (on browsers that can tell).</li>}
         <li>When your camera or microphone is turned off, and when you leave or rejoin.</li>
       </ul>
       <p className="mt-4 text-sm text-ink/75">Nothing is recorded: no video, audio, screenshots or typing is stored. Only the list of these events and their times is kept for the panel.</p>
       <label className="mt-5 flex items-start gap-3 text-sm text-ink">
-        <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]" checked={agree} onChange={(e) => setAgree(e.target.checked)} />I agree to these rules for my interview.
+        <input type="checkbox" className="mt-0.5 h-5 w-5 accent-[var(--color-accent)]" checked={agree} onChange={(e) => setAgree(e.target.checked)} />I agree to these rules for my interview.
       </label>
       {error && (
         <p role="alert" className="mt-3 text-sm text-ink">
@@ -153,7 +209,8 @@ function Consent({ access, onAgreed }: { access: Open; onAgreed: () => void }) {
         </p>
       )}
       <Button
-        className="mt-5"
+        className="mt-5 w-full sm:w-auto"
+        size="lg"
         disabled={!agree || busy}
         onClick={async () => {
           setBusy(true);
@@ -186,13 +243,42 @@ function useRevealedQuestions(bookingId: string, slotId: string, active: boolean
       .channel(`reveals-${slotId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "recruitment_question_reveals", filter: `slot_id=eq.${slotId}` }, () => void load())
       .subscribe();
+    // The sign-in is kept fresh in the background (no page change while in the room).
+    const keepSignedIn = window.setInterval(() => void supabase.auth.getSession().catch(() => null), 4 * 60_000);
     return () => {
       stop = true;
       window.clearInterval(timer);
+      window.clearInterval(keepSignedIn);
       void supabase.removeChannel(channel);
     };
   }, [bookingId, slotId, active]);
   return questions;
+}
+
+/** Keeps the screen on while in the room (Screen Wake Lock API, where the browser has it). */
+function useWakeLock(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    type Sentinel = { release: () => Promise<void> };
+    const nav = navigator as Navigator & { wakeLock?: { request: (type: "screen") => Promise<Sentinel> } };
+    if (!nav.wakeLock) return;
+    let lock: Sentinel | null = null;
+    const take = () => {
+      if (document.visibilityState !== "visible") return;
+      nav.wakeLock
+        ?.request("screen")
+        .then((l) => {
+          lock = l;
+        })
+        .catch(() => {});
+    };
+    take();
+    document.addEventListener("visibilitychange", take);
+    return () => {
+      document.removeEventListener("visibilitychange", take);
+      void lock?.release().catch(() => {});
+    };
+  }, [active]);
 }
 
 /** The QR code that opens the phone camera page (10 minutes; renewed automatically). */
@@ -240,18 +326,30 @@ function PhoneQr({ access, connected }: { access: Open; connected: boolean }) {
   );
 }
 
+const ORDINAL = (n: number) => (n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`);
+
 /**
  * The FusionX Interview Room for a candidate: device check → consent → the
- * call (LiveKit), in fullscreen when the day asks for it,
- * with the revealed questions and the phone-camera QR beside it.
+ * call (LiveKit), in fullscreen when the day asks for it and the device can,
+ * with the revealed questions and (on a laptop) the phone-camera QR beside it.
+ * Works on laptops, tablets and phones; in-app browsers are asked to open the
+ * link in Chrome or Safari.
  *
  * The day has one room; a candidate is in it for their own slot only. Opened
  * early on the day, the page waits ("Waiting room", with a countdown) and
  * connects by itself when the slot's join time comes. When the slot ends
  * (by the database's clock) the call closes and cannot be joined again; the
  * server also removes anyone still connected.
+ *
+ * Leaving the interview screen is shown to the panel at once; the candidate
+ * is warned when they come back, and the day may remove them after a limit.
  */
 export function CandidateRoom({ access }: { access: Open & { state?: string } }) {
+  const rules = access.rules ?? DEFAULT_RULES;
+  const device = useDevice();
+  const mobile = device ? device.kind !== "laptop" : false;
+  // Fullscreen only where the device has it (not on iPhone): elsewhere the lock-in is skipped, not the candidate.
+  const strictFs = access.strict_fullscreen && device?.fullscreen !== false;
   const [step, setStep] = useState<Step>(access.consented_at ? "ready" : "device");
   const [error, setError] = useState("");
   const [joining, setJoining] = useState(false);
@@ -259,16 +357,35 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
   const [phoneConnected, setPhoneConnected] = useState(false);
   const [moved, setMoved] = useState(false);
   const [ended, setEnded] = useState(false);
+  const [removed, setRemoved] = useState<"left_screen" | "panel" | null>(null);
+  const [warning, setWarning] = useState<{ seconds: number; times: number } | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(true);
   const endedRef = useRef(false);
   const shell = useRef<HTMLDivElement>(null);
   // The call: its server and token while connected (null = not in the call).
   const [conn, setConn] = useState<{ serverUrl: string; token: string } | null>(null);
   const joinedOnce = useRef(false);
+  const deviceLogged = useRef(false);
   const phoneId = phoneUserId(access.booking_id);
   const inRoom = step === "room";
+  const usePhoneCamera = access.phone_camera !== "off" && !mobile;
+
   const onFullscreenExit = useCallback(() => setFullscreen(false), []);
-  const { record } = useIntegrity(access.booking_id, inRoom, { strictFullscreen: access.strict_fullscreen, onFullscreenExit });
+  const onReturn = useCallback((seconds: number, times: number) => setWarning({ seconds, times }), []);
+  const onRemoved = useCallback((reason: "left_screen" | "panel") => {
+    endedRef.current = true;
+    setRemoved(reason);
+    setConn(null);
+    exitFullscreen();
+  }, []);
+  const { record } = useIntegrity(access.booking_id, inRoom && !removed, {
+    strictFullscreen: strictFs,
+    onFullscreenExit,
+    onReturn: rules.warn_on_leave ? onReturn : undefined,
+    onRemoved,
+  });
   const questions = useRevealedQuestions(access.booking_id, access.slot_id, inRoom);
+  useWakeLock(inRoom && !removed);
 
   const { now, tick } = useServerClock(access.now);
   const opensAt = new Date(access.opens_at).getTime();
@@ -285,18 +402,14 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
         endedRef.current = true;
         setEnded(true);
         setConn(null);
-        if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+        exitFullscreen();
       },
       Math.max(closesAt - now(), 0) + 500,
     );
     return () => window.clearTimeout(timer);
   }, [closesAt, now]);
 
-  useEffect(() => {
-    const onChange = () => setFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, []);
+  useEffect(() => onFullscreenChange(() => setFullscreen(Boolean(fullscreenElement()))), []);
 
   // The panel can switch the day back to Google Meet at any time: leave the call and say where to go.
   useEffect(() => {
@@ -305,7 +418,7 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
       if (await roomStillOn(access.booking_id).catch(() => true)) return;
       setConn(null);
       setMoved(true);
-      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+      exitFullscreen();
     }, 15_000);
     return () => window.clearInterval(timer);
   }, [inRoom, moved, access.booking_id]);
@@ -314,12 +427,8 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
     async (auto = false) => {
       setJoining(true);
       setError("");
-      // Fullscreen needs a click; when the waiting room connects by itself, the "Return to fullscreen" screen asks for it.
-      if (access.strict_fullscreen && !auto) {
-        try {
-          await shell.current?.requestFullscreen();
-        } catch {}
-      }
+      // Fullscreen needs a tap; when the waiting room connects by itself, the "Return to fullscreen" screen asks for it.
+      if (strictFs && !auto) await enterFullscreen(shell.current);
       let res = await joinInterview(access.booking_id);
       // A device clock a few seconds fast: the server says "not yet"; try again shortly.
       for (let i = 0; auto && !res.ok && /room opens at/i.test(res.message) && i < 5; i++) {
@@ -328,15 +437,19 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
       }
       setJoining(false);
       if (!res.ok) {
+        if (/removed/i.test(res.message)) {
+          setRemoved(/panel/i.test(res.message) ? "panel" : "left_screen");
+          return;
+        }
         setError(res.message);
         return;
       }
       if (endedRef.current) return;
       setConn({ serverUrl: res.serverUrl, token: res.token });
       setStep("room");
-      setFullscreen(Boolean(document.fullscreenElement));
+      setFullscreen(Boolean(fullscreenElement()));
     },
-    [access.booking_id, access.strict_fullscreen],
+    [access.booking_id, strictFs],
   );
 
   // Waiting room: connect by itself at the slot's join time.
@@ -353,30 +466,39 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
     if (joinedOnce.current) record("rejoined");
     joinedOnce.current = true;
     setError("");
-  }, [record]);
+    if (!deviceLogged.current) {
+      deviceLogged.current = true;
+      const d = deviceSnapshot();
+      record("device_info", { device: DEVICE_LABEL[d.kind], browser: d.browser, fullscreen: d.fullscreen, phone_camera: !mobile });
+      if (access.strict_fullscreen && !d.fullscreen) record("fullscreen_unsupported");
+    }
+  }, [record, mobile, access.strict_fullscreen]);
+  const onReconnected = useCallback(() => record("reconnect"), [record]);
   const onDisconnected = useCallback(
-    (removed: boolean) => {
+    (wasRemoved: boolean) => {
       setConn(null);
-      // Removed by the server (slot over, or the day moved to Google Meet), or closed by the timer: not "left".
-      if (removed || endedRef.current) {
-        if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+      // Removed by the server (slot over, removed for leaving the screen or by the panel, or the day moved to Google Meet),
+      // or closed by the timer: not "left".
+      if (wasRemoved || endedRef.current) {
+        exitFullscreen();
         if (endedRef.current) {
           setEnded(true);
           return;
         }
-        void roomStillOn(access.booking_id)
-          .catch(() => true)
-          .then((on) => {
-            if (on) {
-              endedRef.current = true;
-              setEnded(true);
-            } else setMoved(true);
-          });
+        void (async () => {
+          const why = await myRemoval(access.booking_id).catch(() => null);
+          if (why) return onRemoved(why);
+          const on = await roomStillOn(access.booking_id).catch(() => true);
+          if (on) {
+            endedRef.current = true;
+            setEnded(true);
+          } else setMoved(true);
+        })();
         return;
       }
       record("left_room");
     },
-    [record, access.booking_id],
+    [record, access.booking_id, onRemoved],
   );
   const onCallError = useCallback((message: string) => {
     setError(joinErrorText(message, "candidate"));
@@ -389,15 +511,30 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
     setError("");
     const res = await joinInterview(access.booking_id);
     if (res.ok) setConn({ serverUrl: res.serverUrl, token: res.token });
+    else if (/removed/i.test(res.message)) setRemoved(/panel/i.test(res.message) ? "panel" : "left_screen");
     else setError(res.message);
   };
+
+  if (removed) {
+    return (
+      <CutCard className="h-auto">
+        <h2 className="font-serif text-xl text-ink">
+          {removed === "left_screen" ? "You were removed for leaving the interview screen" : "The panel removed you from this interview"}
+        </h2>
+        <p className="mt-2 text-sm text-ink/75">You can&rsquo;t rejoin this slot. The panel has been told and will decide on your application.</p>
+        <LinkButton href="/recruitment/status" variant="secondary" size="sm" className="mt-5">
+          Go to your status page
+        </LinkButton>
+      </CutCard>
+    );
+  }
 
   return (
     <div ref={shell} className={cn(inRoom && "bg-paper", inRoom && "fixed inset-0 z-50 flex flex-col")}>
       {!inRoom && (
         <div className="space-y-6">
-          {step === "device" && <DeviceCheck onReady={() => setStep("consent")} />}
-          {step === "consent" && <Consent access={access} onAgreed={() => setStep("ready")} />}
+          {step === "device" && <DeviceCheck allowPhones={rules.allow_phones} checklist={rules.checklist} onReady={() => setStep("consent")} />}
+          {step === "consent" && <Consent access={access} mobile={mobile} onAgreed={() => setStep("ready")} />}
           {step === "ready" && ended && (
             <CutCard className="h-auto">
               <h2 className="font-serif text-xl text-ink">Your interview slot has ended</h2>
@@ -408,51 +545,56 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
             </CutCard>
           )}
           {step === "ready" && !ended && waiting && (
-            <CutCard className="h-auto">
-              <h2 className="flex items-center gap-2 font-serif text-xl text-ink">
-                <Clock size={18} aria-hidden /> Waiting room
-              </h2>
-              <p className="mt-2 text-sm leading-relaxed text-ink/75">
-                Your slot: {slotRange(access.starts_at, access.ends_at)} IST. You will be connected to the interview room by itself at{" "}
-                {slotTime(access.opens_at)}. Keep this page open
-                {access.strict_fullscreen ? "; the interview then runs in fullscreen" : ""}.
-              </p>
-              {tick !== null && (
-                <p className="mt-5 font-serif text-4xl tabular-nums text-ink" role="timer" aria-live="off">
-                  {countdownText(opensAt - tick)}
+            <>
+              <CutCard className="h-auto">
+                <h2 className="flex items-center gap-2 font-serif text-xl text-ink">
+                  <Clock size={18} aria-hidden /> Waiting room
+                </h2>
+                <p className="mt-2 text-sm leading-relaxed text-ink/75">
+                  Your slot: {slotRange(access.starts_at, access.ends_at)} IST. You will be connected to the interview room by itself at{" "}
+                  {slotTime(access.opens_at)}. Keep this page open
+                  {strictFs ? "; the interview then runs in fullscreen" : ""}.
                 </p>
-              )}
-              {access.phone_camera !== "off" && (
-                <div className="mt-6 border-t border-line pt-5">
-                  {tick !== null && tick >= opensAt - 30 * 60_000 ? (
-                    <PhoneQr access={access} connected={false} />
-                  ) : (
-                    <p className="flex items-center gap-2 text-sm text-ink/75">
-                      <Smartphone size={16} aria-hidden /> The QR code for your phone camera appears here 30 minutes before your slot.
-                    </p>
-                  )}
-                </div>
-              )}
-              {error && (
-                <p role="alert" className="mt-3 text-sm text-ink">
-                  {error}
-                </p>
-              )}
-            </CutCard>
+                {tick !== null && (
+                  <p className="mt-5 font-serif text-4xl tabular-nums text-ink" role="timer" aria-live="off">
+                    {countdownText(opensAt - tick)}
+                  </p>
+                )}
+                {usePhoneCamera && (
+                  <div className="mt-6 border-t border-line pt-5">
+                    {tick !== null && tick >= opensAt - 30 * 60_000 ? (
+                      <PhoneQr access={access} connected={false} />
+                    ) : (
+                      <p className="flex items-center gap-2 text-sm text-ink/75">
+                        <Smartphone size={16} aria-hidden /> The QR code for your phone camera appears here 30 minutes before your slot.
+                      </p>
+                    )}
+                  </div>
+                )}
+                {error && (
+                  <p role="alert" className="mt-3 text-sm text-ink">
+                    {error}
+                  </p>
+                )}
+              </CutCard>
+              <CutCard className="h-auto">
+                <Checklist text={rules.checklist} />
+              </CutCard>
+            </>
           )}
           {step === "ready" && !ended && !waiting && (
             <CutCard className="h-auto">
               <h2 className="font-serif text-xl text-ink">3. Join your interview</h2>
               <p className="mt-2 text-sm text-ink/75">
                 Your slot: {slotRange(access.starts_at, access.ends_at)} IST.
-                {access.strict_fullscreen ? " The interview opens in fullscreen; stay in fullscreen until it ends." : ""}
+                {strictFs ? " The interview opens in fullscreen; stay in fullscreen until it ends." : ""} Don&rsquo;t leave this screen until it ends.
               </p>
               {error && (
                 <p role="alert" className="mt-3 text-sm text-ink">
                   {error}
                 </p>
               )}
-              <Button className="mt-5" disabled={joining} onClick={() => void join()}>
+              <Button className="mt-5 w-full sm:w-auto" size="lg" disabled={joining} onClick={() => void join()}>
                 <Maximize size={16} aria-hidden /> {joining ? "Opening the room…" : "Join the interview room"}
               </Button>
             </CutCard>
@@ -462,7 +604,20 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
 
       {inRoom && (
         <div className="relative flex min-h-0 flex-1 flex-col lg:flex-row">
-          <div data-interview-frame className="relative min-h-[60vh] flex-1 bg-black lg:min-h-0">
+          {warning && (
+            <div role="alert" className="absolute inset-x-2 top-2 z-30 flex items-start justify-between gap-3 border border-red-500/60 bg-paper p-3 text-sm text-ink shadow-lg sm:inset-x-auto sm:left-1/2 sm:w-[32rem] sm:-translate-x-1/2">
+              <p>
+                <span className="font-semibold">Leaving the interview screen is recorded and shown to the panel.</span>{" "}
+                <span className="text-ink/75">
+                  You were away {warning.seconds} s ({ORDINAL(warning.times)} time).
+                </span>
+              </p>
+              <button type="button" className="shrink-0 border border-ink/30 px-3 py-1 font-medium" onClick={() => setWarning(null)}>
+                OK
+              </button>
+            </div>
+          )}
+          <div data-interview-frame className="relative min-h-0 flex-1 bg-black">
             {conn ? (
               <LiveKitStage
                 serverUrl={conn.serverUrl}
@@ -476,53 +631,72 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
                 onJoined={onJoined}
                 onLeft={onLeft}
                 onLocalOff={onLocalOff}
+                onReconnected={onReconnected}
               />
             ) : (
               !moved &&
               !ended && (
                 <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
                   <p className="text-sm text-white/85">You are not in the call.</p>
-                  <Button onClick={rejoin}>Rejoin the call</Button>
+                  <Button size="lg" onClick={rejoin}>
+                    Rejoin the call
+                  </Button>
                 </div>
               )
             )}
           </div>
-          <aside className="w-full shrink-0 overflow-y-auto border-t border-line bg-surface p-5 lg:w-96 lg:border-l lg:border-t-0" aria-label="Interview questions and phone camera">
-            <p className="text-xs text-ink/70">FusionX@SCRIET interview room · {slotRange(access.starts_at, access.ends_at)} IST</p>
-            {tick !== null && !ended && (
-              <p className="mt-2 text-sm tabular-nums text-ink" role="timer" aria-live="off">
-                {hold ? `Your slot starts in ${countdownText(startsAt - tick)}. Camera and microphone turn on then.` : `Your slot ends in ${countdownText(closesAt - tick)}`}
-              </p>
+          {/* On a phone: a bottom sheet that can be folded down; on a laptop: a sidebar. */}
+          <aside
+            className={cn(
+              "w-full shrink-0 overflow-y-auto border-t border-line bg-surface lg:max-h-none lg:w-96 lg:border-l lg:border-t-0 lg:p-5",
+              sheetOpen ? "max-h-[42vh] p-4" : "max-h-14 px-4 py-2",
             )}
-            <h2 className="mt-4 font-serif text-lg text-ink">Questions</h2>
-            {questions.length === 0 ? (
-              <p className="mt-2 text-sm text-ink/70">The panel will show questions here during the interview.</p>
-            ) : (
-              <ol className="mt-3 space-y-3" aria-live="polite">
-                {questions.map((q, i) => (
-                  <li key={q.id} className="border border-line p-3 text-sm text-ink">
-                    <span className="mb-1 block text-xs text-ink/65">
-                      Question {i + 1} · {q.hub}
-                    </span>
-                    <span className="whitespace-pre-line select-none">{q.body}</span>
-                  </li>
-                ))}
-              </ol>
-            )}
-            {access.phone_camera !== "off" && (
-              <div className="mt-6 border-t border-line pt-5">
-                <PhoneQr access={access} connected={phoneConnected} />
-              </div>
-            )}
-            {error && (
-              <p role="alert" className="mt-4 text-sm text-ink">
-                {error}
-              </p>
-            )}
+            aria-label="Interview questions"
+          >
+            <button type="button" className="flex w-full items-center justify-between gap-2 py-1 text-left lg:hidden" onClick={() => setSheetOpen((o) => !o)} aria-expanded={sheetOpen}>
+              <span className="text-sm font-semibold text-ink">
+                Questions ({questions.length})
+                {tick !== null && !ended && <span className="ml-2 font-normal tabular-nums text-ink/75">{hold ? `starts in ${countdownText(startsAt - tick)}` : `ends in ${countdownText(closesAt - tick)}`}</span>}
+              </span>
+              {sheetOpen ? <ChevronDown size={18} aria-hidden /> : <ChevronUp size={18} aria-hidden />}
+            </button>
+            <div className={cn(!sheetOpen && "hidden lg:block")}>
+              <p className="hidden text-xs text-ink/70 lg:block">FusionX@SCRIET interview room · {slotRange(access.starts_at, access.ends_at)} IST</p>
+              {tick !== null && !ended && (
+                <p className="mt-2 hidden text-sm tabular-nums text-ink lg:block" role="timer" aria-live="off">
+                  {hold ? `Your slot starts in ${countdownText(startsAt - tick)}. Camera and microphone turn on then.` : `Your slot ends in ${countdownText(closesAt - tick)}`}
+                </p>
+              )}
+              <h2 className="mt-2 hidden font-serif text-lg text-ink lg:mt-4 lg:block">Questions</h2>
+              {questions.length === 0 ? (
+                <p className="mt-2 text-sm text-ink/70">The panel will show questions here during the interview.</p>
+              ) : (
+                <ol className="mt-3 space-y-3" aria-live="polite">
+                  {questions.map((q, i) => (
+                    <li key={q.id} className="border border-line p-3 text-sm text-ink">
+                      <span className="mb-1 block text-xs text-ink/65">
+                        Question {i + 1} · {q.hub}
+                      </span>
+                      <span className="whitespace-pre-line select-none">{q.body}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+              {usePhoneCamera && (
+                <div className="mt-6 border-t border-line pt-5">
+                  <PhoneQr access={access} connected={phoneConnected} />
+                </div>
+              )}
+              {error && (
+                <p role="alert" className="mt-4 text-sm text-ink">
+                  {error}
+                </p>
+              )}
+            </div>
           </aside>
 
           {moved && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-paper p-6" role="alertdialog" aria-modal="true" aria-labelledby="moved-title">
+            <div className="absolute inset-0 z-40 flex items-center justify-center bg-paper p-6" role="alertdialog" aria-modal="true" aria-labelledby="moved-title">
               <div className="max-w-md text-center">
                 <h2 id="moved-title" className="font-serif text-2xl text-ink">
                   Your interview has moved to Google Meet
@@ -536,7 +710,7 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
           )}
 
           {ended && !moved && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-paper p-6" role="alertdialog" aria-modal="true" aria-labelledby="ended-title">
+            <div className="absolute inset-0 z-40 flex items-center justify-center bg-paper p-6" role="alertdialog" aria-modal="true" aria-labelledby="ended-title">
               <div className="max-w-md text-center">
                 <h2 id="ended-title" className="font-serif text-2xl text-ink">
                   Your interview slot has ended. Thank you!
@@ -549,21 +723,14 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
             </div>
           )}
 
-          {access.strict_fullscreen && !fullscreen && !moved && !ended && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-paper/95 p-6" role="dialog" aria-modal="true" aria-labelledby="fs-title">
+          {strictFs && !fullscreen && !moved && !ended && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-paper/95 p-6" role="dialog" aria-modal="true" aria-labelledby="fs-title">
               <div className="max-w-md text-center">
                 <h2 id="fs-title" className="font-serif text-2xl text-ink">
                   Return to fullscreen
                 </h2>
                 <p className="mt-3 text-sm text-ink/75">The interview runs in fullscreen. Each time it is left, the panel is told.</p>
-                <Button
-                  className="mt-5"
-                  onClick={async () => {
-                    try {
-                      await shell.current?.requestFullscreen();
-                    } catch {}
-                  }}
-                >
+                <Button className="mt-5" size="lg" onClick={() => void enterFullscreen(shell.current)}>
                   <Maximize size={16} aria-hidden /> Return to fullscreen
                 </Button>
               </div>

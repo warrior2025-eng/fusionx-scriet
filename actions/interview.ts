@@ -89,8 +89,15 @@ const eventSchema = z
   .min(1)
   .max(50);
 
-/** A batch of integrity events (the database rate-limits per person). */
-export async function logInterviewEvents(bookingId: string, events: unknown): Promise<Result<{ saved: number }>> {
+type Removal = { reason: "left_screen" | "panel"; day_id: string } | null;
+
+/**
+ * A batch of integrity events (the database rate-limits per person). When the
+ * day removes candidates for leaving the screen (migration 0025) and this
+ * batch reached the limit, the answer says so and they are taken out of the
+ * call at once.
+ */
+export async function logInterviewEvents(bookingId: string, events: unknown): Promise<Result<{ saved: number; removed: "left_screen" | "panel" | null }>> {
   if (!uuid.safeParse(bookingId).success) return { ok: false, message: "Interview not found." };
   const parsed = eventSchema.safeParse(events);
   if (!parsed.success) return { ok: false, message: "Invalid events." };
@@ -98,7 +105,27 @@ export async function logInterviewEvents(bookingId: string, events: unknown): Pr
   if (!user) return { ok: false, message: "Please sign in." };
   const { data, error } = await supabase.rpc("log_interview_events", { p_booking: bookingId, p_events: parsed.data });
   if (error) return { ok: false, message: friendlyDbError(error.message, "Could not save.") };
-  return { ok: true, saved: Number(data ?? 0) };
+  const counted = parsed.data.some((e) => e.type === "left_screen" || e.type === "returned_screen");
+  const removal = counted ? (((await supabase.rpc("my_room_removal", { p_booking: bookingId })).data ?? null) as Removal) : null;
+  if (removal) {
+    after(async () => {
+      try {
+        await cleanUpDayRoom(await createClient(), removal.day_id);
+      } catch (e) {
+        console.error("day room clean-up failed:", e instanceof Error ? e.message : e);
+      }
+    });
+  }
+  return { ok: true, saved: Number(data ?? 0), removed: removal?.reason ?? null };
+}
+
+/** Whether the candidate was taken out of their slot (for leaving the screen, or by the panel). */
+export async function myRemoval(bookingId: string): Promise<"left_screen" | "panel" | null> {
+  if (!uuid.safeParse(bookingId).success) return null;
+  const { supabase, user } = await signedIn();
+  if (!user) return null;
+  const { data } = await supabase.rpc("my_room_removal", { p_booking: bookingId });
+  return ((data ?? null) as Removal)?.reason ?? null;
 }
 
 /** The questions the panel has revealed to the candidate's slot (never the others). */

@@ -10,6 +10,7 @@ import { Section } from "@/components/ui/section";
 import { istDateTime } from "@/lib/events/format";
 import { agreeToAnnouncement } from "@/actions/recruitment-results";
 import { InterviewCard } from "@/components/recruitment/interview-card";
+import { Checklist } from "@/components/interview/checklist";
 import type { InterviewAccess } from "@/lib/interview/shared";
 import { dayLabel, slotRange, slotTime } from "@/lib/recruitment/slots";
 import { ResultView } from "@/components/recruitment/result-view";
@@ -199,9 +200,9 @@ export default async function RecruitmentStatusPage({ searchParams }: { searchPa
             <p className="text-sm text-ink/65">Interview room</p>
             <p className="mt-2 font-medium text-ink">Your interview is in the FusionX@SCRIET interview room, on this website</p>
             <p className="mt-2 text-sm text-ink/75">
-              {dayLabel(roomCard.day)}, {slotRange(roomCard.starts_at, roomCard.ends_at)} IST. Use a laptop or desktop with Chrome or Edge, and keep
-              your phone ready as a second camera.
+              {dayLabel(roomCard.day)}, {slotRange(roomCard.starts_at, roomCard.ends_at)} IST.
             </p>
+            <Checklist text={roomCard.rules?.checklist} className="mt-4" />
             {/* The room link only on the interview date (IST); before it, when it opens. */}
             {roomCard.state === "open" || roomCard.today !== false ? (
               <div className="mt-5">
