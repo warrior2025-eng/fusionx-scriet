@@ -38,6 +38,7 @@ export default async function CycleApplicationsPage({ params, searchParams }: { 
     score: param(query, "score"),
   };
   const shown = filterApplications(all, filters);
+  const filterTeam = teams.find((t) => t.id === filters.team);
   const doubles = new Set(all.filter((a) => a.teams.filter((t) => t.stage === "selected").length > 1).map((a) => a.id));
 
   return (
@@ -73,7 +74,7 @@ export default async function CycleApplicationsPage({ params, searchParams }: { 
           { name: "score", label: "Average score", options: [2, 3, 4, 5].map((n) => ({ value: String(n), label: `${n} or more` })) },
         ]}
       />
-      {!filters.team && <p className="mb-4 text-sm text-ink/65">Choose a team in the filter to export its applications as CSV.</p>}
+      {!filters.team && <p className="mb-4 text-sm text-ink/65">Choose a team in the filter to move its applications to a stage or export them as CSV.</p>}
 
       <AdminForm action={bulkStage.bind(null, id)} submitLabel="Move selected" warnUnsaved={false}>
         <Table label="Applications">
@@ -130,19 +131,18 @@ export default async function CycleApplicationsPage({ params, searchParams }: { 
           </tbody>
         </Table>
 
+        {/* A stage belongs to one team: the team chosen in the Team filter above. */}
+        <input type="hidden" name="bulk_team" value={filterTeam?.id ?? ""} />
         <div className="grid gap-5 sm:grid-cols-2">
-          {/* A stage always belongs to one team: no empty choice. The team in the filter, else the first. */}
-          <SelectField
-            name="bulk_team"
-            label="For team"
-            defaultValue={teams.some((t) => t.id === filters.team) ? filters.team : (teams[0]?.id ?? "")}
-            options={teams.map((t) => ({ value: t.id, label: t.name }))}
-          />
           <SelectField
             name="bulk_stage"
-            label="Move to stage"
+            label={filterTeam ? `Move to stage (${filterTeam.name})` : "Move to stage"}
             options={[{ value: "", label: "Choose a stage" }, ...STAGES.filter((s) => s !== "interview").map((s) => ({ value: s, label: STAGE_LABELS[s] }))]}
-            hint="Interviews are scheduled one by one, from the application's own page."
+            hint={
+              filterTeam
+                ? "Interviews are scheduled one by one, from the application's own page."
+                : "First choose a team in the Team filter above: the stage is changed for that team."
+            }
           />
         </div>
       </AdminForm>
