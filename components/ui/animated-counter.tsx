@@ -6,15 +6,21 @@ import { useEffect, useRef, useState } from "react";
  * Counts from 0 to `value` when the element scrolls into view.
  * Uses requestAnimationFrame for smooth 60fps interpolation.
  * Falls back to static display if reduced motion is preferred.
+ * `suffix` (like "+") sits right after the number and is not animated;
+ * `label` is what screen readers hear instead (like "29 or more students").
  */
 export function AnimatedCounter({
   value,
   duration = 1200,
   className,
+  suffix,
+  label,
 }: {
   value: number;
   duration?: number;
   className?: string;
+  suffix?: string;
+  label?: string;
 }) {
   const [display, setDisplay] = useState(0);
   const [hasAnimated, setHasAnimated] = useState(false);
@@ -56,9 +62,21 @@ export function AnimatedCounter({
     return () => observer.disconnect();
   }, [value, duration, hasAnimated]);
 
+  if (label) {
+    return (
+      <span ref={ref} className={className}>
+        <span className="sr-only">{label}</span>
+        <span aria-hidden>
+          {display}
+          {suffix}
+        </span>
+      </span>
+    );
+  }
   return (
     <span ref={ref} className={className}>
       {display}
+      {suffix}
     </span>
   );
 }

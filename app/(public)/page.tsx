@@ -119,8 +119,10 @@ export default async function HomePage() {
 
   // Real counts only, never fabricated: a failed or empty count shows as 0.
   // All three are always shown, to every visitor.
-  const stats = [
-    { label: "Students", value: typeof memberCount === "number" ? memberCount : 0 },
+  // Students reads "29+" (the count of signed-up members; more join all the time); 0 stays "0".
+  const students = typeof memberCount === "number" ? memberCount : 0;
+  const stats: { label: string; value: number; suffix?: string; spoken?: string }[] = [
+    { label: "Students", value: students, ...(students > 0 ? { suffix: "+", spoken: `${students} or more students` } : {}) },
     { label: "Projects", value: projectCount ?? 0 },
     { label: "Events", value: eventCount ?? 0 },
   ];
@@ -475,6 +477,8 @@ export default async function HomePage() {
                           <dd>
                             <AnimatedCounter
                               value={s.value}
+                              suffix={s.suffix}
+                              label={s.spoken}
                               className="block font-serif text-3xl font-medium tabular-nums text-ink md:text-4xl"
                             />
                           </dd>
