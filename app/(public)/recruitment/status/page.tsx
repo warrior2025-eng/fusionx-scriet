@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/permissions";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { withdrawRecruitmentApplication } from "@/actions/recruitment";
@@ -54,9 +55,7 @@ const ORDINALS = ["1st", "2nd", "3rd", "4th"];
 
 export default async function RecruitmentStatusPage({ searchParams }: { searchParams: Promise<{ submitted?: string }> }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect("/login?next=/recruitment/status");
   const { submitted } = await searchParams;
 

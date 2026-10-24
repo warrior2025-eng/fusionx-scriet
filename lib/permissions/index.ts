@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { AppRole } from "@/types/database";
 
@@ -8,25 +9,23 @@ import type { AppRole } from "@/types/database";
  * never be the only thing standing between a user and admin data.
  */
 
-export async function getCurrentUser() {
+/** The signed-in user, checked with Supabase Auth once per request (React cache: the layout and the page share it). */
+export const getCurrentUser = cache(async () => {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   return user;
-}
+});
 
-export async function getCurrentRoles(): Promise<AppRole[]> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+/** Their roles, once per request. */
+export const getCurrentRoles = cache(async (): Promise<AppRole[]> => {
+  const user = await getCurrentUser();
   if (!user) return [];
-
+  const supabase = await createClient();
   const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
   return (data ?? []).map((r) => r.role as AppRole);
-}
+});
 
 export async function hasRole(role: AppRole): Promise<boolean> {
   const roles = await getCurrentRoles();

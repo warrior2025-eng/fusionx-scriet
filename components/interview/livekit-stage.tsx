@@ -17,6 +17,7 @@ import {
   type VideoCaptureOptions,
 } from "livekit-client";
 import { Expand, Maximize2, Minimize2, Pin, PinOff } from "lucide-react";
+import { DEVICE_KEYS } from "@/lib/interview/device";
 import { isPhoneIdentity } from "@/lib/interview/shared";
 import { cn } from "@/lib/utils";
 
@@ -62,8 +63,6 @@ export type StageEvents = {
   onStatus?: (status: Record<string, ParticipantStatus>) => void;
 };
 
-/** The devices picked on the device check (kept for this browser tab). */
-export const DEVICE_KEYS = { camera: "fx-camera", microphone: "fx-microphone", speaker: "fx-speaker" } as const;
 function savedDevice(key: string): string | undefined {
   try {
     return sessionStorage.getItem(key) || undefined;

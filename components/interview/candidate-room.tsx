@@ -5,12 +5,13 @@ import { Camera, CheckCircle2, ChevronDown, ChevronUp, Clock, Copy, Maximize, Mi
 import { giveConsent, joinInterview, myInterviewQuestions, myRemoval, phoneCameraLink, roomStillOn } from "@/actions/interview";
 import { Checklist } from "@/components/interview/checklist";
 import { ReminderBanner } from "@/components/interview/reminder-banner";
-import { DEVICE_KEYS, LiveKitStage, type DeviceErrorKind, type StageControls } from "@/components/interview/livekit-stage";
+import type { DeviceErrorKind, StageControls } from "@/components/interview/livekit-stage";
+import { LiveKitStage } from "@/components/interview/livekit-stage-lazy";
 import { useIntegrity } from "@/components/interview/use-integrity";
 import { countdownText, useServerClock } from "@/components/interview/use-server-clock";
 import { Button, LinkButton } from "@/components/ui/button";
 import { CutCard } from "@/components/ui/cut-card";
-import { DEVICE_LABEL, enterFullscreen, exitFullscreen, fullscreenElement, onFullscreenChange, readDevice, type DeviceInfo } from "@/lib/interview/device";
+import { DEVICE_KEYS, DEVICE_LABEL, enterFullscreen, exitFullscreen, fullscreenElement, onFullscreenChange, readDevice, type DeviceInfo } from "@/lib/interview/device";
 import { DEFAULT_RULES, phoneUserId, type InterviewWindow, type RevealedQuestion } from "@/lib/interview/shared";
 import { slotRange, slotTime } from "@/lib/recruitment/slots";
 import { joinErrorText } from "@/lib/interview/join-error";

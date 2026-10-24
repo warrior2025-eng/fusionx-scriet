@@ -4,7 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useRouter } from "next/navigation";
 import { PanelRightClose, PanelRightOpen, Video } from "lucide-react";
 import { enforceDayRoom, joinDayRoom, type DayRoomNow } from "@/actions/interview-panel";
-import { LiveKitStage, type ParticipantStatus, type StageControls } from "@/components/interview/livekit-stage";
+import type { ParticipantStatus, StageControls } from "@/components/interview/livekit-stage";
+import { LiveKitStage } from "@/components/interview/livekit-stage-lazy";
 import { countdownText, useServerClock } from "@/components/interview/use-server-clock";
 import { Button } from "@/components/ui/button";
 import { currentSlot, type DayAccess } from "@/lib/interview/shared";

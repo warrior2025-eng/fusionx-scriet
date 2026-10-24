@@ -15,6 +15,17 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
+  const protectedPrefixes = ["/admin", "/faculty", "/member"];
+  const isProtected = protectedPrefixes.some((p) => request.nextUrl.pathname.startsWith(p));
+
+  // Not signed in (no Supabase session cookie): nothing to refresh. Most visitors; no call to Supabase at all.
+  const hasSession = request.cookies.getAll().some((c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"));
+  if (!hasSession) {
+    if (!isProtected) return response;
+    const redirectUrl = new URL("/login", request.url);
+    redirectUrl.searchParams.set("next", request.nextUrl.pathname);
+    return NextResponse.redirect(redirectUrl);
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,14 +44,14 @@ export async function proxy(request: NextRequest) {
     }
   );
 
+  // Refreshes the session cookie when it has expired (a network call only then). This is only the coarse
+  // gate: every protected page checks the user with Supabase Auth itself (getUser), and RLS checks every query,
+  // so the per-request round trip that getUser cost here (on every page, click and action) is not needed.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  const protectedPrefixes = ["/admin", "/faculty", "/member"];
-  const isProtected = protectedPrefixes.some((p) => request.nextUrl.pathname.startsWith(p));
-
-  if (isProtected && !user) {
+  if (isProtected && !session) {
     const redirectUrl = new URL("/login", request.url);
     redirectUrl.searchParams.set("next", request.nextUrl.pathname);
     return NextResponse.redirect(redirectUrl);

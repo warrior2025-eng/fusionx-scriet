@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/permissions";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { SlotList, type ListSlot } from "@/components/interview/slot-list";
@@ -15,9 +16,7 @@ export const metadata: Metadata = { title: "Interview panel", robots: { index: f
  */
 export default async function ReviewerInterviewsPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect("/login?next=/review/interviews");
 
   const { data: ids } = await supabase.rpc("my_interview_panel_slots");

@@ -40,6 +40,9 @@ export function readDevice(): DeviceInfo {
 
 export const DEVICE_LABEL: Record<DeviceKind, string> = { phone: "Phone", tablet: "Tablet", laptop: "Laptop" };
 
+/** The camera, microphone and speaker picked on the device check (kept for this browser tab; the room uses them). */
+export const DEVICE_KEYS = { camera: "fx-camera", microphone: "fx-microphone", speaker: "fx-speaker" } as const;
+
 export function fullscreenElement(): Element | null {
   const d = document as FsDocument;
   return d.fullscreenElement ?? d.webkitFullscreenElement ?? null;

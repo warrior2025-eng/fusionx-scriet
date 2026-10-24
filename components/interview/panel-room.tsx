@@ -5,7 +5,8 @@ import { Eye, EyeOff, MicOff, RefreshCw, Smartphone, Video, VideoOff, Wifi, Wifi
 import { hideQuestion, joinAsPanel, removeFromRoom, revealQuestion, revealedIds, slotEvents } from "@/actions/interview-panel";
 import { ActionButton } from "@/components/admin/action-button";
 import { useDayPresence } from "@/components/interview/day-room";
-import { LiveKitStage, type ParticipantStatus } from "@/components/interview/livekit-stage";
+import type { ParticipantStatus } from "@/components/interview/livekit-stage";
+import { LiveKitStage } from "@/components/interview/livekit-stage-lazy";
 import { Pill } from "@/components/admin/ui";
 import { Button } from "@/components/ui/button";
 import { EVENT_LABELS, FLAG_TYPES, phoneUserId, type IntegrityEvent, type IntegrityType, type PhoneCameraSetting } from "@/lib/interview/shared";
