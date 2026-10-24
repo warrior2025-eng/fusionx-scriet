@@ -192,10 +192,23 @@ const bookingsText = (r: Generated) =>
     : ` Bookings: ${r.bookings}, moved: ${r.moved ?? 0}, time(s) changed: ${r.changed ?? 0}, need rebooking: ${r.rebook ?? 0}, over capacity: ${r.over_capacity ?? 0}.`) +
   (r.links_reset ? " The Google Meet link is unpublished until you publish it again on the new day." : "");
 
-/** Re-cuts the day from its saved settings. Every booking is kept (moved into the new slot that covers its time). */
-export async function generateSlots(cycleId: string, dayId: string): Promise<ActionState> {
+/**
+ * Re-cuts the day from its saved settings. Every booking is kept (moved into the new slot that covers its time,
+ * or the nearest free one). When some bookings would find no seat at all, nothing happens unless the admin
+ * confirms with "Generate anyway" (`force`): those candidates would lose their slot and be asked to choose again.
+ */
+export async function generateSlots(cycleId: string, dayId: string, force = false): Promise<ActionState> {
   const ctx = await authorize("recruitment");
   if (!ctx) return FORBIDDEN;
+  if (!force) {
+    const { data: dry } = await ctx.supabase.rpc("preview_slot_timings", { p_day: dayId });
+    const rebook = (dry as Generated | null)?.rebook ?? 0;
+    if (rebook > 0) {
+      return fail(
+        `Not generated: ${rebook} booking${rebook === 1 ? "" : "s"} would have no free seat (more bookings than seats). Raise the capacity of some slots or make a session longer, then Preview again. To go ahead anyway, use "Generate anyway": those candidates lose their slot and are asked to choose a new one.`,
+      );
+    }
+  }
   const { data, error } = await ctx.supabase.rpc("generate_slots", { p_day: dayId });
   if (error) return fail(friendlyDbError(error.message, "Could not generate the slots."));
   const r = data as Generated;

@@ -256,11 +256,23 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
                         action={generateSlots.bind(null, id, day.id)}
                         confirm={{
                           title: "Apply these slot timings?",
-                          body: "Every booking is moved into the new slot that covers its time (first booked first). If that slot is full, into the next free one. Anyone whose time changes is notified. Press Preview first to see the numbers.",
+                          body: "Bookings whose time is still a slot keep it. Bookings in removed slots move to the nearest free slot (first booked first). Anyone whose time changes is notified. If some would find no seat, nothing is changed. Press Preview first to see the numbers.",
                           confirmLabel: "Generate slots",
                         }}
                       >
                         Generate slots
+                      </ActionButton>
+                      {/* Only needed when Preview shows "need rebooking" above 0: Generate refuses then. */}
+                      <ActionButton
+                        variant="ghost"
+                        action={generateSlots.bind(null, id, day.id, true)}
+                        confirm={{
+                          title: "Generate even if some candidates lose their slot?",
+                          body: "Use this only when Preview shows \"need rebooking\" above 0 and you accept it: those candidates lose their slot and are asked to choose a new one. Otherwise raise the capacity of some slots or make a session longer first.",
+                          confirmLabel: "Generate anyway",
+                        }}
+                      >
+                        Generate anyway
                       </ActionButton>
                     </div>
                     <AdminForm action={saveDay.bind(null, id, day.id)}>
