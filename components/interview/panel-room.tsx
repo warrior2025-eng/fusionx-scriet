@@ -649,7 +649,7 @@ export function PanelRoom({
                 const open = p.booking_id === sel;
                 const flags = (byPerson[p.booking_id] ?? []).filter((e) => FLAG_TYPES.includes(e.type as IntegrityType)).length;
                 return (
-                  <div key={p.booking_id} className={cn("border-l-4 border bg-surface", open ? "border-accent" : "border-line", { green: "border-l-emerald-600", amber: "border-l-amber-500", red: "border-l-red-600", grey: "border-l-ink/30" }[t.tone])}>
+                  <div key={p.booking_id} className={cn("border bg-surface", open ? "border-accent" : "border-line", "border-l-4", { green: "border-l-emerald-600", amber: "border-l-amber-500", red: "border-l-red-600", grey: "border-l-ink/30" }[t.tone])}>
                     <button
                       type="button"
                       onClick={() => choose(p.booking_id)}
