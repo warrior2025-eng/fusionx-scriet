@@ -109,7 +109,7 @@ export function DayRoomShell({ access, title, children }: { access: DayAccess; t
     }, 0);
     const key = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
-      if (e.key !== "]" || el?.closest("input, textarea, select, [contenteditable]")) return;
+      if (e.key !== "]" || (typeof el?.closest === "function" && el.closest("input, textarea, select, [contenteditable]"))) return;
       setSideOpen((o) => !o);
     };
     window.addEventListener("keydown", key);
