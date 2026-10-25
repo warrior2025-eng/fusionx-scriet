@@ -36,10 +36,17 @@ export async function DaySidebar({
   const slotAccess = data as PanelAccess | null;
 
   return (
-    <div className="space-y-4">
-      <nav aria-label="Slots of the day" className="border border-line bg-surface p-3">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-ink">{pinned && chosen.id !== live?.id ? "Looking at another slot" : "Following the current slot"}</p>
+    <div>
+      {/* Compact: the sidebar keeps its room for the candidates. */}
+      <details className="border-b border-line bg-surface px-3 py-2" open={Boolean(pinned && chosen.id !== live?.id)}>
+        <summary className="flex cursor-pointer items-center justify-between gap-3 text-sm">
+          <span className="font-semibold text-ink">
+            {pinned && chosen.id !== live?.id ? "Looking at another slot" : "Following the current slot"} · {slotRange(chosen.starts_at, chosen.ends_at)}
+          </span>
+          <span className="text-xs text-ink/65">Change slot</span>
+        </summary>
+        <nav aria-label="Slots of the day" className="pt-2">
+        <div className="flex items-center justify-end gap-3">
           {pinned && chosen.id !== live?.id && (
             <Link href={base} className="text-sm font-medium text-accent underline underline-offset-2">
               Back to the current slot
@@ -69,7 +76,8 @@ export async function DaySidebar({
             );
           })}
         </ul>
-      </nav>
+        </nav>
+      </details>
       {slotAccess ? (
         <PanelView supabase={supabase} access={slotAccess} userId={userId} dayMode />
       ) : (
