@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loginSchema, signUpSchema } from "@/lib/validations";
 import { getOrganizationSettings } from "@/lib/data/organization";
 import { safeNext } from "@/lib/auth/safe-next";
+import { landingAfterSignIn } from "@/lib/recruitment/my-entry";
 
 export type AuthActionState = {
   status: "idle" | "error";
@@ -77,8 +78,9 @@ export async function loginAction(_prev: AuthActionState, formData: FormData): P
     return initialErrorState("Incorrect email or password.");
   }
 
-  // Only ever redirect to a path on this site, never to an outside URL.
-  redirect(safeNext(formData.get("next")?.toString()));
+  // Only ever redirect to a path on this site, never to an outside URL. A candidate signing in from the
+  // home page lands on their status page while their interview / result entry is shown.
+  redirect(await landingAfterSignIn(supabase, safeNext(formData.get("next")?.toString())));
 }
 
 export async function logoutAction() {

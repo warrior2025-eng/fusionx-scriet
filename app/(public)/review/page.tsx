@@ -9,8 +9,10 @@ import { Section } from "@/components/ui/section";
 import { STAGE_LABELS, STAGE_TONE, type Stage } from "@/lib/recruitment/data";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import { getLiveInterviewDay } from "@/lib/recruitment/my-entry";
+import { slotRange } from "@/lib/recruitment/slots";
 
-export const metadata: Metadata = { title: "Review applications", robots: { index: false } };
+export const metadata: Metadata = { title: "Reviewer panel", robots: { index: false } };
 
 /**
  * For team reviewers: the applications that list a team they review. The
@@ -20,6 +22,7 @@ export const metadata: Metadata = { title: "Review applications", robots: { inde
 export default async function ReviewPage({ searchParams }: { searchParams: Promise<{ team?: string }> }) {
   const supabase = await createClient();
   const user = await getCurrentUser();
+  const live = user ? await getLiveInterviewDay() : null;
   if (!user) redirect("/login?next=/review");
   const { team: wanted } = await searchParams;
 
@@ -52,7 +55,24 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   return (
     <Section className="pt-16">
       <Eyebrow>Recruitment</Eyebrow>
-      <h1 className="font-serif text-3xl tracking-tight text-ink md:text-4xl">Review applications</h1>
+      <h1 className="font-serif text-3xl tracking-tight text-ink md:text-4xl">Reviewer panel</h1>
+      {live && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-2 border-[#004df6] bg-paper p-4 sm:p-5" role="status">
+          <p className="text-ink">
+            <span className="font-semibold">Interviews today</span>
+            {live.slotStartsAt && live.slotEndsAt && (
+              <span className="text-ink/80">
+                {" "}
+                · {new Date(live.now) >= new Date(live.slotStartsAt) ? "Now" : "Next"}: {slotRange(live.slotStartsAt, live.slotEndsAt)} ({live.booked} candidate
+                {live.booked === 1 ? "" : "s"})
+              </span>
+            )}
+          </p>
+          <Link href={live.href} className="inline-flex items-center gap-2 rounded-sm bg-[#004df6] px-5 py-2.5 font-semibold text-white hover:bg-[#003dd1]">
+            Open interview room
+          </Link>
+        </div>
+      )}
       {teams.length > 0 && (
         <p className="mt-2 text-sm">
           <Link href="/review/interviews" className="font-medium text-accent underline underline-offset-2">

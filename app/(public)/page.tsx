@@ -15,6 +15,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { ScrollProgress } from "@/components/ui/scroll-progress";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
+import { CandidateEntryCard } from "@/components/recruitment/candidate-entry";
+import { getCandidateEntry } from "@/lib/recruitment/my-entry";
 import { FusionXHero } from "@/components/hero/fusionx-hero";
 import { getOrganizationSettings } from "@/lib/data/organization";
 import { getPeople, peopleIn } from "@/lib/data/people";
@@ -90,6 +92,7 @@ export default async function HomePage() {
     { count: projectCount },
     { count: eventCount },
     cycle,
+    candidate,
   ] = await Promise.all([
     getOrganizationSettings(),
     getContent("home.hero"),
@@ -113,6 +116,7 @@ export default async function HomePage() {
     supabase.from("projects").select("*", { count: "exact", head: true }).eq("is_published", true),
     supabase.from("events").select("*", { count: "exact", head: true }).eq("is_published", true),
     getCurrentCycle(),
+    getCandidateEntry(),
   ]);
 
   if (memberCountError) console.error("get_member_count failed:", memberCountError.message);
@@ -441,6 +445,8 @@ export default async function HomePage() {
         <div className="container-fx relative w-full py-16 md:py-20">
           <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-10">
             <div className="lg:col-span-7">
+              {/* A candidate with an interview booking: where to join, then the result (shared with the header). */}
+              {candidate && <CandidateEntryCard entry={candidate} />}
               <div className="hero-float" style={float(18, 1.2)}>
                 <Eyebrow className="animate-fade">{hero.eyebrow}</Eyebrow>
                 <h1 className="font-serif text-[clamp(2.75rem,7vw,5.75rem)] leading-[1.02] tracking-tight text-ink animate-reveal">

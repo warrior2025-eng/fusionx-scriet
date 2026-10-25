@@ -9,6 +9,9 @@ import { cn } from "@/lib/utils";
 import { LinkButton } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { logoutAction } from "@/actions/auth";
+import { CandidateEntryButton, ReviewerLiveButton } from "@/components/recruitment/candidate-entry";
+import type { CandidateEntry } from "@/lib/recruitment/entry-stage";
+import type { LiveDay } from "@/lib/recruitment/my-entry";
 
 /*
  * Three layouts, by what fits (measured; the header row is up to 90rem wide):
@@ -40,6 +43,10 @@ type SiteUser = {
   avatarUrl: string | null;
   /** Staff and faculty panels this person may open. Empty for members. */
   panels: { href: string; label: string }[];
+  /** A candidate with an interview booking: "My Interview" / "My Application" / "My Result". */
+  candidate?: CandidateEntry | null;
+  /** A reviewer while today's interviews are on: "Reviewer panel · Live". */
+  reviewerLive?: LiveDay | null;
 };
 
 function initials(name: string) {
@@ -183,9 +190,23 @@ function ProfileMenu({ user }: { user: SiteUser }) {
             <p className="text-sm font-medium text-ink truncate">{user.fullName}</p>
             <p className="text-xs text-ink/45 truncate">{user.email}</p>
           </div>
+          {user.candidate && <CandidateEntryButton entry={user.candidate} place="menu" onNavigate={() => setOpen(false)} />}
           {user.panels.map((panel) => (
-            <Link key={panel.href} href={panel.href} onClick={() => setOpen(false)} className="block px-3.5 py-2 text-sm font-medium text-ink hover:bg-ink/5">
+            <Link
+              key={panel.href}
+              href={panel.href}
+              onClick={() => setOpen(false)}
+              className={cn(
+                "flex items-center gap-2 px-3.5 py-2 text-sm font-medium hover:bg-ink/5",
+                panel.label === "Reviewer panel" && user.reviewerLive ? "font-semibold text-accent-text" : "text-ink",
+              )}
+            >
               {panel.label}
+              {panel.label === "Reviewer panel" && user.reviewerLive && (
+                <span className="ml-auto inline-flex items-center gap-1 rounded-sm bg-[#004df6] px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                  <span className="h-1.5 w-1.5 rounded-full bg-white motion-safe:animate-pulse" aria-hidden /> Live
+                </span>
+              )}
             </Link>
           ))}
           <Link href="/profile" onClick={() => setOpen(false)} className="block px-3.5 py-2 text-sm text-ink/70 hover:bg-ink/5 hover:text-ink">
@@ -331,6 +352,16 @@ export function SiteHeader({
               Sign in
             </Link>
           )}
+          {user?.reviewerLive && (
+            <span className="ml-1">
+              <ReviewerLiveButton live={user.reviewerLive} place="header" />
+            </span>
+          )}
+          {user?.candidate && (
+            <span className="ml-1">
+              <CandidateEntryButton entry={user.candidate} place="header" />
+            </span>
+          )}
           <LinkButton href="/join" size="sm" className="ml-1">
             Join <ArrowRight size={14} />
           </LinkButton>
@@ -350,6 +381,12 @@ export function SiteHeader({
       {/* Mobile Nav */}
       {open && (
         <nav aria-label="Main" className="lg:hidden border-t border-ink/10 bg-paper px-6 py-4 flex flex-col gap-1">
+          {(user?.candidate || user?.reviewerLive) && (
+            <div className="mb-3 flex flex-col gap-2">
+              {user.reviewerLive && <ReviewerLiveButton live={user.reviewerLive} place="mobile-menu" onNavigate={() => setOpen(false)} />}
+              {user.candidate && <CandidateEntryButton entry={user.candidate} place="mobile-menu" onNavigate={() => setOpen(false)} />}
+            </div>
+          )}
           <div className="flex items-center justify-between pb-3 mb-2 border-b border-ink/10">
             <span className="text-sm text-ink/65">Theme</span>
             <ThemeToggle className="p-1.5 rounded-full border border-ink/15 text-ink/70 hover:text-ink" />

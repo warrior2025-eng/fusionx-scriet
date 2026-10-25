@@ -9,6 +9,8 @@ import { capabilitiesFor } from "@/lib/permissions/capabilities";
 import { cycleState, getCurrentCycle } from "@/lib/recruitment/data";
 import { resultsVisible } from "@/lib/recruitment/results";
 import { createClient } from "@/lib/supabase/server";
+import { CandidateEntryBar } from "@/components/recruitment/candidate-entry";
+import { getCandidateEntry, getLiveInterviewDay } from "@/lib/recruitment/my-entry";
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
   // Two rounds of queries instead of one after another: everything that does not need the user, with the
@@ -21,13 +23,18 @@ export default async function PublicLayout({ children }: { children: React.React
     getContent("footer.columns"),
   ]);
   const supabase = user ? await createClient() : null;
-  const [roles, profileRow, reviewerCount] = user && supabase
+  const [roles, profileRow, reviewerCount, candidate, liveDay] = user && supabase
     ? await Promise.all([
         getCurrentRoles(),
         supabase.from("profiles").select("full_name, avatar_url").eq("id", user.id).single().then((r) => r.data),
         supabase.from("recruitment_team_reviewers").select("team_id", { count: "exact", head: true }).eq("user_id", user.id).then((r) => r.count ?? 0),
+        // The candidate's "My Interview / My Result" and a reviewer's live interview day (migration 0028; null before it).
+        getCandidateEntry(),
+        getLiveInterviewDay(),
       ])
-    : [[], null, 0];
+    : [[], null, 0, null, null];
+  // Only reviewers get "Reviewer panel · Live" (admins keep their admin links).
+  const reviewerLive = reviewerCount ? liveDay : null;
 
   // Maintenance mode: the public gets the maintenance page; staff browse on.
   if (settings.maintenance_mode) {
@@ -58,7 +65,8 @@ export default async function PublicLayout({ children }: { children: React.React
     : { badge: navLinks.recruitmentBadge && recruitmentOpen ? "Open" : null, href: "/recruitment" };
 
   // A team reviewer gets a link to their applications in the account menu.
-  if (reviewerCount) panels.push({ href: "/review", label: "Review applications" });
+  // Today's interview room while interviews are on, else their applications.
+  if (reviewerCount) panels.push({ href: reviewerLive?.href ?? "/review", label: "Reviewer panel" });
 
   // Footer: Recruitment and Teams links can be switched off; Recruitment is added to the second column when on.
   const hidden = new Set([...(navLinks.footerRecruitment ? [] : ["/recruitment"]), ...(navLinks.footerTeams ? [] : ["/teams"])]);
@@ -89,9 +97,14 @@ export default async function PublicLayout({ children }: { children: React.React
         subtitle={settings.subtitle}
         logoUrl={settings.logo_path}
         recruitment={showRecruitment ? recruitmentLink : null}
-        user={user ? { email: user.email ?? "", fullName: profile?.full_name ?? "Member", avatarUrl: profile?.avatar_url ?? null, panels } : null}
+        user={
+          user
+            ? { email: user.email ?? "", fullName: profile?.full_name ?? "Member", avatarUrl: profile?.avatar_url ?? null, panels, candidate, reviewerLive }
+            : null
+        }
       />
-      <main className="flex-1">{children}</main>
+      <main className={candidate ? "flex-1 pb-24 lg:pb-0" : "flex-1"}>{children}</main>
+      {candidate && <CandidateEntryBar entry={candidate} />}
       <SiteFooter settings={settings} columns={footerColumns} />
     </>
   );

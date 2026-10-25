@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { safeNext } from "@/lib/auth/safe-next";
+import { landingAfterSignIn } from "@/lib/recruitment/my-entry";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -50,5 +51,5 @@ export async function GET(request: Request) {
     await supabase.from("profiles").update({ avatar_url: photo }).eq("id", data.user.id).is("avatar_url", null);
   }
 
-  return NextResponse.redirect(new URL(next, origin));
+  return NextResponse.redirect(new URL(await landingAfterSignIn(supabase, next), origin));
 }
