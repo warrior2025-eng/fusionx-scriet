@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DayRoomShell } from "@/components/interview/day-room";
-import { AdminPage } from "@/components/admin/ui";
 import { requireCapability } from "@/lib/admin/guard";
 import { getDayAccess } from "@/lib/interview/day-access";
 import { dayLabel } from "@/lib/recruitment/slots";
@@ -14,13 +13,10 @@ export default async function DayRoomLayout({ params, children }: { params: Prom
   await requireCapability("recruitment", `/admin/interviews/day/${dayId}`);
   const access = await getDayAccess(dayId);
   if (!access) notFound();
+  // A full-window app below the admin bar: video always in view, the sidebar scrolls on its own.
   return (
-    <AdminPage
-      title={`Interview room: ${dayLabel(access.day, "long")}`}
-      description="One room for the whole day. The panel stays in it; each slot's candidates are let in for their slot and removed when it ends."
-      crumbs={[{ label: "Interviews", href: "/admin/interviews" }, { label: dayLabel(access.day) }]}
-    >
-      <DayRoomShell access={access}>{children}</DayRoomShell>
-    </AdminPage>
+    <DayRoomShell access={access} title={`Interview room · ${dayLabel(access.day)}`}>
+      {children}
+    </DayRoomShell>
   );
 }

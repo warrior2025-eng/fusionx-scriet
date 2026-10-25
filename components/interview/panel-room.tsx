@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Eye, EyeOff, MicOff, RefreshCw, Smartphone, Video, VideoOff, Wifi, WifiOff } from "lucide-react";
+import { CheckCircle2, ChevronDown, Circle, Eye, EyeOff, MicOff, RefreshCw, Smartphone, Video, VideoOff, Wifi, WifiOff } from "lucide-react";
 import { hideQuestion, joinAsPanel, removeFromRoom, revealQuestion, revealedIds, slotEvents } from "@/actions/interview-panel";
 import { ActionButton } from "@/components/admin/action-button";
 import { useDayPresence } from "@/components/interview/day-room";
 import type { ParticipantStatus } from "@/components/interview/livekit-stage";
 import { LiveKitStage } from "@/components/interview/livekit-stage-lazy";
 import { Pill } from "@/components/admin/ui";
+import { TONE_CLASS, useDayPanel, type StateTone, type TileInfo } from "@/components/interview/tile-context";
 import { Button } from "@/components/ui/button";
 import { EVENT_LABELS, FLAG_TYPES, phoneUserId, type IntegrityEvent, type IntegrityType, type PhoneCameraSetting } from "@/lib/interview/shared";
 import { slotTime } from "@/lib/recruitment/slots";
@@ -15,7 +16,23 @@ import { joinErrorText } from "@/lib/interview/join-error";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
-export type PanelPerson = { booking_id: string; name: string; status: "booked" | "attended" | "no_show"; hubs: string; consented_at: string | null };
+export type PanelPerson = {
+  booking_id: string;
+  name: string;
+  status: "booked" | "attended" | "no_show";
+  hubs: string;
+  consented_at: string | null;
+  hubList?: string[];
+  year?: string | null;
+  department?: string | null;
+};
+
+/** The admin Pill tones in the day panel's colours (the same on the video tile and the card). */
+const PILL_TONE: Record<Tone, StateTone> = { good: "green", warn: "amber", bad: "red", neutral: "grey" };
+
+function StateChip({ tone, children, className }: { tone: StateTone; children: React.ReactNode; className?: string }) {
+  return <span className={cn("inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs font-semibold", TONE_CLASS[tone], className)}>{children}</span>;
+}
 export type BankItem = { id: string; hub: string; body: string };
 
 /** Pauses polling while the tab is hidden (realtime still brings changes in). */
@@ -145,7 +162,7 @@ function screenState(events: IntegrityEvent[], now: number, live: Live | null) {
   else if (away) state = { label: `Away from screen · ${awayFor}s`, tone: "bad" };
   else if (live?.inDay && live.present) state = now - rejoinedAt < 60_000 ? { label: "Rejoined", tone: "good" } : { label: "In the room", tone: "good" };
   else if (live?.inDay && (live.seen || leftRoom)) state = { label: "Left the room", tone: "neutral" };
-  else if (live?.inDay) state = live.late && live.status === "booked" ? { label: "Not joined yet", tone: "bad" } : { label: "Not in the room yet", tone: "neutral" };
+  else if (live?.inDay) state = live.late && live.status === "booked" ? { label: "Not joined yet", tone: "warn" } : { label: "Not in the room yet", tone: "neutral" };
   else if (leftRoom) state = { label: "Left the room", tone: "neutral" };
   else state = { label: "", tone: "neutral" };
   return { device, away, awayFor, leaves, seconds: Math.round(seconds + awayFor), removed: removed?.label ?? null, state };
@@ -195,7 +212,7 @@ function RemoveFromRoom({ bookingId, name }: { bookingId: string; name: string }
   );
 }
 
-type Tab = "candidates" | "questions" | "scores";
+type Tab = "candidates" | "questions" | "scores" | "checklist";
 
 /**
  * The interview panel for one slot: the call (owner token), a live integrity
@@ -221,6 +238,10 @@ export function PanelRoom({
   roomEnabled,
   dayMode = false,
   slotStartsAt,
+  slotEndsAt,
+  attendance,
+  application,
+  scored,
 }: {
   slotId: string;
   role: "admin" | "reviewer";
@@ -234,8 +255,14 @@ export function PanelRoom({
   roomEnabled: boolean;
   dayMode?: boolean;
   slotStartsAt?: string;
+  slotEndsAt?: string;
+  /** The day room's compact cards: attendance buttons (admins), the application, whether this panel member has scored. */
+  attendance?: Record<string, React.ReactNode>;
+  application?: Record<string, React.ReactNode>;
+  scored?: Record<string, boolean>;
 }) {
   const day = useDayPresence();
+  const panelCtx = useDayPanel();
   const events = useSlotEvents(slotId, initialEvents);
   const visible = useVisible();
   const [selected, setSelected] = useState(people[0]?.booking_id ?? "");
@@ -311,16 +338,45 @@ export function PanelRoom({
           present: day.present.has(p.booking_id),
           seen: day.seen.has(p.booking_id),
           quality: day.status[p.booking_id]?.quality,
-          late: Boolean(slotStartsAt && day.now !== null && day.now > new Date(slotStartsAt).getTime() + 5 * 60_000),
+          late: Boolean(slotStartsAt && day.now !== null && day.now > new Date(slotStartsAt).getTime() + 2 * 60_000),
           status: p.status,
         }
       : null;
   const stateOf = (p: PanelPerson) => screenState(byPerson[p.booking_id] ?? [], clock ?? 0, liveOf(p));
 
-  const person = people.find((p) => p.booking_id === selected);
-  const mine = byPerson[selected] ?? [];
+  // In the day room the selection is shared with the video grid (a click on a tile selects the card).
+  const sel = dayMode && panelCtx?.selected && people.some((p) => p.booking_id === panelCtx.selected) ? panelCtx.selected : selected;
+  const choose = (id: string) => {
+    setSelected(id);
+    panelCtx?.select(id);
+  };
+  const person = people.find((p) => p.booking_id === sel);
+  const toneOf = (p: PanelPerson): { label: string; tone: StateTone } => {
+    const st = stateOf(p);
+    if (st.away) return { label: `Away · ${st.awayFor}s`, tone: "red" };
+    const base = { label: st.state.label || "Booked", tone: PILL_TONE[st.state.tone] };
+    const m = dayMode && day?.inCall && day.present.has(p.booking_id) ? day.status[p.booking_id] : undefined;
+    const evs = byPerson[p.booking_id] ?? [];
+    const lastFix = [...evs].reverse().find((e) => e.type === "devices_fixed");
+    const blocked = evs.some((e) => e.type === "device_error" && e.detail?.kind === "permission_denied" && (!lastFix || e.id > lastFix.id));
+    if (base.tone === "grey") return base;
+    if (blocked) return { label: "Camera blocked", tone: "red" };
+    if (m && m.camera && !m.video) return { label: "No video received", tone: "red" };
+    if (m && (m.quality === "poor" || !m.camera) && base.tone === "green") return { label: !m.camera ? "Camera off" : "Poor connection", tone: "amber" };
+    return base;
+  };
+  const mine = byPerson[sel] ?? [];
   const screen = person ? stateOf(person) : null;
   const media = person && dayMode && day?.inCall && day.present.has(person.booking_id) ? day.status[person.booking_id] : undefined;
+
+  const tileInfo: Record<string, TileInfo> = {};
+  if (dayMode) for (const p of people) tileInfo[p.booking_id] = { hubs: p.hubList ?? (p.hubs ? p.hubs.split(", ") : []), state: toneOf(p) };
+  const tileKey = JSON.stringify(tileInfo);
+  const setTiles = panelCtx?.setTiles;
+  useEffect(() => {
+    if (!dayMode || !setTiles) return;
+    setTiles(JSON.parse(tileKey) as Record<string, TileInfo>);
+  }, [dayMode, setTiles, tileKey]);
 
   const chips = (
     <div className="flex flex-wrap gap-2" role="tablist" aria-label="Candidates in this slot">
@@ -334,12 +390,12 @@ export function PanelRoom({
             key={p.booking_id}
             type="button"
             role="tab"
-            aria-selected={p.booking_id === selected}
-            onClick={() => setSelected(p.booking_id)}
+            aria-selected={p.booking_id === sel}
+            onClick={() => choose(p.booking_id)}
             className={cn(
               "border px-3 py-1.5 text-left text-sm",
-              p.booking_id === selected ? "border-accent bg-accent text-white" : "border-ink/25 text-ink hover:border-ink/60",
-              missing && p.booking_id !== selected && "border-dashed border-accent",
+              p.booking_id === sel ? "border-accent bg-accent text-white" : "border-ink/25 text-ink hover:border-ink/60",
+              missing && p.booking_id !== sel && "border-dashed border-accent",
               away && "border-red-500 bg-red-500/15 text-ink",
             )}
           >
@@ -355,8 +411,12 @@ export function PanelRoom({
 
   const statusCard = person && screen && (
     <div className="border border-line bg-surface p-4 sm:p-5">
-      <h2 className="font-serif text-lg text-ink">{person.name}</h2>
-      <p className="mt-1 text-xs text-ink/70">{person.hubs}</p>
+      {!dayMode && (
+        <>
+          <h2 className="font-serif text-lg text-ink">{person.name}</h2>
+          <p className="mt-1 text-xs text-ink/70">{person.hubs}</p>
+        </>
+      )}
       {screen.away && (
         <p role="alert" className="mt-3 border border-red-500/60 bg-red-500/15 px-3 py-2 text-sm font-semibold text-ink">
           Away from the interview screen · {screen.awayFor}s · {nth(screen.leaves)} time
@@ -435,7 +495,7 @@ export function PanelRoom({
           <RefreshCw size={14} aria-hidden /> {(asked[person.booking_id] ?? 0) > (clock ?? 0) - 10_000 ? "Asked" : "Ask to re-check devices"}
         </Button>
       )}
-      <h3 className="mt-5 text-sm font-semibold text-ink">Integrity</h3>
+      <h3 className="mt-5 text-sm font-semibold text-ink" data-tour="integrity">Integrity</h3>
       <p className="mb-2 text-xs text-ink/65">Signals to help the panel judge. They show what happened, not why.</p>
       {screen.leaves > 0 && (
         <p className="mb-2 text-sm font-medium text-ink">
@@ -461,7 +521,7 @@ export function PanelRoom({
         </details>
       )}
       {dayMode && !screen.removed && (
-        <div className="mt-4">
+        <div className="mt-4" data-tour="remove">
           <RemoveFromRoom key={person.booking_id} bookingId={person.booking_id} name={person.name} />
         </div>
       )}
@@ -514,50 +574,145 @@ export function PanelRoom({
     ) : null;
 
   if (dayMode) {
+    // The slot's checklist, ticked from real data (resets with the slot: this sidebar is the slot's).
+    const endsIn = slotEndsAt && clock !== null ? new Date(slotEndsAt).getTime() - clock : null;
+    const nearEnd = endsIn !== null && endsIn > 0 && endsIn <= 2 * 60_000;
+    const checks = [
+      { label: "All candidates joined or marked", done: people.length > 0 && people.every((p) => day?.present.has(p.booking_id) || day?.seen.has(p.booking_id) || p.status !== "booked") },
+      { label: "Attendance marked", done: people.length > 0 && people.every((p) => p.status !== "booked") },
+      { label: "Questions asked", done: revealed.size > 0 },
+      { label: "Every candidate scored", done: people.length > 0 && people.every((p) => scored?.[p.booking_id]) },
+    ];
+    const doneCount = checks.filter((c) => c.done).length;
     const tabs: { id: Tab; label: string }[] = [
       { id: "candidates", label: `Candidates (${people.length})` },
       { id: "questions", label: "Questions" },
       { id: "scores", label: "Scores" },
+      { id: "checklist", label: `Checklist ${doneCount}/${checks.length}` },
     ];
+    const checklist = (
+      <ul className="space-y-2">
+        {checks.map((c) => (
+          <li
+            key={c.label}
+            className={cn(
+              "flex items-center gap-2 border px-3 py-2 text-sm",
+              c.done ? TONE_CLASS.green : nearEnd ? TONE_CLASS.amber : "border-line text-ink",
+            )}
+          >
+            {c.done ? <CheckCircle2 size={16} aria-hidden /> : <Circle size={16} aria-hidden />}
+            {c.label}
+            <span className="sr-only">{c.done ? "done" : "not yet"}</span>
+          </li>
+        ))}
+      </ul>
+    );
     return (
-      <div className="space-y-4">
-        <div className="flex border-b border-line" role="tablist" aria-label="Panel sidebar">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.id}
-              onClick={() => setTab(t.id)}
-              className={cn(
-                "-mb-px flex-1 border-b-2 px-2 py-2 text-sm font-medium",
-                tab === t.id ? "border-accent text-ink" : "border-transparent text-ink/65 hover:text-ink",
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
+      <div>
+        <div className="sticky top-0 z-10 border-b border-line bg-paper">
+          <div className="flex" role="tablist" aria-label="Panel sidebar">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.id}
+                data-tour={`tab-${t.id}`}
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  "-mb-px flex-1 border-b-2 px-1.5 py-2.5 text-[13px] font-medium",
+                  tab === t.id ? "border-accent text-ink" : "border-transparent text-ink/65 hover:text-ink",
+                  t.id === "checklist" && nearEnd && doneCount < checks.length && "text-amber-700 dark:text-amber-400",
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          {/* The checklist at a glance. */}
+          <div className="flex flex-wrap gap-1 px-3 py-1.5" aria-label="Checklist summary">
+            {checks.map((c) => (
+              <StateChip key={c.label} tone={c.done ? "green" : nearEnd ? "amber" : "grey"} className="font-medium">
+                {c.done ? "✓" : "○"} {c.label.replace("All candidates joined or marked", "Joined").replace("Attendance marked", "Attendance").replace("Questions asked", "Questions").replace("Every candidate scored", "Scored")}
+              </StateChip>
+            ))}
+          </div>
         </div>
-        {tab === "candidates" &&
-          (people.length === 0 ? (
-            <p className="text-sm text-ink/70">No candidates in this slot.</p>
-          ) : (
-            <div className="space-y-4">
-              {chips}
-              {statusCard}
-              {person && details[person.booking_id]}
+
+        <div className="space-y-3 p-3">
+          {tab === "candidates" &&
+            (people.length === 0 ? (
+              <p className="text-sm text-ink/70">No candidates in this slot.</p>
+            ) : (
+              people.map((p) => {
+                const t = toneOf(p);
+                const open = p.booking_id === sel;
+                const flags = (byPerson[p.booking_id] ?? []).filter((e) => FLAG_TYPES.includes(e.type as IntegrityType)).length;
+                return (
+                  <div key={p.booking_id} className={cn("border bg-surface", open ? "border-accent" : "border-line", "border-l-4", { green: "border-l-emerald-600", amber: "border-l-amber-500", red: "border-l-red-600", grey: "border-l-ink/30" }[t.tone])}>
+                    <button
+                      type="button"
+                      onClick={() => choose(p.booking_id)}
+                      aria-expanded={open}
+                      className="flex w-full items-start gap-3 px-3 pt-3 text-left"
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white" aria-hidden>
+                        {p.name.trim().charAt(0).toUpperCase()}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="font-semibold text-ink">{p.name}</span>
+                          <StateChip tone={t.tone}>{t.label}</StateChip>
+                          {flags > 0 && <span className="text-xs text-ink/70">{flags} flag{flags === 1 ? "" : "s"}</span>}
+                        </span>
+                        {(p.year || p.department) && <span className="block text-xs text-ink/70">{[p.year, p.department].filter(Boolean).join(" · ")}</span>}
+                        <span className="mt-1 flex flex-wrap gap-1">
+                          {(p.hubList ?? []).map((h) => (
+                            <span key={h} className="rounded-sm bg-ink/5 px-1.5 py-0.5 text-[11px] text-ink/80">
+                              {h}
+                            </span>
+                          ))}
+                        </span>
+                      </span>
+                      <ChevronDown size={18} className={cn("mt-1 shrink-0 text-ink/60 transition-transform", open && "rotate-180")} aria-hidden />
+                    </button>
+                    <div className="flex flex-wrap items-center gap-2 px-3 pb-3 pt-2">
+                      {attendance?.[p.booking_id]}
+                      <StateChip tone={p.status !== "booked" ? "green" : nearEnd ? "amber" : "grey"}>
+                        {p.status === "attended" ? "Attended" : p.status === "no_show" ? "No-show" : "Attendance not marked"}
+                      </StateChip>
+                      <StateChip tone={scored?.[p.booking_id] ? "green" : nearEnd ? "amber" : "grey"}>{scored?.[p.booking_id] ? "Scored" : "Not scored"}</StateChip>
+                    </div>
+                    {open && (
+                      <div className="space-y-4 border-t border-line px-3 py-3">
+                        {statusCard}
+                        <div>
+                          <h3 className="mb-2 text-sm font-semibold text-ink">Application</h3>
+                          {application?.[p.booking_id] ?? details[p.booking_id]}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ))}
+          {tab === "questions" && (bankSection ?? <p className="text-sm text-ink/70">{role === "admin" ? "No questions for these hubs yet." : "Admins reveal the questions."}</p>)}
+          {tab === "scores" &&
+            (people.length === 0 ? (
+              <p className="text-sm text-ink/70">No candidates in this slot.</p>
+            ) : (
+              <div className="space-y-3">
+                {chips}
+                {person && (scores?.[person.booking_id] ?? <p className="text-sm text-ink/70">Nothing to score for you here.</p>)}
+              </div>
+            ))}
+          {tab === "checklist" && (
+            <div className="space-y-3">
+              <p className="text-sm text-ink/75">Resets each slot. Unticked items turn amber 2 minutes before the slot ends.</p>
+              {checklist}
             </div>
-          ))}
-        {tab === "questions" && (bankSection ?? <p className="text-sm text-ink/70">{role === "admin" ? "No questions for these hubs yet." : "Admins reveal the questions."}</p>)}
-        {tab === "scores" &&
-          (people.length === 0 ? (
-            <p className="text-sm text-ink/70">No candidates in this slot.</p>
-          ) : (
-            <div className="space-y-4">
-              {chips}
-              {person && (scores?.[person.booking_id] ?? <p className="text-sm text-ink/70">Nothing to score for you here.</p>)}
-            </div>
-          ))}
+          )}
+        </div>
       </div>
     );
   }

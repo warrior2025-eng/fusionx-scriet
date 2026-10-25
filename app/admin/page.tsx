@@ -12,7 +12,7 @@ const QUICK_ACTIONS: { href: string; label: string; cap: Capability }[] = [
   { href: "/admin/opportunities/new", label: "Add an opportunity", cap: "content" },
   { href: "/admin/content", label: "Edit the home page", cap: "content" },
   { href: "/admin/team/new", label: "Add a core profile", cap: "team" },
-  { href: "/admin/applications?status=submitted", label: "Review applications", cap: "applications" },
+  { href: "/admin/applications?status=submitted", label: "Join applications to review", cap: "applications" },
   { href: "/admin/notifications", label: "Send a notification", cap: "broadcast" },
 ];
 

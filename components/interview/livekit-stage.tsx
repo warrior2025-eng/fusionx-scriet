@@ -18,6 +18,7 @@ import {
 } from "livekit-client";
 import { Expand, Maximize2, Minimize2, Pin, PinOff } from "lucide-react";
 import { DEVICE_KEYS } from "@/lib/interview/device";
+import { TONE_BORDER, TONE_CLASS, useDayPanel } from "@/components/interview/tile-context";
 import { isPhoneIdentity } from "@/lib/interview/shared";
 import { cn } from "@/lib/utils";
 
@@ -99,23 +100,41 @@ function Tile({
   trackRef,
   pinned,
   onPin,
+  onSelect,
   className,
   children,
 }: {
   trackRef: TrackReferenceOrPlaceholder;
   pinned?: boolean;
   onPin?: () => void;
+  /** The whole tile is a button: enlarge / back, and select the candidate's card. */
+  onSelect?: () => void;
   className?: string;
   children?: React.ReactNode;
 }) {
   const who = trackRef.participant.name || trackRef.participant.identity;
   return (
-    <div className={cn("relative overflow-hidden rounded bg-black", className)}>
+    <div
+      className={cn("relative overflow-hidden rounded bg-black", onSelect && "cursor-pointer", className)}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (onSelect && (e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      role={onSelect ? "button" : undefined}
+      tabIndex={onSelect ? 0 : undefined}
+      aria-label={onSelect ? (pinned ? `${who}: back to the grid` : `${who}: enlarge and show details`) : undefined}
+    >
       <ParticipantTile trackRef={trackRef} className="h-full w-full" />
       {onPin && (
         <button
           type="button"
-          onClick={onPin}
+          onClick={(e) => {
+            e.stopPropagation();
+            onPin();
+          }}
           className="absolute right-1.5 top-1.5 z-10 rounded bg-black/60 p-1.5 text-white opacity-80 hover:opacity-100 focus-visible:opacity-100"
           aria-label={pinned ? `Back to the grid from ${who}` : `Enlarge ${who}`}
           title={pinned ? "Back to the grid" : "Enlarge"}
@@ -161,6 +180,7 @@ function Tiles({ mode, onlyLocal }: { mode: StageMode; onlyLocal: boolean }) {
     return () => document.removeEventListener("fullscreenchange", on);
   }, []);
   const key = (t: TrackReferenceOrPlaceholder) => `${t.participant.identity}:${t.source}`;
+  const dayPanel = useDayPanel();
 
   if (onlyLocal || mode !== "panel") {
     const shown = onlyLocal ? all.filter((t) => t.participant.isLocal) : all.filter((t) => !isPhoneIdentity(t.participant.identity));
@@ -192,24 +212,40 @@ function Tiles({ mode, onlyLocal }: { mode: StageMode; onlyLocal: boolean }) {
   const lonePhones = [...phones.values()].filter((p) => !candidates.some((c) => phoneOf(c) === p));
   const main = [...shares, ...candidates, ...lonePhones];
   const pin = (t: TrackReferenceOrPlaceholder) => setPinned((p) => (p === key(t) ? null : key(t)));
+  const day = dayPanel;
   const big = pinned ? [...main, ...panelTracks].find((t) => key(t) === pinned) : undefined;
-  let cols = main.length <= 1 ? 1 : main.length <= 4 ? 2 : 3;
-  let tileW = 0;
-  if (size.w > 0 && size.h > 0 && main.length > 0) {
-    for (let c = 1; c <= main.length; c++) {
-      const rows = Math.ceil(main.length / c);
-      const w = Math.min((size.w - (c - 1) * 4) / c, ((size.h - (rows - 1) * 4) / rows) * (16 / 9));
-      if (w > tileW) {
-        tileW = w;
-        cols = c;
-      }
-    }
-  }
+  // Equal tiles: 1 candidate = one large tile, 2 side by side, 3–4 in a 2×2 grid, more in 3 columns; as large as fits.
+  const cols = main.length <= 1 ? 1 : main.length <= 4 ? 2 : 3;
+  const rows = Math.max(1, Math.ceil(main.length / cols));
+  const tileW = size.w > 0 && size.h > 0 ? Math.min((size.w - (cols - 1) * 4) / cols, ((size.h - (rows - 1) * 4) / rows) * (16 / 9)) : 0;
 
   const candidateTile = (t: TrackReferenceOrPlaceholder, className?: string) => {
     const phone = phoneOf(t);
+    const id = t.participant.identity;
+    const info = day?.tiles[id];
+    const choose = () => {
+      pin(t);
+      day?.select(id);
+    };
     return (
-      <Tile key={key(t)} trackRef={t} pinned={pinned === key(t)} onPin={() => pin(t)} className={className}>
+      <Tile
+        key={key(t)}
+        trackRef={t}
+        pinned={pinned === key(t)}
+        onPin={() => pin(t)}
+        onSelect={choose}
+        className={cn(className, info ? TONE_BORDER[info.state.tone] : "ring-1 ring-white/20", day?.selected === id && "outline outline-2 outline-offset-2 outline-white")}
+      >
+        {info && (
+          <div className="pointer-events-none absolute inset-x-1.5 top-1.5 z-10 flex flex-wrap items-start gap-1 pr-9">
+            <span className={cn("rounded-sm border px-1.5 py-0.5 text-[11px] font-semibold", TONE_CLASS[info.state.tone], "bg-black/70 text-white")}>{info.state.label}</span>
+            {info.hubs.slice(0, 2).map((h) => (
+              <span key={h} className="rounded-sm bg-black/60 px-1.5 py-0.5 text-[11px] text-white/90">
+                {h}
+              </span>
+            ))}
+          </div>
+        )}
         {phone && (
           <div className="absolute bottom-9 right-1.5 z-10 aspect-[3/4] w-1/4 min-w-16 overflow-hidden rounded border border-white/50 shadow-lg" aria-label={phone.participant.name || "Phone camera"}>
             <ParticipantTile trackRef={phone} className="h-full w-full" />
@@ -220,7 +256,7 @@ function Tiles({ mode, onlyLocal }: { mode: StageMode; onlyLocal: boolean }) {
   };
 
   return (
-    <div ref={box} className="relative flex flex-col bg-black" style={{ height: "calc(100% - var(--lk-control-bar-height))" }}>
+    <div ref={box} className="relative flex h-full flex-col bg-black pb-14" data-tour="video">
       <div className="flex shrink-0 items-center gap-1 overflow-x-auto p-1">
         {panelTracks.map((t) => (
           <Tile key={key(t)} trackRef={t} pinned={pinned === key(t)} onPin={() => pin(t)} className="aspect-video h-20 shrink-0 sm:h-24" />
@@ -514,7 +550,13 @@ export function LiveKitStage({
           className="absolute! left-1/2 top-1/2 z-30 -translate-x-1/2 -translate-y-1/2 rounded! bg-[#004df6]! px-6! py-4! text-base! font-semibold! text-white! shadow-xl"
         />
       )}
-      <ControlBar controls={{ chat: false, screenShare: mode === "panel", microphone: mode !== "phone", camera: true, leave: true, settings: false }} />
+      {mode === "panel" ? (
+        <div className="absolute inset-x-0 bottom-0 z-20 bg-black/55" data-tour="controls">
+          <ControlBar controls={{ chat: false, screenShare: true, microphone: true, camera: true, leave: true, settings: false }} />
+        </div>
+      ) : (
+        <ControlBar controls={{ chat: false, screenShare: false, microphone: mode !== "phone", camera: true, leave: true, settings: false }} />
+      )}
       <Watcher hold={hold} mode={mode} {...events} />
     </LiveKitRoom>
   );

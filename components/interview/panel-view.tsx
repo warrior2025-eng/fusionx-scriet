@@ -1,4 +1,5 @@
-import { ExternalLink } from "lucide-react";
+import { Briefcase, Code, ExternalLink, Globe } from "lucide-react";
+import { Clamp } from "@/components/interview/clamp";
 import { savePanelReview, type PanelAccess } from "@/actions/interview-panel";
 import { setBookingStatus } from "@/actions/admin-slots";
 import { ActionButton } from "@/components/admin/action-button";
@@ -40,6 +41,10 @@ export async function PanelView({ supabase, access, userId, dayMode = false }: {
 
   const details: Record<string, React.ReactNode> = {};
   const scores: Record<string, React.ReactNode> = {};
+  // The day room's compact cards: attendance in the header, the application when opened, whether this panel member has scored.
+  const attendance: Record<string, React.ReactNode> = {};
+  const application: Record<string, React.ReactNode> = {};
+  const scored: Record<string, boolean> = {};
   for (const person of people) {
     const detail = await loadApplicationDetail(supabase, person.application_id);
     const scorable = (person.hubs ?? []).filter((h) => access.role === "admin" || (access.teams ?? []).includes(h.team_id));
@@ -70,6 +75,53 @@ export async function PanelView({ supabase, access, userId, dayMode = false }: {
           );
         })}
       </div>
+    );
+    scored[person.booking_id] =
+      scorable.length > 0 && scorable.every((hub) => detail?.reviews.some((r) => r.team_id === hub.team_id && r.reviewer_id === userId && r.score !== null));
+    if (access.role === "admin") {
+      attendance[person.booking_id] = (
+        <span className="inline-flex gap-1.5" data-tour="attendance">
+          <ActionButton variant={person.status === "attended" ? "primary" : "secondary"} action={setBookingStatus.bind(null, access.cycle_id, person.booking_id, "attended")}>
+            Attended
+          </ActionButton>
+          <ActionButton variant={person.status === "no_show" ? "primary" : "secondary"} action={setBookingStatus.bind(null, access.cycle_id, person.booking_id, "no_show")}>
+            No-show
+          </ActionButton>
+        </span>
+      );
+    }
+    application[person.booking_id] = detail ? (
+      <div className="space-y-3 text-sm">
+        {links.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {links.map(([k, v]) => {
+              const Icon = /github/i.test(v) ? Code : /linkedin/i.test(v) ? Briefcase : Globe;
+              return (
+                <a
+                  key={k}
+                  href={v}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={`${k}: ${v}`}
+                  className="inline-flex items-center gap-1.5 border border-line px-2 py-1 text-xs font-medium text-ink hover:border-ink/50"
+                >
+                  <Icon size={14} aria-hidden /> {k}
+                </a>
+              );
+            })}
+          </div>
+        )}
+        {asked
+          .filter((q) => q.type !== "file")
+          .map((q) => (
+            <div key={q.id}>
+              <p className="text-xs text-ink/65">{q.label}</p>
+              <Clamp text={answerText(detail.application.answers[q.id]) || "No answer"} />
+            </div>
+          ))}
+      </div>
+    ) : (
+      <p className="text-sm text-ink/70">Not available.</p>
     );
     details[person.booking_id] = (
       <div className="space-y-4">
@@ -128,12 +180,15 @@ export async function PanelView({ supabase, access, userId, dayMode = false }: {
     name: p.name,
     status: p.status,
     hubs: (p.hubs ?? []).map((h) => h.name).join(", "),
+    hubList: (p.hubs ?? []).map((h) => h.name),
+    year: p.year,
+    department: p.department,
     consented_at: p.consented_at,
   }));
 
   return (
     <>
-      <p className={dayMode ? "mb-4 text-xs text-ink/70" : "mb-4 text-sm text-ink/75"}>
+      <p className={dayMode ? "sr-only" : "mb-4 text-sm text-ink/75"}>
         {dayLabel(access.day)} · {slotRange(access.starts_at, access.ends_at)} IST ·{" "}
         {access.room_enabled ? "In-website room" : "Google Meet day"} · phone camera {access.phone_camera} · fullscreen {access.strict_fullscreen ? "strict" : "off"}
       </p>
@@ -144,6 +199,10 @@ export async function PanelView({ supabase, access, userId, dayMode = false }: {
         people={panelPeople}
         details={details}
         scores={scores}
+        attendance={attendance}
+        application={application}
+        scored={scored}
+        slotEndsAt={access.ends_at}
         initialEvents={(eventRows ?? []) as IntegrityEvent[]}
         bank={bank}
         initialRevealed={(revealRows ?? []).map((r) => r.question_id as string)}
