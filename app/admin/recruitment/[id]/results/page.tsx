@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowDown, ArrowUp, Download, Eye } from "lucide-react";
+import { ArrowDown, ArrowUp, Eye } from "lucide-react";
 import {
   cancelSchedule,
   lockDecisions,

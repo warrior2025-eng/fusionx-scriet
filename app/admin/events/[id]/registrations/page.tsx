@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Award, Download, ScanLine, X } from "lucide-react";
+import { Award, ScanLine, X } from "lucide-react";
 import { addVolunteer, issueCertificates, removeVolunteer } from "@/actions/admin-events";
 import { ExportButtons } from "@/components/admin/export-buttons";
 import { ActionButton } from "@/components/admin/action-button";
