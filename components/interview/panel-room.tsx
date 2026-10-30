@@ -723,7 +723,16 @@ export function PanelRoom({
         <div className="relative aspect-video w-full bg-black">
           {conn && (
             <div className="absolute inset-0">
-              <LiveKitStage serverUrl={conn.serverUrl} token={conn.token} mode="panel" onConnected={onConnected} onDisconnected={onDisconnected} onError={onCallError} onPeople={onPeople} />
+              <LiveKitStage
+                serverUrl={conn.serverUrl}
+                token={conn.token}
+                mode="panel"
+                onConnected={onConnected}
+                onDisconnected={onDisconnected}
+                onError={onCallError}
+                onPeople={onPeople}
+                onDeviceError={() => setError("Your camera or microphone could not start; you are still in the call. Allow it in the address bar or close other apps using it.")}
+              />
             </div>
           )}
           {joined !== "joined" && (
