@@ -16,6 +16,8 @@ import { siteName } from "@/lib/site-config";
 /** Past this the file takes too long or gets too large: the page asks for narrower filters or the CSV. */
 export const PDF_MAX_ROWS = 5000;
 export const PDF_MAX_MS = 45_000;
+/** Just under what a Vercel function may send back (4.5 MB). */
+export const PDF_MAX_BYTES = 4_400_000;
 export const PDF_TOO_MANY = "Too many rows for a PDF. Narrow the filters or use CSV.";
 
 export class PdfTooLarge extends Error {}
@@ -280,5 +282,7 @@ export async function renderTablePdf<T>({ title, filters = {}, rows, columns }: 
     const label = `Page ${i + 1} of ${pages.length}`;
     p.drawText(label, { x: W - MARGIN - sansFont.widthOfTextAtSize(label, 7.5), y: FOOTER - 11, size: 7.5, font: sansFont, color: MUTED });
   });
-  return pdf.save();
+  const bytes = await pdf.save();
+  if (bytes.length > PDF_MAX_BYTES) throw new PdfTooLarge(PDF_TOO_MANY);
+  return bytes;
 }
