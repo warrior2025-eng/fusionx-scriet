@@ -124,7 +124,7 @@ function columnWidths(headers: string[][], cells: string[][][], face: Face, bold
         for (const w of paragraph.split(" ")) {
           const u = face.unit(w);
           // A link can break anywhere: it does not set the minimum width.
-          if (u * size < 70) word = Math.max(word, u);
+          if (u * size < 100) word = Math.max(word, u);
           line += u + space;
         }
         chars += line;
@@ -132,7 +132,7 @@ function columnWidths(headers: string[][], cells: string[][][], face: Face, bold
       }
       sum += chars;
     }
-    return { min: word * size + PAD_X * 2 + 1, natural: longest * size + PAD_X * 2 + 1, weight: Math.sqrt(sum / Math.max(cells.length, 1)) + 0.5 };
+    return { min: word * size + PAD_X * 2 + 1, natural: longest * size + PAD_X * 2 + 1, weight: sum / Math.max(cells.length, 1) + 1 };
   });
   const floor = Math.min(26, total / headers.length);
   const minimum = stats.map((s) => Math.max(s.min, floor));
@@ -208,7 +208,7 @@ export async function renderTablePdf<T>({ title, filters = {}, rows, columns }: 
   const applied = Object.entries(filters).filter(([, v]) => v);
   const meta = [
     `Filters: ${applied.length ? applied.map(([k, v]) => `${k}: ${v}`).join(" · ") : "none (all rows)"}`,
-    `Generated on ${istDateTime(new Date().toISOString())} IST · ${rows.length} row${rows.length === 1 ? "" : "s"}`,
+    `Generated on ${istDateTime(new Date().toISOString())} · ${rows.length} row${rows.length === 1 ? "" : "s"}`,
   ];
   y -= 3;
   for (const text of meta) {
