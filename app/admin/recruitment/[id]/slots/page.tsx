@@ -20,6 +20,7 @@ import {
 import { saveRoomSettings } from "@/actions/interview-panel";
 import { DEFAULT_CHECKLIST } from "@/lib/interview/shared";
 import { RoomStatus } from "@/components/interview/room-status";
+import { FormPdfButton } from "@/components/admin/export-buttons";
 import { ActionButton } from "@/components/admin/action-button";
 import { AdminForm, CheckboxField, SelectField, TextField, TextareaField } from "@/components/admin/admin-form";
 import { CycleTabs } from "@/components/admin/recruitment-parts";
@@ -526,12 +527,14 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
                     <button type="submit" className="border border-accent bg-accent px-3 py-2 text-sm font-medium text-white">
                       CSV (Excel / Google Sheets)
                     </button>
+                    <FormPdfButton action={`${base}/export`} label="PDF" />
                     <button type="submit" formAction={`/print/recruitment/${id}/slots`} className="border border-line px-3 py-2 text-sm font-medium text-ink hover:border-ink/50">
                       Printable list (PDF)
                     </button>
                     <button type="submit" name="empty" value="1" className="border border-line px-3 py-2 text-sm text-ink hover:border-ink/50">
                       Empty schedule (CSV)
                     </button>
+                    <FormPdfButton action={`${base}/export`} label="Empty schedule (PDF)" extra={{ empty: "1" }} />
                     <button type="submit" name="empty" value="1" formAction={`/print/recruitment/${id}/slots`} className="border border-line px-3 py-2 text-sm text-ink hover:border-ink/50">
                       Empty schedule (printable)
                     </button>

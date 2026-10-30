@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Download } from "lucide-react";
-import { LinkButton } from "@/components/ui/button";
 import {
   AdminPage,
   EmptyRow,
@@ -17,6 +15,7 @@ import {
   withParams,
   type ListParams,
 } from "@/components/admin/ui";
+import { ExportButtons } from "@/components/admin/export-buttons";
 import { requireCapability } from "@/lib/admin/guard";
 import { filterUsers, listUsers, type AdminUser } from "@/lib/admin/users";
 import { ALL_ROLES, ROLE_LABELS } from "@/lib/permissions/capabilities";
@@ -51,9 +50,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
       description="Every account on the site. Roles are granted by a super admin from a user's page."
       crumbs={[{ label: "Users & roles" }]}
       actions={
-        <LinkButton href={withParams("/admin/users/export", params, { page: undefined })} variant="secondary" size="sm">
-          <Download size={14} /> Export CSV
-        </LinkButton>
+        <ExportButtons href={withParams("/admin/users/export", params, { page: undefined })} />
       }
     >
       <Toolbar

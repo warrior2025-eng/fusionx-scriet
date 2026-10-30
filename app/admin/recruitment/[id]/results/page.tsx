@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowDown, ArrowUp, Download, Eye } from "lucide-react";
+import { ArrowDown, ArrowUp, Eye } from "lucide-react";
 import {
   cancelSchedule,
   lockDecisions,
@@ -20,6 +20,7 @@ import {
   setTaskReviewed,
   unlockDecisions,
 } from "@/actions/admin-results";
+import { ExportButtons } from "@/components/admin/export-buttons";
 import { ActionButton } from "@/components/admin/action-button";
 import { AdminForm, CheckboxField, SelectField, TextField, TextareaField } from "@/components/admin/admin-form";
 import { CycleTabs } from "@/components/admin/recruitment-parts";
@@ -176,9 +177,7 @@ export default async function CycleResultsPage({ params, searchParams }: { param
             <LinkButton href={`${base}/public-preview`} variant="secondary" size="sm">
               <Eye size={14} aria-hidden /> Preview public results page
             </LinkButton>
-            <LinkButton href={`${base}/export`} variant="secondary" size="sm">
-              <Download size={14} aria-hidden /> Final results (CSV, all hubs)
-            </LinkButton>
+            <ExportButtons href={`${base}/export`} label="Final results, all hubs" />
           </div>
         </Panel>
 
@@ -469,12 +468,8 @@ export default async function CycleResultsPage({ params, searchParams }: { param
                     <textarea readOnly rows={9} className="w-full border border-line bg-paper p-3 font-mono text-xs text-ink" defaultValue={socialDraft((templateRows?.body as string | undefined) ?? "")} />
                   </label>
                   <div className="mt-3 flex flex-wrap gap-3">
-                    <LinkButton href={`${base}/social?hub=${hub.id}`} variant="secondary" size="sm">
-                      <Download size={14} aria-hidden /> CSV for {hub.name}
-                    </LinkButton>
-                    <LinkButton href={`${base}/social`} variant="ghost" size="sm">
-                      CSV, every hub
-                    </LinkButton>
+                    <ExportButtons href={`${base}/social?hub=${hub.id}`} label={hub.name} />
+                    <ExportButtons href={`${base}/social`} label="Every hub" variant="ghost" />
                     <Link href="/admin/recruitment/templates" className="self-center text-sm text-ink/70 underline underline-offset-2">
                       Edit the template
                     </Link>

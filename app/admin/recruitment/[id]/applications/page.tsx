@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Download } from "lucide-react";
 import { bulkStage } from "@/actions/admin-recruitment";
+import { ExportButtons } from "@/components/admin/export-buttons";
 import { AdminForm, SelectField } from "@/components/admin/admin-form";
 import { CycleTabs } from "@/components/admin/recruitment-parts";
 import { SelectAll } from "@/components/admin/select-all";
 import { AdminPage, EmptyRow, Pill, Table, Td, Th, Toolbar, formatDate, param, withParams, type ListParams } from "@/components/admin/ui";
-import { LinkButton } from "@/components/ui/button";
 import { requireCapability } from "@/lib/admin/guard";
 import { distinct, filterApplications, loadCycleApplications } from "@/lib/recruitment/admin";
 import { STAGES, STAGE_LABELS, STAGE_TONE } from "@/lib/recruitment/data";
@@ -49,12 +48,8 @@ export default async function CycleApplicationsPage({ params, searchParams }: { 
       actions={
         filters.team ? (
           <>
-            <LinkButton href={withParams(`${base}/export`, query, {})} variant="secondary" size="sm">
-              <Download size={14} /> Export this team (CSV)
-            </LinkButton>
-            <LinkButton href={withParams(`${base}/export`, query, { notes: 1 })} variant="ghost" size="sm">
-              With private notes
-            </LinkButton>
+            <ExportButtons href={withParams(`${base}/export`, query, {})} label="This team" />
+            <ExportButtons href={withParams(`${base}/export`, query, { notes: 1 })} label="With private notes" variant="ghost" />
           </>
         ) : undefined
       }
