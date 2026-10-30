@@ -520,7 +520,16 @@ export function LiveKitStage({
     return id ? { ...AUDIO, deviceId: id } : true;
   }, []);
   const handleDisconnected = useCallback((reason?: DisconnectReason) => onDisconnected?.(reason === DisconnectReason.PARTICIPANT_REMOVED), [onDisconnected]);
-  const handleError = useCallback((e: Error) => onError?.(e.message), [onError]);
+  // LiveKitRoom also reports here when the camera or microphone cannot start after connecting (blocked, busy,
+  // missing). That is not a failed call: it goes to onDeviceError, and the call stays open.
+  const handleError = useCallback(
+    (e: Error) => {
+      const device = /NotAllowed|NotReadable|NotFound|Overconstrained|Security|TrackStart|DevicesNotFound/i.test(e.name) || /getUserMedia|could not start|requested device/i.test(e.message);
+      if (device && onDeviceError) onDeviceError(errorKind(e), /audio|microphone/i.test(e.message) ? "microphone" : "camera");
+      else onError?.(e.message);
+    },
+    [onError, onDeviceError],
+  );
   const handleDevice = useCallback(
     (f?: MediaDeviceFailure, kind?: MediaDeviceKind) => onDeviceError?.(failureKind(f), kind === "audioinput" ? "microphone" : "camera"),
     [onDeviceError],

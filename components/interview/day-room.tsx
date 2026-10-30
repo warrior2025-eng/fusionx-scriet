@@ -56,6 +56,7 @@ export function DayRoomShell({ access, title, children }: { access: DayAccess; t
   const [callPresent, setCallPresent] = useState<string[]>([]);
   const [room, setRoom] = useState<(DayRoomNow & { ok: true }) | null>(null);
   const [checkError, setCheckError] = useState("");
+  const [deviceNote, setDeviceNote] = useState("");
   const [status, setStatus] = useState<Record<string, ParticipantStatus>>({});
   const [controls, setControls] = useState<StageControls | null>(null);
   const [sideOpen, setSideOpen] = useState(true);
@@ -210,6 +211,18 @@ export function DayRoomShell({ access, title, children }: { access: DayAccess; t
     setConn(null);
     setJoined("idle");
   }, []);
+  // The panel member's own camera or microphone did not start: the call stays open, with a note.
+  const onDeviceError = useCallback((kind: string, which: "camera" | "microphone") => {
+    setDeviceNote(
+      kind === "permission_denied"
+        ? `Your ${which} is blocked by the browser. You are still in the call: allow it (camera icon in the address bar), then press the ${which === "camera" ? "Camera" : "Microphone"} button below.`
+        : kind === "device_in_use"
+          ? `Your ${which} is being used by another app or tab (Zoom, Meet, another interview tab). Close it, then press the ${which === "camera" ? "Camera" : "Microphone"} button below.`
+          : kind === "no_device"
+            ? `No ${which} found on this device. You are still in the call and can see and hear the candidates.`
+            : `Your ${which} could not start. You are still in the call; try the ${which === "camera" ? "Camera" : "Microphone"} button below.`,
+    );
+  }, [setDeviceNote]);
   const onPeople = useCallback(
     (ids: string[]) => {
       setCallPresent(ids);
@@ -316,7 +329,16 @@ export function DayRoomShell({ access, title, children }: { access: DayAccess; t
                     onPeople={onPeople}
                     onStatus={setStatus}
                     onControls={setControls}
+                    onDeviceError={onDeviceError}
                   />
+                </div>
+              )}
+              {deviceNote && joined === "joined" && (
+                <div role="alert" className="absolute inset-x-2 top-2 z-30 flex items-start gap-3 border border-amber-500/70 bg-paper p-3 text-sm text-ink shadow-lg sm:left-auto sm:w-[28rem]">
+                  <p className="flex-1">{deviceNote}</p>
+                  <button type="button" onClick={() => setDeviceNote("")} className="shrink-0 border border-ink/30 px-2 py-0.5 text-xs font-medium">
+                    OK
+                  </button>
                 </div>
               )}
               {joined !== "joined" && (
