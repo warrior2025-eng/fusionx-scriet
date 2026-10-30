@@ -1,5 +1,5 @@
 import { logAudit } from "@/lib/admin/audit";
-import { csvResponse, toCsv } from "@/lib/admin/csv";
+import { exportFormat, exportResponse } from "@/lib/admin/export";
 import { authorize } from "@/lib/admin/guard";
 import { eventRegistrations, filterRegistrations, type Registration } from "@/lib/admin/registrations";
 import { STATUS_LABELS, istDateTime } from "@/lib/events/format";
@@ -13,7 +13,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!event) return new Response("Not found", { status: 404 });
 
   // The same search and status filter as the page it was opened from.
-  const query = new URL(request.url).searchParams;
+  const url = new URL(request.url);
+  const format = exportFormat(url);
+  const query = url.searchParams;
   const registrations = filterRegistrations(await eventRegistrations(ctx, id), {
     q: query.get("q") ?? "",
     status: query.get("status") ?? "",
@@ -23,12 +25,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     action: "exported",
     table: "event_registrations",
     id,
-    note: `${registrations.length} registrations to CSV`,
+    note: `${registrations.length} registrations to ${format.toUpperCase()}`,
   });
 
-  return csvResponse(
-    "fusionx-event-registrations",
-    toCsv(registrations, [
+  const status = query.get("status") ?? "";
+  return exportResponse(format, {
+    filename: "fusionx-event-registrations",
+    title: `Registrations: ${event.title}`,
+    filters: { Search: query.get("q"), Status: status ? (STATUS_LABELS[status as Registration["status"]] ?? status) : "" },
+    rows: registrations,
+    columns: [
       { header: "Event", value: () => String(event.title) },
       { header: "Name", value: (r) => r.name },
       // Emails only for roles that may view users.
@@ -39,6 +45,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       { header: "Registered", value: (r) => istDateTime(r.registeredAt) },
       { header: "Checked in at", value: (r) => istDateTime(r.checkedInAt) },
       { header: "Certificate serial", value: (r) => r.certificateSerial },
-    ]),
-  );
+    ],
+  });
 }

@@ -1,3 +1,4 @@
+import { ExportButtons } from "@/components/admin/export-buttons";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Download, Settings } from "lucide-react";
@@ -38,9 +39,7 @@ export default async function TeamsAdminPage({ searchParams }: { searchParams: P
               <Settings size={14} /> Settings
             </LinkButton>
           )}
-          <LinkButton href={withParams("/admin/teams/export", query, {})} variant="secondary" size="sm">
-            <Download size={14} /> Export CSV
-          </LinkButton>
+          <ExportButtons href={withParams("/admin/teams/export", query, {})} />
         </>
       }
     >

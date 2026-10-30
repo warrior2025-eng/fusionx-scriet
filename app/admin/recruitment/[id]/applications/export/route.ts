@@ -1,20 +1,22 @@
 import { logAudit } from "@/lib/admin/audit";
-import { csvResponse, toCsv } from "@/lib/admin/csv";
+import { exportFormat, exportResponse } from "@/lib/admin/export";
 import { authorize } from "@/lib/admin/guard";
 import { istDateTime } from "@/lib/events/format";
 import { filterApplications, loadCycleApplications, type AdminApplication } from "@/lib/recruitment/admin";
 import { STAGE_LABELS, answerText, questionsFor, toQuestion } from "@/lib/recruitment/data";
 
 /**
- * One team's applications as CSV, with the same filters as the list it was
- * opened from. Reviewers' private notes are left out unless `notes=1`.
+ * One team's applications as CSV or PDF, with the same filters as the list it
+ * was opened from. Reviewers' private notes are left out unless `notes=1`.
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const ctx = await authorize("recruitment");
   if (!ctx) return new Response("Forbidden", { status: 403 });
 
-  const query = new URL(request.url).searchParams;
+  const url = new URL(request.url);
+  const format = exportFormat(url);
+  const query = url.searchParams;
   const teamId = query.get("team") ?? "";
   const { data: team } = await ctx.supabase.from("recruitment_teams").select("id, name, cycle_id").eq("id", teamId).maybeSingle();
   if (!team || team.cycle_id !== id) return new Response("Choose a team to export.", { status: 400 });
@@ -42,12 +44,29 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     action: "exported",
     table: "recruitment_applications",
     id,
-    note: `${rows.length} applications for ${team.name}${withNotes ? ", with private notes" : ""}`,
+    note: `${rows.length} applications for ${team.name}${withNotes ? ", with private notes" : ""}${format === "pdf" ? " (PDF)" : ""}`,
   });
 
-  return csvResponse(
-    "fusionx-recruitment",
-    toCsv(rows, [
+  // Only the PDF has a heading.
+  const { data: cycle } = format === "pdf" ? await ctx.supabase.from("recruitment_cycles").select("title").eq("id", id).maybeSingle() : { data: null };
+  const stage = query.get("stage") ?? "";
+  const rank = query.get("rank") ?? "";
+  const score = query.get("score") ?? "";
+  return exportResponse(format, {
+    filename: "fusionx-recruitment",
+    title: `Recruitment applications: ${cycle?.title ?? ""}`,
+    filters: {
+      Team: String(team.name),
+      Search: query.get("q"),
+      Preference: rank ? `Choice ${rank}` : "",
+      Stage: stage ? (STAGE_LABELS[stage as keyof typeof STAGE_LABELS] ?? stage) : "",
+      Department: query.get("department"),
+      Year: query.get("year"),
+      "Average score": score ? `${score} or more` : "",
+      "Private notes": withNotes ? "included" : "",
+    },
+    rows,
+    columns: [
       { header: "Team", value: () => String(team.name) },
       { header: "Name", value: (a) => a.full_name },
       { header: "Department", value: (a) => a.department },
@@ -72,6 +91,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             },
           ]
         : []),
-    ]),
-  );
+    ],
+  });
 }

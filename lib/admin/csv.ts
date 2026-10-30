@@ -1,13 +1,21 @@
-type Cell = string | number | boolean | null | undefined | string[];
+export type Cell = string | number | boolean | null | undefined | string[];
+
+/** One column of an export: the same list makes the CSV and the PDF. */
+export type Column<T> = { header: string; value: (row: T) => Cell };
+
+/** What a cell says, before any file format touches it. */
+export function cellText(value: Cell): string {
+  return Array.isArray(value) ? value.join("; ") : value === null || value === undefined ? "" : String(value);
+}
 
 function cell(value: Cell): string {
-  let text = Array.isArray(value) ? value.join("; ") : value === null || value === undefined ? "" : String(value);
+  let text = cellText(value);
   // A cell starting with = + - @ is run as a formula by spreadsheet apps.
   if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-export function toCsv<T>(rows: T[], columns: { header: string; value: (row: T) => Cell }[]): string {
+export function toCsv<T>(rows: T[], columns: Column<T>[]): string {
   const lines = [columns.map((c) => cell(c.header)).join(",")];
   for (const row of rows) lines.push(columns.map((c) => cell(c.value(row))).join(","));
   // BOM so Excel opens it as UTF-8.

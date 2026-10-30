@@ -1,5 +1,5 @@
 import { logAudit } from "@/lib/admin/audit";
-import { csvResponse, toCsv } from "@/lib/admin/csv";
+import { exportFormat, exportResponse } from "@/lib/admin/export";
 import { authorize } from "@/lib/admin/guard";
 import { istDateTime } from "@/lib/events/format";
 import { filterTeams, loadTeams } from "@/lib/teams/admin";
@@ -9,7 +9,9 @@ import { TEAM_STATUS_LABELS, TEAM_TYPE_LABELS, VERIFICATION_LABELS } from "@/lib
 export async function GET(request: Request) {
   const ctx = await authorize("moderation");
   if (!ctx) return new Response("Forbidden", { status: 403 });
-  const query = new URL(request.url).searchParams;
+  const url = new URL(request.url);
+  const format = exportFormat(url);
+  const query = url.searchParams;
   const teams = filterTeams(await loadTeams(ctx.supabase), {
     q: query.get("q") ?? "",
     verification: query.get("verification") ?? "",
@@ -19,11 +21,22 @@ export async function GET(request: Request) {
     looking: query.get("looking") ?? "",
     size: query.get("size") ?? "",
   });
-  await logAudit(ctx, { action: "exported", table: "teams", note: `${teams.length} teams to CSV` });
+  await logAudit(ctx, { action: "exported", table: "teams", note: `${teams.length} teams to ${format.toUpperCase()}` });
 
-  return csvResponse(
-    "fusionx-teams",
-    toCsv(teams, [
+  return exportResponse(format, {
+    filename: "fusionx-teams",
+    title: "FusionX Teams",
+    filters: {
+      Search: query.get("q"),
+      Verification: query.get("verification"),
+      Type: query.get("type"),
+      Focus: query.get("focus"),
+      Status: query.get("status"),
+      "Looking for members": query.get("looking"),
+      Size: query.get("size"),
+    },
+    rows: teams,
+    columns: [
       { header: "Team", value: (t) => t.name },
       { header: "Leader", value: (t) => t.leader },
       { header: "Type", value: (t) => TEAM_TYPE_LABELS[t.team_type] },
@@ -39,6 +52,6 @@ export async function GET(request: Request) {
       { header: "Demo", value: (t) => t.demo_url },
       { header: "Skills", value: (t) => (t.skills_needed ?? []).join(", ") },
       { header: "Registered", value: (t) => istDateTime(t.created_at) },
-    ]),
-  );
+    ],
+  });
 }

@@ -1,7 +1,7 @@
+import { ExportButtons } from "@/components/admin/export-buttons";
 import type { Metadata } from "next";
 import { JoinControls } from "@/components/admin/site-controls";
 import Link from "next/link";
-import { Download } from "lucide-react";
 import { bulkReviewApplications } from "@/actions/admin-applications";
 import { AdminForm, SelectField, TextareaField } from "@/components/admin/admin-form";
 import { SelectAll } from "@/components/admin/select-all";
@@ -20,7 +20,6 @@ import {
   withParams,
   type ListParams,
 } from "@/components/admin/ui";
-import { LinkButton } from "@/components/ui/button";
 import { APPLICATION_STATUSES, applicationsQuery } from "@/lib/admin/applications";
 import { requireCapability } from "@/lib/admin/guard";
 import type { Application } from "@/types/database";
@@ -50,9 +49,7 @@ export default async function ApplicationsPage({ searchParams }: { searchParams:
       description="Applications to join. Applicants are notified in the app when their status changes."
       crumbs={[{ label: "Applications" }]}
       actions={
-        <LinkButton href={withParams("/admin/applications/export", params, { page: undefined })} variant="secondary" size="sm">
-          <Download size={14} /> Export CSV
-        </LinkButton>
+        <ExportButtons href={withParams("/admin/applications/export", params, { page: undefined })} />
       }
     >
       <Toolbar

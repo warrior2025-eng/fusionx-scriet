@@ -1,6 +1,6 @@
 import { applicationsQuery } from "@/lib/admin/applications";
 import { logAudit } from "@/lib/admin/audit";
-import { csvResponse, toCsv } from "@/lib/admin/csv";
+import { exportFormat, exportResponse } from "@/lib/admin/export";
 import { authorize } from "@/lib/admin/guard";
 import type { Application } from "@/types/database";
 
@@ -8,7 +8,9 @@ export async function GET(request: Request) {
   const ctx = await authorize("applications");
   if (!ctx) return new Response("Forbidden", { status: 403 });
 
-  const q = new URL(request.url).searchParams;
+  const url = new URL(request.url);
+  const format = exportFormat(url);
+  const q = url.searchParams;
   const { data } = await applicationsQuery(ctx, {
     q: q.get("q") ?? "",
     status: q.get("status") ?? "",
@@ -18,11 +20,14 @@ export async function GET(request: Request) {
   }).limit(5000);
   const rows = (data ?? []) as unknown as Application[];
 
-  await logAudit(ctx, { action: "exported", table: "applications", note: `${rows.length} applications to CSV` });
+  await logAudit(ctx, { action: "exported", table: "applications", note: `${rows.length} applications to ${format.toUpperCase()}` });
 
-  return csvResponse(
-    "fusionx-applications",
-    toCsv(rows, [
+  return exportResponse(format, {
+    filename: "fusionx-applications",
+    title: "Join applications",
+    filters: { Search: q.get("q"), Status: q.get("status"), Department: q.get("department"), From: q.get("from"), To: q.get("to") },
+    rows,
+    columns: [
       { header: "Name", value: (a) => a.full_name },
       { header: "College email", value: (a) => a.college_email },
       { header: "Department", value: (a) => a.department },
@@ -39,6 +44,6 @@ export async function GET(request: Request) {
       { header: "Status", value: (a) => a.status },
       { header: "Review note", value: (a) => a.review_notes },
       { header: "Received", value: (a) => a.created_at?.slice(0, 10) },
-    ]),
-  );
+    ],
+  });
 }

@@ -1,5 +1,5 @@
 import { logAudit } from "@/lib/admin/audit";
-import { csvResponse, toCsv } from "@/lib/admin/csv";
+import { exportFormat, exportResponse } from "@/lib/admin/export";
 import { authorize } from "@/lib/admin/guard";
 import { loadBoard } from "@/lib/recruitment/results-admin";
 
@@ -12,7 +12,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const ctx = await authorize("recruitment");
   if (!ctx) return new Response("Forbidden", { status: 403 });
-  const hubId = new URL(request.url).searchParams.get("hub") ?? "";
+  const url = new URL(request.url);
+  const format = exportFormat(url);
+  const hubId = url.searchParams.get("hub") ?? "";
 
   const { teams, rows } = await loadBoard(ctx.supabase, id);
   const hub = teams.find((t) => t.id === hubId);
@@ -28,15 +30,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     );
   const teamName = new Map(teams.map((t) => [t.id, t.name]));
 
-  await logAudit(ctx, { action: "exported_social", table: "recruitment_team_status", id, note: `${named.length} name(s)${hub ? ` for ${hub.name}` : ""}` });
+  await logAudit(ctx, { action: "exported_social", table: "recruitment_team_status", id, note: `${named.length} name(s)${hub ? ` for ${hub.name}` : ""}${format === "pdf" ? " (PDF)" : ""}` });
 
-  return csvResponse(
-    `fusionx-results-social${hub ? `-${hub.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}` : ""}`,
-    toCsv(named, [
+  // Only the PDF has a heading.
+  const { data: cycle } = format === "pdf" ? await ctx.supabase.from("recruitment_cycles").select("title").eq("id", id).maybeSingle() : { data: null };
+  return exportResponse(format, {
+    filename: `fusionx-results-social${hub ? `-${hub.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}` : ""}`,
+    title: `Names to announce: ${cycle?.title ?? ""}`,
+    filters: { Hub: hub?.name ?? "all hubs" },
+    rows: named,
+    columns: [
       { header: "Name", value: (r) => r.name },
       { header: "Hub", value: (r) => teamName.get(r.team_id) ?? "" },
       { header: "Status", value: (r) => (r.stage === "selected" ? "Selected" : "Waitlist") },
       { header: "Waitlist rank", value: (r) => (r.stage === "waitlisted" && r.waitlist_rank ? String(r.waitlist_rank) : "") },
-    ]),
-  );
+    ],
+  });
 }
