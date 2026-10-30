@@ -12,11 +12,10 @@ import { istDateTime } from "@/lib/events/format";
 export type OfferLetterData = {
   organization: string;
   name: string;
-  hub: string;
+  /** Every hub the candidate is selected in. */
+  hubs: { name: string; deadline: string | null; accepted: boolean }[];
   cycle: string;
   issuedAt: string;
-  deadline: string | null;
-  accepted: boolean;
   induction: { at: string | null; mode: string | null; venue: string | null; link: string | null } | null;
 };
 
@@ -96,14 +95,19 @@ export async function renderOfferLetter(data: OfferLetterData): Promise<Uint8Arr
     y -= gap;
   };
   paragraph(`Dear ${name},`, serif, 14);
-  paragraph(`Congratulations! You have been selected for ${data.hub} in ${data.cycle} at ${data.organization}.`);
-  paragraph(
-    data.accepted
+  const hubNames = data.hubs.map((h) => h.name).join(" and ");
+  paragraph(`Congratulations! You have been selected for ${hubNames} in ${data.cycle} at ${data.organization}.`);
+  const answer = (h: OfferLetterData["hubs"][number]) =>
+    h.accepted
       ? "You have accepted your place. Welcome!"
-      : data.deadline
-        ? `Please accept or decline your place on your status page by ${istDateTime(data.deadline)}.`
-        : "Please accept or decline your place on your status page.",
-  );
+      : h.deadline
+        ? `Please accept or decline your place on your status page by ${istDateTime(h.deadline)}.`
+        : "Please accept or decline your place on your status page.";
+  if (data.hubs.length === 1) paragraph(answer(data.hubs[0]));
+  else {
+    for (const h of data.hubs) paragraph(`${h.name}: ${answer(h)}`, sans, 11, NAVY, 4);
+    y -= 6;
+  }
   if (data.induction && (data.induction.at || data.induction.venue || data.induction.link)) {
     paragraph("Induction meeting", sansBold, 11, NAVY, 2);
     if (data.induction.at) paragraph(`When: ${istDateTime(data.induction.at)}`, sans, 11, NAVY, 2);

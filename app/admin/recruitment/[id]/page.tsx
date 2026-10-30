@@ -52,15 +52,16 @@ export default async function CyclePage({ params }: { params: Promise<{ id: stri
 
   // People selected for more than one team: worth a look before publishing.
   const { data: selectedRows } = admin
-    ? await ctx.supabase.from("recruitment_team_status").select("application_id, recruitment_applications!inner(cycle_id, full_name)").eq("stage", "selected").eq("recruitment_applications.cycle_id", id)
+    ? await ctx.supabase.from("recruitment_team_status").select("application_id, multi_hub_allowed, recruitment_applications!inner(cycle_id, full_name)").eq("stage", "selected").eq("recruitment_applications.cycle_id", id)
     : { data: [] };
-  const perPerson = new Map<string, { name: string; count: number }>();
-  for (const row of (selectedRows ?? []) as unknown as { application_id: string; recruitment_applications: { full_name: string } }[]) {
-    const entry = perPerson.get(row.application_id) ?? { name: row.recruitment_applications.full_name, count: 0 };
+  const perPerson = new Map<string, { name: string; count: number; allowed: boolean }>();
+  for (const row of (selectedRows ?? []) as unknown as { application_id: string; multi_hub_allowed: boolean; recruitment_applications: { full_name: string } }[]) {
+    const entry = perPerson.get(row.application_id) ?? { name: row.recruitment_applications.full_name, count: 0, allowed: cycle.one_hub_mode === "allow_multiple" };
     entry.count++;
+    entry.allowed ||= row.multi_hub_allowed === true;
     perPerson.set(row.application_id, entry);
   }
-  const doubles = [...perPerson.values()].filter((p) => p.count > 1);
+  const doubles = [...perPerson.values()].filter((p) => p.count > 1 && !p.allowed);
 
   return (
     <AdminPage

@@ -14,6 +14,16 @@ export type OfferStatus = "pending" | "accepted" | "declined" | "expired";
 export type Attendance = "attended" | "no_show" | "booked" | "none";
 export type Outcome = "selected" | "waitlisted" | "not_selected" | "absent" | "declined" | "expired" | "in_review";
 
+/** One hub the candidate is selected in, with its own link and its own answer. */
+export type SelectedHub = {
+  team_id: string;
+  team_name: string;
+  whatsapp_url: string | null;
+  offer_status: OfferStatus | null;
+  offer_deadline: string | null;
+  can_respond: boolean;
+};
+
 export type ResultHub = {
   team_id: string;
   team_name: string;
@@ -36,14 +46,9 @@ export type MyResult =
       cycle_title: string;
       consent: boolean;
       hubs: ResultHub[];
-      selected: {
-        team_id: string;
-        team_name: string;
-        whatsapp_url: string | null;
-        offer_status: OfferStatus | null;
-        offer_deadline: string | null;
-        can_respond: boolean;
-      } | null;
+      selected: SelectedHub | null;
+      /** Every selected hub, in order of preference (migration 0029). */
+      selected_hubs?: SelectedHub[];
       induction: { at: string | null; mode: "online" | "in_person" | null; link: string | null; venue: string | null; note: string | null } | null;
     };
 
@@ -68,6 +73,9 @@ export type PublicResults =
       show_selected: boolean;
       show_waitlist: boolean;
       hubs: PublicHub[];
+      /** Everyone selected counts once; places count once per hub (migration 0029). */
+      selected_people?: number;
+      selected_places?: number;
       just_published?: boolean;
     };
 
@@ -76,6 +84,10 @@ export type Readiness = {
   undecided_attended: number;
   conflicts: number;
   conflict_names: string[];
+  /** Selected in more than one hub, and allowed to be (migration 0029). */
+  multi_hub?: number;
+  selected_people?: number;
+  selected_places?: number;
   locked: boolean;
   scheduled: boolean;
   visible: boolean;
@@ -87,7 +99,7 @@ export type CycleResults = {
   results_publish_at?: string | null;
   results_scheduled?: boolean;
   results_published_at?: string | null;
-  one_hub_mode?: "not_selected" | "keep_waitlisted";
+  one_hub_mode?: "not_selected" | "keep_waitlisted" | "allow_multiple";
   show_selected_publicly?: boolean;
   show_waitlist_publicly?: boolean;
   results_banner_on?: boolean;

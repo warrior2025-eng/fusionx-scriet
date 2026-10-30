@@ -17,12 +17,14 @@ import {
   saveResultSettings,
   saveResultsDate,
   scheduleResults,
+  selectAdditionalHub,
   setTaskReviewed,
   unlockDecisions,
 } from "@/actions/admin-results";
 import { ExportButtons } from "@/components/admin/export-buttons";
 import { ActionButton } from "@/components/admin/action-button";
 import { AdminForm, CheckboxField, SelectField, TextField, TextareaField } from "@/components/admin/admin-form";
+import { DecisionSelect } from "@/components/admin/decision-select";
 import { CycleTabs } from "@/components/admin/recruitment-parts";
 import { SelectAll } from "@/components/admin/select-all";
 import { AdminPage, EmptyRow, Panel, Pill, Table, Td, Th, Toolbar, formatDate, param, type ListParams } from "@/components/admin/ui";
@@ -95,14 +97,22 @@ export default async function CycleResultsPage({ params, searchParams }: { param
     ((taskRows ?? []) as { application_id: string; status: "not_started" | "submitted" | "reviewed"; link: string | null; submitted_at: string | null; reviewed_at: string | null }[]).map((t) => [t.application_id, t]),
   );
   const hubRows = hub ? rows.filter((r) => r.team_id === hub.id) : [];
+  const teamName = new Map(teams.map((t) => [t.id, t.name]));
+  // Every hub each candidate is selected in, and whether more than one is allowed.
+  const selectedIn = new Map<string, BoardRow[]>();
+  for (const r of rows) if (r.stage === "selected") selectedIn.set(r.application_id, [...(selectedIn.get(r.application_id) ?? []), r]);
+  const multiAllowed = (applicationId: string) => cycle.one_hub_mode === "allow_multiple" || (selectedIn.get(applicationId) ?? []).some((r) => r.multi_hub_allowed);
+  const hubCount = (applicationId: string) => selectedIn.get(applicationId)?.length ?? 0;
   const fDecision = param(query, "decision");
   const fAttendance = param(query, "attendance");
   const fScore = Number(param(query, "score")) || 0;
+  const fHubs = param(query, "hubs");
   const shownRows = hubRows.filter(
     (r) =>
       (!fDecision || decisionOf(r) === fDecision) &&
       (!fAttendance || r.attendance === fAttendance) &&
-      (!fScore || (r.average !== null && r.average >= fScore)),
+      (!fScore || (r.average !== null && r.average >= fScore)) &&
+      (!fHubs || hubCount(r.application_id) > 1),
   );
   const waitlist = hubRows.filter((r) => r.stage === "waitlisted").sort((a, b) => (a.waitlist_rank ?? 999) - (b.waitlist_rank ?? 999));
   const selected = hubRows.filter((r) => r.stage === "selected");
@@ -154,7 +164,7 @@ export default async function CycleResultsPage({ params, searchParams }: { param
             {(
               [
                 ["Undecided", readiness.undecided, readiness.undecided > 0 ? `${readiness.undecided_attended} attended the interview` : "All decided"],
-                ["In two hubs", readiness.conflicts, readiness.conflicts > 0 ? readiness.conflict_names.join(", ") : "None"],
+                ["In two hubs", readiness.conflicts, readiness.conflicts > 0 ? readiness.conflict_names.join(", ") : readiness.multi_hub ? `${readiness.multi_hub} allowed: ${readiness.selected_people} people, ${readiness.selected_places} places` : "None"],
                 ["Decisions", locked ? "Locked" : "Open", locked ? "Reviewers cannot change them" : "Reviewers can still change them"],
                 ["Publish time", cycle.results_publish_at ? istDateTime(cycle.results_publish_at) : "Not set", visible ? "Published" : scheduled ? "Scheduled" : "Not scheduled"],
               ] as const
@@ -170,7 +180,7 @@ export default async function CycleResultsPage({ params, searchParams }: { param
           </dl>
           {(readiness.undecided > 0 || readiness.conflicts > 0) && !visible && (
             <p className="mt-4 border border-amber-500/50 bg-amber-500/10 px-3.5 py-2.5 text-sm text-ink">
-              Publishing is blocked until every candidate has a decision and nobody is selected in two hubs.
+              Publishing is blocked until every candidate has a decision and nobody is selected in two hubs without being allowed.
             </p>
           )}
           <div className="mt-5 flex flex-wrap gap-3">
@@ -235,7 +245,7 @@ export default async function CycleResultsPage({ params, searchParams }: { param
                     <p className="mb-3 text-xs text-ink/65">
                       {scheduled
                         ? `Scheduled for ${istDateTime(cycle.results_publish_at)}. You can move it or cancel it until then.`
-                        : "Needs: decisions locked, nobody undecided, nobody selected in two hubs."}
+                        : "Needs: decisions locked, nobody undecided, nobody selected in two hubs without being allowed."}
                     </p>
                     <AdminForm action={scheduleResults.bind(null, id)} submitLabel={scheduled ? "Reschedule" : "Schedule results"} warnUnsaved={false}>
                       <TextField name="results_at" label="Publish at (IST)" type="datetime-local" defaultValue={scheduleInput} />
@@ -292,6 +302,7 @@ export default async function CycleResultsPage({ params, searchParams }: { param
                 options={[
                   { value: "not_selected", label: "becomes Not selected (default)" },
                   { value: "keep_waitlisted", label: "keeps a waitlist place, if it has one" },
+                  { value: "allow_multiple", label: "Allow selection in more than one hub" },
                 ]}
               />
               <CheckboxField name="show_selected_publicly" label="Show selected names publicly" defaultChecked={cycle.show_selected_publicly !== false} />
@@ -378,12 +389,22 @@ export default async function CycleResultsPage({ params, searchParams }: { param
                     { name: "decision", label: "Decision", options: Object.entries(DECISION_LABELS).map(([value, label]) => ({ value, label })) },
                     { name: "attendance", label: "Attendance", options: Object.entries(ATTENDANCE_LABELS).map(([value, label]) => ({ value, label })) },
                     { name: "score", label: "Average score at least", options: [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n) })) },
+                    { name: "hubs", label: "Hubs", options: [{ value: "multi", label: "Selected in more than one hub" }] },
                   ]}
                 >
                   <input type="hidden" name="hub" value={hub.id} />
                 </Toolbar>
 
-                <DecisionTable rows={shownRows} editable={editable} cycleId={id} teamId={hub.id} />
+                <DecisionTable
+                  rows={shownRows}
+                  editable={editable}
+                  cycleId={id}
+                  teamId={hub.id}
+                  hubName={hub.name}
+                  allowMultiple={cycle.one_hub_mode === "allow_multiple"}
+                  hubCount={hubCount}
+                  otherHubs={(r) => (multiAllowed(r.application_id) ? [] : (selectedIn.get(r.application_id) ?? []).filter((x) => x.team_id !== r.team_id).map((x) => teamName.get(x.team_id) ?? ""))}
+                />
 
                 {editable && undecidedHere > 0 && (
                   <div className="mt-4 flex flex-wrap gap-3">
@@ -485,15 +506,17 @@ export default async function CycleResultsPage({ params, searchParams }: { param
                         <Th>Candidate</Th>
                         <Th>Offer</Th>
                         <Th>Checklist</Th>
+                        <Th>Another hub</Th>
                       </tr>
                     </thead>
                     <tbody>
-                      {selected.length === 0 && <EmptyRow colSpan={3}>No one is selected in this hub.</EmptyRow>}
+                      {selected.length === 0 && <EmptyRow colSpan={4}>No one is selected in this hub.</EmptyRow>}
                       {selected.map((r) => (
                         <tr key={r.application_id}>
                           <Td className="font-medium text-ink">
                             {r.name}
-                            {r.promoted_at && <span className="block text-xs font-normal text-ink/60">Promoted {formatDate(r.promoted_at, true)}</span>}
+                            {hubCount(r.application_id) > 1 && <span className="ml-2"><Pill tone="good">{hubCount(r.application_id)} hubs</Pill></span>}
+                            {r.promoted_at && <span className="block text-xs font-normal text-ink/60">{r.added_after_results ? "Selected" : "Promoted"} {formatDate(r.promoted_at, true)}</span>}
                           </Td>
                           <Td>{r.offer_status ? <Pill tone={r.offer_status === "accepted" ? "good" : "warn"}>{OFFER_LABELS[r.offer_status]}</Pill> : "Not sent"}</Td>
                           <Td>
@@ -509,6 +532,14 @@ export default async function CycleResultsPage({ params, searchParams }: { param
                                 </AdminForm>
                               </div>
                             </details>
+                          </Td>
+                          <Td>
+                            <AnotherHub
+                              cycleId={id}
+                              row={r}
+                              options={rows.filter((x) => x.application_id === r.application_id && x.stage !== "selected" && x.reason !== "declined" && x.reason !== "expired")}
+                              teamName={teamName}
+                            />
                           </Td>
                         </tr>
                       ))}
@@ -597,8 +628,58 @@ export default async function CycleResultsPage({ params, searchParams }: { param
   );
 }
 
+/** "Select in another hub": a normal selection in a hub they applied to. Only after the results. An absent candidate needs a reason. */
+function AnotherHub({ cycleId, row, options, teamName }: { cycleId: string; row: BoardRow; options: BoardRow[]; teamName: Map<string, string> }) {
+  if (options.length === 0) return <span className="text-xs text-ink/50">None</span>;
+  return (
+    <details>
+      <summary className="cursor-pointer text-sm">Select in another hub</summary>
+      <div className="mt-3 flex w-64 flex-col items-start gap-2">
+        {options.map((o) => {
+          const name = teamName.get(o.team_id) ?? "";
+          return row.attendance === "no_show" ? (
+            <AdminForm key={o.team_id} action={selectAdditionalHub.bind(null, cycleId, row.application_id, o.team_id)} submitLabel={`Select in ${name}`} warnUnsaved={false}>
+              <TextField name="reason" label="Reason to override the absent rule" maxLength={300} />
+            </AdminForm>
+          ) : (
+            <ActionButton
+              key={o.team_id}
+              action={selectAdditionalHub.bind(null, cycleId, row.application_id, o.team_id)}
+              confirm={{
+                title: `Select ${row.name} in ${name} as well?`,
+                body: "They are selected in that hub the same way as in their first hub, and get a notification and an email.",
+                confirmLabel: `Select in ${name}`,
+              }}
+            >
+              {name}
+            </ActionButton>
+          );
+        })}
+      </div>
+    </details>
+  );
+}
+
 /** The board for one hub. Editable as one form while decisions are open; read-only after locking. */
-function DecisionTable({ rows, editable, cycleId, teamId }: { rows: BoardRow[]; editable: boolean; cycleId: string; teamId: string }) {
+function DecisionTable({
+  rows,
+  editable,
+  cycleId,
+  teamId,
+  hubName,
+  allowMultiple,
+  hubCount,
+  otherHubs,
+}: {
+  rows: BoardRow[];
+  editable: boolean;
+  cycleId: string;
+  teamId: string;
+  hubName: string;
+  allowMultiple: boolean;
+  hubCount: (applicationId: string) => number;
+  otherHubs: (row: BoardRow) => string[];
+}) {
   const table = (
     <Table label="Final decisions">
       <thead>
@@ -632,6 +713,7 @@ function DecisionTable({ rows, editable, cycleId, teamId }: { rows: BoardRow[]; 
               )}
               <Td className="min-w-[10rem]">
                 <span className="font-medium text-ink">{r.name}</span>
+                {hubCount(r.application_id) > 1 && <span className="ml-2"><Pill tone="good">{hubCount(r.application_id)} hubs</Pill></span>}
                 <span className="block text-xs text-ink/60">{[r.department, r.year].filter(Boolean).join(", ")}</span>
                 <Link href={`/admin/recruitment/${cycleId}/results/preview?app=${r.application_id}`} className="text-xs text-accent underline underline-offset-2">
                   Preview as candidate
@@ -666,18 +748,14 @@ function DecisionTable({ rows, editable, cycleId, teamId }: { rows: BoardRow[]; 
                 {editable ? (
                   <>
                     <input type="hidden" name={`orig_${r.application_id}`} value={d} />
-                    <select
-                      name={`dec_${r.application_id}`}
+                    <DecisionSelect
+                      applicationId={r.application_id}
+                      name={r.name}
+                      hub={hubName}
+                      otherHubs={otherHubs(r)}
                       defaultValue={d}
-                      aria-label={`Decision for ${r.name}`}
-                      className="w-full border border-line bg-paper px-2 py-1.5 text-sm text-ink"
-                    >
-                      {Object.entries(DECISION_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
+                      options={Object.entries(DECISION_LABELS).map(([value, label]) => ({ value, label }))}
+                    />
                     {r.attendance === "no_show" && (
                       <input
                         name={`why_${r.application_id}`}
@@ -731,7 +809,10 @@ function DecisionTable({ rows, editable, cycleId, teamId }: { rows: BoardRow[]; 
         />
       </div>
       <p className="text-xs text-ink/60">
-        Selecting someone here sets their other hub to Not selected (see Result settings). An absent candidate stays Not selected unless you give a reason.
+        {allowMultiple
+          ? "This cycle allows selection in more than one hub: selecting someone here leaves their other hubs as they are."
+          : "Selecting someone here sets their other hub to Not selected (see Result settings). If they are already selected in another hub, you choose: keep both or move them."}{" "}
+        An absent candidate stays Not selected unless you give a reason.
       </p>
     </AdminForm>
   );

@@ -45,6 +45,8 @@ const rowSchema = z.object({
   message: z.string().max(1000, "At most 1000 characters"),
   originalMessage: z.string().max(1000),
   reason: z.string().max(300),
+  hubs: z.enum(["", "keep", "move"]),
+  hubsReason: z.string().max(300),
 });
 
 /**
@@ -69,6 +71,8 @@ export async function saveDecisions(cycleId: string, teamId: string, _prev: Acti
       message: text(formData, `msg_${id}`),
       originalMessage: text(formData, `origmsg_${id}`),
       reason: text(formData, `why_${id}`),
+      hubs: text(formData, `hubs_${id}`),
+      hubsReason: text(formData, `hubswhy_${id}`),
     });
     if (!parsed.success) {
       errors.push(parsed.error.issues[0]?.message ?? "Invalid row");
@@ -82,6 +86,8 @@ export async function saveDecisions(cycleId: string, teamId: string, _prev: Acti
       p_decision: v.decision,
       p_note: v.message,
       p_reason: v.reason || null,
+      p_hubs: v.hubs || null,
+      p_hubs_reason: v.hubsReason || null,
     });
     if (error) errors.push(friendlyDbError(error.message, "Could not save one decision."));
     else saved++;
@@ -185,7 +191,7 @@ export async function publishNow(cycleId: string): Promise<ActionState> {
 
 // ── settings ───────────────────────────────────────────────────────────
 const settingsSchema = z.object({
-  one_hub_mode: z.enum(["not_selected", "keep_waitlisted"]),
+  one_hub_mode: z.enum(["not_selected", "keep_waitlisted", "allow_multiple"]),
   show_selected_publicly: z.boolean(),
   show_waitlist_publicly: z.boolean(),
   results_banner_on: z.boolean(),
@@ -272,6 +278,18 @@ export async function promote(cycleId: string, applicationId: string, teamId: st
   if (error) return fail(friendlyDbError(error.message, "Could not promote."));
   touched(cycleId);
   return ok("Promoted. They have been notified, and the public lists are updated.", { viewHref: "/recruitment/results" });
+}
+
+/** After the results: a selected candidate is selected in one more hub they applied to. The reason is only for an absent candidate. */
+export async function selectAdditionalHub(cycleId: string, applicationId: string, teamId: string, _prev?: ActionState, formData?: FormData): Promise<ActionState> {
+  const ctx = await admin(cycleId);
+  if (!ctx || !uuid.safeParse(applicationId).success || !uuid.safeParse(teamId).success) return FORBIDDEN;
+  const reason = z.string().trim().max(300, "At most 300 characters").safeParse(formData ? text(formData, "reason") : "");
+  if (!reason.success) return fail("Please fix the highlighted fields.", { reason: reason.error.issues[0].message });
+  const { error } = await ctx.supabase.rpc("select_additional_hub", { p_application: applicationId, p_team: teamId, p_reason: reason.data || null });
+  if (error) return fail(friendlyDbError(error.message, "Could not select them in that hub."));
+  touched(cycleId);
+  return ok("Selected. They have been notified, and the public lists are updated.", { viewHref: "/recruitment/results" });
 }
 
 export async function removeFromWaitlist(cycleId: string, applicationId: string, teamId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
