@@ -39,6 +39,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const questions = questionsFor((questionRows ?? []).map((q) => toQuestion(q as Record<string, unknown>)), [teamId]).filter((q) => q.type !== "file");
   const notes = (noteRows ?? []) as { application_id: string; private_notes: string | null }[];
   const forTeam = (a: AdminApplication) => a.teams.find((t) => t.team_id === teamId);
+  const selectedIn = (a: AdminApplication) => a.teams.filter((t) => t.stage === "selected");
+  const anyMulti = rows.some((a) => selectedIn(a).length > 1);
+  const { data: hubRows } = anyMulti ? await ctx.supabase.from("recruitment_teams").select("id, name").eq("cycle_id", id) : { data: [] };
+  const hubName = new Map(((hubRows ?? []) as { id: string; name: string }[]).map((h) => [h.id, h.name]));
 
   await logAudit(ctx, {
     action: "exported",
@@ -73,6 +77,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       { header: "Year", value: (a) => a.year },
       { header: "Preference", value: (a) => forTeam(a)?.rank ?? "" },
       { header: "Stage", value: (a) => (forTeam(a) ? STAGE_LABELS[forTeam(a)!.stage] : "") },
+      ...(anyMulti ? [{ header: "Selected in", value: (a: AdminApplication) => selectedIn(a).map((t) => hubName.get(t.team_id) ?? "") }] : []),
       { header: "Average score", value: (a) => forTeam(a)?.average?.toFixed(1) ?? "" },
       { header: "Reviews", value: (a) => forTeam(a)?.reviews ?? 0 },
       { header: "Interview", value: (a) => istDateTime(forTeam(a)?.interview_at) },

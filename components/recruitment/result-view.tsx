@@ -4,7 +4,7 @@ import { ActionButton } from "@/components/admin/action-button";
 import { LinkButton } from "@/components/ui/button";
 import { CutCard } from "@/components/ui/cut-card";
 import { istDateTime } from "@/lib/events/format";
-import type { MyResult } from "@/lib/recruitment/results";
+import type { MyResult, SelectedHub } from "@/lib/recruitment/results";
 
 type Shown = Extract<MyResult, { state: "published" | "preview" }>;
 
@@ -34,35 +34,41 @@ export function ResultView({ result, cycleId, preview = false }: { result: Shown
   const first = (result.name ?? "").trim().split(/\s+/)[0] || "there";
   const waitlisted = result.hubs.filter((h) => h.decision === "waitlisted" && h.waitlist_rank !== null);
   const sel = result.selected;
-  const selHub = sel ? result.hubs.find((h) => h.team_id === sel.team_id) : undefined;
+  // One card per selected hub: each has its own group link and its own answer.
+  const places: SelectedHub[] = result.selected_hubs?.length ? result.selected_hubs : sel ? [sel] : [];
   const induction = result.induction;
   const hasInduction = Boolean(induction && (induction.at || induction.link || induction.venue || induction.note));
 
   if (result.outcome === "selected" && sel) {
     return (
-      <CutCard className="h-auto">
+      <>
+        {places.map((place, i) => {
+          const selHub = result.hubs.find((h) => h.team_id === place.team_id);
+          return (
+      <CutCard key={place.team_id} className="h-auto">
         <p className="flex items-center gap-2 text-sm font-medium text-accent">
           <PartyPopper size={16} aria-hidden /> Selected
         </p>
         <h2 className="mt-2 font-serif text-2xl text-ink md:text-3xl">Congratulations, {first}!</h2>
         <p className="mt-2 text-ink">
-          You have been selected for <span className="font-semibold">{sel.team_name}</span>.
+          You have been selected for <span className="font-semibold">{place.team_name}</span>.
         </p>
         {selHub?.message && <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-ink/75">{selHub.message}</p>}
 
         <div className="mt-6 flex flex-wrap gap-3">
-          {sel.whatsapp_url && (
+          {place.whatsapp_url && (
             <a
-              href={preview ? undefined : sel.whatsapp_url}
+              href={preview ? undefined : place.whatsapp_url}
               target="_blank"
               rel="noopener noreferrer"
               aria-disabled={preview || undefined}
               className="inline-flex items-center gap-2 rounded-sm bg-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-accent/90"
             >
-              <MessageCircle size={16} aria-hidden /> Join your hub&rsquo;s WhatsApp group <ExternalLink size={14} aria-hidden />
+              <MessageCircle size={16} aria-hidden /> {places.length > 1 ? `Join the ${place.team_name} WhatsApp group` : <>Join your hub&rsquo;s WhatsApp group</>} <ExternalLink size={14} aria-hidden />
             </a>
           )}
-          {!preview && (
+          {/* One letter lists every hub. */}
+          {!preview && i === 0 && (
             <LinkButton href="/recruitment/results/offer-letter" variant="secondary" size="md">
               <FileText size={15} aria-hidden /> Download offer letter
             </LinkButton>
@@ -110,16 +116,16 @@ export function ResultView({ result, cycleId, preview = false }: { result: Shown
 
         <div className="mt-6 border-t border-line pt-5">
           <h3 className="text-sm font-semibold text-ink">Your place</h3>
-          {sel.offer_status === "accepted" ? (
-            <p className="mt-2 text-sm text-ink">You accepted your place. Welcome to {sel.team_name}!</p>
-          ) : sel.can_respond || preview ? (
+          {place.offer_status === "accepted" ? (
+            <p className="mt-2 text-sm text-ink">You accepted your place. Welcome to {place.team_name}!</p>
+          ) : place.can_respond || preview ? (
             <>
               <p className="mt-2 text-sm text-ink/75">
                 Please accept or decline your place
-                {sel.offer_deadline ? ` by ${istDateTime(sel.offer_deadline)}` : ""}.
+                {place.offer_deadline ? ` by ${istDateTime(place.offer_deadline)}` : ""}.
               </p>
               <div className="mt-3 flex flex-wrap gap-3">
-                <ActionButton variant="primary" size="md" disabled={preview} action={respondToOffer.bind(null, cycleId, true)}>
+                <ActionButton variant="primary" size="md" disabled={preview} action={respondToOffer.bind(null, cycleId, true, place.team_id)}>
                   Accept my place
                 </ActionButton>
                 <ActionButton
@@ -127,10 +133,10 @@ export function ResultView({ result, cycleId, preview = false }: { result: Shown
                   size="md"
                   danger
                   disabled={preview}
-                  action={respondToOffer.bind(null, cycleId, false)}
+                  action={respondToOffer.bind(null, cycleId, false, place.team_id)}
                   confirm={{
                     title: "Decline your place?",
-                    body: `Your seat in ${sel.team_name} will be offered to someone on the waitlist. This cannot be undone.`,
+                    body: `Your seat in ${place.team_name} will be offered to someone on the waitlist. This cannot be undone.`,
                     confirmLabel: "Decline",
                   }}
                 >
@@ -143,6 +149,9 @@ export function ResultView({ result, cycleId, preview = false }: { result: Shown
           )}
         </div>
       </CutCard>
+          );
+        })}
+      </>
     );
   }
 

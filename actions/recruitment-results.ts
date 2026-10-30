@@ -35,11 +35,11 @@ export async function agreeToAnnouncement(cycleId: string): Promise<ActionState>
   return ok("Thank you. Your agreement is saved.");
 }
 
-export async function respondToOffer(cycleId: string, accept: boolean): Promise<ActionState> {
-  if (!uuid.safeParse(cycleId).success) return fail("Recruitment not found.");
+export async function respondToOffer(cycleId: string, accept: boolean, teamId: string): Promise<ActionState> {
+  if (!uuid.safeParse(cycleId).success || !uuid.safeParse(teamId).success) return fail("Recruitment not found.");
   const { supabase, user } = await signedIn();
   if (!user) return fail("Please sign in.");
-  const { error } = await supabase.rpc("respond_to_offer", { p_cycle: cycleId, p_accept: accept });
+  const { error } = await supabase.rpc("respond_to_offer", { p_cycle: cycleId, p_accept: accept, p_team: teamId });
   if (error) return fail(friendlyDbError(error.message, "Could not save your answer. Please try again."));
   revalidatePath("/recruitment/status");
   revalidatePath("/recruitment/results");

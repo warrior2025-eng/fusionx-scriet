@@ -12,8 +12,16 @@ const more = (n: number, shown: number) => (n > shown ? `+ ${n - shown} more` : 
  */
 export function ResultsLists({ results }: { results: Shown }) {
   if (results.hubs.length === 0) return <p className="text-sm text-ink/70">No hubs to show.</p>;
+  const people = results.selected_people ?? 0;
+  const places = results.selected_places ?? 0;
   return (
     <div className="space-y-8">
+      {/* Only when someone holds a place in more than one hub: otherwise the two numbers are the same. */}
+      {places > people && (
+        <p className="text-sm font-medium text-ink">
+          Selected: {people} {people === 1 ? "person" : "people"}, {places} places
+        </p>
+      )}
       {results.hubs.map((hub) => {
         const selectedMore = more(hub.selected_total, hub.selected.length);
         const waitMore = more(hub.waitlist_total, hub.waitlist.length);

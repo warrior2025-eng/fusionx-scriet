@@ -20,11 +20,9 @@ export async function GET(request: Request) {
   const bytes = await renderOfferLetter({
     organization: chapter_name || "FusionX@SCRIET",
     name: result.name ?? "",
-    hub: result.selected.team_name,
+    hubs: (result.selected_hubs ?? [result.selected]).map((h) => ({ name: h.team_name, deadline: h.offer_deadline, accepted: h.offer_status === "accepted" })),
     cycle: result.cycle_title,
     issuedAt: cycle.results_publish_at ?? new Date().toISOString(),
-    deadline: result.selected.offer_deadline,
-    accepted: result.selected.offer_status === "accepted",
     induction: result.induction,
   });
   return new Response(new Uint8Array(bytes), {

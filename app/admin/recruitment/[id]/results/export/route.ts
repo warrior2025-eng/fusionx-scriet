@@ -34,6 +34,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     // Without the service key the email column stays empty; the rest still exports.
   }
   const teamName = new Map(teams.map((t) => [t.id, t.name]));
+  const hubsOf = new Map<string, string[]>();
+  for (const r of rows.filter((x) => x.stage === "selected").sort((a, b) => a.pref_rank - b.pref_rank)) {
+    hubsOf.set(r.application_id, [...(hubsOf.get(r.application_id) ?? []), teamName.get(r.team_id) ?? ""]);
+  }
+  const anyMulti = [...hubsOf.values()].some((h) => h.length > 1);
 
   await logAudit(ctx, { action: "exported", table: "recruitment_team_status", id, note: `${chosen.length} result row(s)${hub ? ` for ${hub.name}` : ""}${format === "pdf" ? " (PDF)" : ""}` });
 
@@ -60,6 +65,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       { header: "WhatsApp added", value: (r) => (r.stage === "selected" ? (r.whatsapp_added ? "Yes" : "No") : "") },
       { header: "Induction attended", value: (r) => (r.stage === "selected" ? (r.induction_attended ? "Yes" : "No") : "") },
       { header: "Name may be announced", value: (r) => (r.consent ? "Yes" : "No") },
+      ...(anyMulti ? [{ header: "Selected in", value: (r: (typeof rows)[number]) => hubsOf.get(r.application_id) ?? [] }] : []),
     ],
   });
 }
