@@ -21,6 +21,7 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
 export type TeamStatusRow = {
   team_id: string;
   rank: number;
+  added_by_admin?: boolean;
   stage: Stage;
   stage_updated_at: string;
   interview_at: string | null;
@@ -143,7 +144,7 @@ export async function ApplicationView({
         return (
           <Panel
             key={status.team_id}
-            title={`${teamNames[status.team_id] ?? "Team"} (${ORDINALS[status.rank - 1] ?? status.rank} choice)`}
+            title={`${teamNames[status.team_id] ?? "Team"} (${status.added_by_admin ? "added by admin, not applied" : `${ORDINALS[status.rank - 1] ?? status.rank} choice`})`}
             description={
               (average ? `Average score ${average} from ${scores.length} review${scores.length === 1 ? "" : "s"}` : "No scores yet") +
               (rubricAvg ? ` · Interview rubric average ${rubricAvg}` : "")

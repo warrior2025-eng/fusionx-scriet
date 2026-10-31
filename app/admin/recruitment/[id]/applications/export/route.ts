@@ -75,7 +75,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       { header: "Name", value: (a) => a.full_name },
       { header: "Department", value: (a) => a.department },
       { header: "Year", value: (a) => a.year },
-      { header: "Preference", value: (a) => forTeam(a)?.rank ?? "" },
+      { header: "Preference", value: (a) => (forTeam(a)?.added_by_admin ? "Not applied" : (forTeam(a)?.rank ?? "")) },
       { header: "Stage", value: (a) => (forTeam(a) ? STAGE_LABELS[forTeam(a)!.stage] : "") },
       ...(anyMulti ? [{ header: "Selected in", value: (a: AdminApplication) => selectedIn(a).map((t) => hubName.get(t.team_id) ?? "") }] : []),
       { header: "Average score", value: (a) => forTeam(a)?.average?.toFixed(1) ?? "" },

@@ -25,6 +25,7 @@ import { ExportButtons } from "@/components/admin/export-buttons";
 import { ActionButton } from "@/components/admin/action-button";
 import { AdminForm, CheckboxField, SelectField, TextField, TextareaField } from "@/components/admin/admin-form";
 import { DecisionSelect } from "@/components/admin/decision-select";
+import { UnappliedHubButton } from "@/components/admin/unapplied-hub-button";
 import { CycleTabs } from "@/components/admin/recruitment-parts";
 import { SelectAll } from "@/components/admin/select-all";
 import { AdminPage, EmptyRow, Panel, Pill, Table, Td, Th, Toolbar, formatDate, param, type ListParams } from "@/components/admin/ui";
@@ -44,7 +45,7 @@ import {
   resultsVisible,
   type Attendance,
 } from "@/lib/recruitment/results";
-import { isFinal, loadBoard, loadConfig, loadReadiness, type BoardRow } from "@/lib/recruitment/results-admin";
+import { isFinal, loadBoard, loadConfig, loadReadiness, type BoardRow, type BoardTeam } from "@/lib/recruitment/results-admin";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Admin: Recruitment results" };
@@ -403,6 +404,9 @@ export default async function CycleResultsPage({ params, searchParams }: { param
                   hubName={hub.name}
                   allowMultiple={cycle.one_hub_mode === "allow_multiple"}
                   hubCount={hubCount}
+                  allRows={rows}
+                  teams={teams}
+                  visible={visible}
                   otherHubs={(r) => (multiAllowed(r.application_id) ? [] : (selectedIn.get(r.application_id) ?? []).filter((x) => x.team_id !== r.team_id).map((x) => teamName.get(x.team_id) ?? ""))}
                 />
 
@@ -516,6 +520,7 @@ export default async function CycleResultsPage({ params, searchParams }: { param
                           <Td className="font-medium text-ink">
                             {r.name}
                             {hubCount(r.application_id) > 1 && <span className="ml-2"><Pill tone="good">{hubCount(r.application_id)} hubs</Pill></span>}
+                            {r.added_by_admin && <span className="ml-2"><Pill tone="warn">Added by admin · not applied</Pill></span>}
                             {r.promoted_at && <span className="block text-xs font-normal text-ink/60">{r.added_after_results ? "Selected" : "Promoted"} {formatDate(r.promoted_at, true)}</span>}
                           </Td>
                           <Td>{r.offer_status ? <Pill tone={r.offer_status === "accepted" ? "good" : "warn"}>{OFFER_LABELS[r.offer_status]}</Pill> : "Not sent"}</Td>
@@ -534,12 +539,7 @@ export default async function CycleResultsPage({ params, searchParams }: { param
                             </details>
                           </Td>
                           <Td>
-                            <AnotherHub
-                              cycleId={id}
-                              row={r}
-                              options={rows.filter((x) => x.application_id === r.application_id && x.stage !== "selected" && x.reason !== "declined" && x.reason !== "expired")}
-                              teamName={teamName}
-                            />
+                            <AnotherHub cycleId={id} row={r} rows={rows} teams={teams} visible={visible} />
                           </Td>
                         </tr>
                       ))}
@@ -628,15 +628,34 @@ export default async function CycleResultsPage({ params, searchParams }: { param
   );
 }
 
-/** "Select in another hub": a normal selection in a hub they applied to. Only after the results. An absent candidate needs a reason. */
-function AnotherHub({ cycleId, row, options, teamName }: { cycleId: string; row: BoardRow; options: BoardRow[]; teamName: Map<string, string> }) {
-  if (options.length === 0) return <span className="text-xs text-ink/50">None</span>;
+/**
+ * "Select in another hub": every other hub of the cycle. A hub they applied to
+ * is a normal selection once the results are out, for someone holding a place;
+ * before that it is decided on its own board. A hub they did not apply to takes
+ * a reason. An absent candidate always needs a reason.
+ */
+function AnotherHub({ cycleId, row, rows, teams, visible }: { cycleId: string; row: BoardRow; rows: BoardRow[]; teams: BoardTeam[]; visible: boolean }) {
+  const mine = rows.filter((x) => x.application_id === row.application_id);
+  const closed = (x: BoardRow) => x.stage === "selected" || x.reason === "declined" || x.reason === "expired";
+  const nameOf = (teamId: string) => teams.find((t) => t.id === teamId)?.name ?? "";
+  const held = mine.filter((x) => x.stage === "selected");
+  const applied = mine.filter((x) => x.team_id !== row.team_id && !x.added_by_admin && !closed(x));
+  const notApplied = teams.filter((t) => t.id !== row.team_id && !mine.some((x) => x.team_id === t.id && (!x.added_by_admin || closed(x))));
+  const options = visible ? (held.length > 0 ? applied : []) : applied;
+  if (options.length === 0 && notApplied.length === 0) return <span className="text-xs text-ink/50">None</span>;
   return (
     <details>
       <summary className="cursor-pointer text-sm">Select in another hub</summary>
       <div className="mt-3 flex w-64 flex-col items-start gap-2">
         {options.map((o) => {
-          const name = teamName.get(o.team_id) ?? "";
+          const name = nameOf(o.team_id);
+          if (!visible) {
+            return (
+              <Link key={o.team_id} href={`/admin/recruitment/${cycleId}/results?hub=${o.team_id}`} className="text-sm text-accent underline underline-offset-2">
+                {name}: decide on its board
+              </Link>
+            );
+          }
           return row.attendance === "no_show" ? (
             <AdminForm key={o.team_id} action={selectAdditionalHub.bind(null, cycleId, row.application_id, o.team_id)} submitLabel={`Select in ${name}`} warnUnsaved={false}>
               <TextField name="reason" label="Reason to override the absent rule" maxLength={300} />
@@ -655,6 +674,18 @@ function AnotherHub({ cycleId, row, options, teamName }: { cycleId: string; row:
             </ActionButton>
           );
         })}
+        {notApplied.map((t) => (
+          <UnappliedHubButton
+            key={t.id}
+            cycleId={cycleId}
+            applicationId={row.application_id}
+            name={row.name}
+            teamId={t.id}
+            hub={t.name}
+            heldHubs={held.filter((x) => x.team_id !== t.id).map((x) => nameOf(x.team_id))}
+            absent={row.attendance === "no_show"}
+          />
+        ))}
       </div>
     </details>
   );
@@ -669,6 +700,9 @@ function DecisionTable({
   hubName,
   allowMultiple,
   hubCount,
+  allRows,
+  teams,
+  visible,
   otherHubs,
 }: {
   rows: BoardRow[];
@@ -678,6 +712,9 @@ function DecisionTable({
   hubName: string;
   allowMultiple: boolean;
   hubCount: (applicationId: string) => number;
+  allRows: BoardRow[];
+  teams: BoardTeam[];
+  visible: boolean;
   otherHubs: (row: BoardRow) => string[];
 }) {
   const table = (
@@ -714,12 +751,23 @@ function DecisionTable({
               <Td className="min-w-[10rem]">
                 <span className="font-medium text-ink">{r.name}</span>
                 {hubCount(r.application_id) > 1 && <span className="ml-2"><Pill tone="good">{hubCount(r.application_id)} hubs</Pill></span>}
+                {r.added_by_admin && (
+                  <span className="mt-1 block">
+                    <Pill tone="warn">Added by admin · not applied</Pill>
+                    {r.added_reason && <span className="mt-1 block text-xs text-ink/60">Reason: {r.added_reason}</span>}
+                  </span>
+                )}
                 <span className="block text-xs text-ink/60">{[r.department, r.year].filter(Boolean).join(", ")}</span>
                 <Link href={`/admin/recruitment/${cycleId}/results/preview?app=${r.application_id}`} className="text-xs text-accent underline underline-offset-2">
                   Preview as candidate
                 </Link>
+                {(editable || visible) && (
+                  <div className="mt-1 text-xs">
+                    <AnotherHub cycleId={cycleId} row={r} rows={allRows} teams={teams} visible={visible} />
+                  </div>
+                )}
               </Td>
-              <Td className="tabular-nums">{r.pref_rank}</Td>
+              <Td className="tabular-nums">{r.added_by_admin ? "Not applied" : r.pref_rank}</Td>
               <Td>
                 <Pill tone={ATTEND_TONE[r.attendance]}>{ATTENDANCE_LABELS[r.attendance]}</Pill>
               </Td>

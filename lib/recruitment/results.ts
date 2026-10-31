@@ -9,7 +9,7 @@
  */
 
 export type Decision = "selected" | "waitlisted" | "not_selected";
-export type DecisionReason = "absent" | "one_hub" | "override" | "declined" | "expired" | "removed";
+export type DecisionReason = "absent" | "one_hub" | "override" | "declined" | "expired" | "removed" | "moved";
 export type OfferStatus = "pending" | "accepted" | "declined" | "expired";
 export type Attendance = "attended" | "no_show" | "booked" | "none";
 export type Outcome = "selected" | "waitlisted" | "not_selected" | "absent" | "declined" | "expired" | "in_review";
@@ -120,6 +120,7 @@ export const REASON_LABELS: Record<DecisionReason, string> = {
   declined: "Declined the offer",
   expired: "Offer expired",
   removed: "Removed from waitlist",
+  moved: "Moved to another hub",
 };
 
 export const ATTENDANCE_LABELS: Record<Attendance, string> = {

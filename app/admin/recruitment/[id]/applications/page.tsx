@@ -108,7 +108,7 @@ export default async function CycleApplicationsPage({ params, searchParams }: { 
                   <ul className="space-y-1">
                     {application.teams.map((t) => (
                       <li key={t.team_id} className="flex flex-wrap items-center gap-2 text-sm">
-                        <span className="tabular-nums text-ink/60">{t.rank}.</span>
+                        <span className="tabular-nums text-ink/60">{t.added_by_admin ? "Not applied:" : `${t.rank}.`}</span>
                         <span className="text-ink">{teamName(t.team_id)}</span>
                         <Pill tone={STAGE_TONE[t.stage]}>{STAGE_LABELS[t.stage]}</Pill>
                         {t.average !== null && (

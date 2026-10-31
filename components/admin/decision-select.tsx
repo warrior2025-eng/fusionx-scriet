@@ -66,6 +66,9 @@ export function DecisionSelect({
       <dialog
         ref={dialogRef}
         aria-labelledby={titleId}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.preventDefault();
+        }}
         // Closed without an answer: the row goes back to what it was.
         onClose={() => setChoice((c) => (c ? c : (setValue(asked), "")))}
         className="m-auto w-[min(92vw,28rem)] border border-line bg-surface p-6 text-ink backdrop:bg-black/60"

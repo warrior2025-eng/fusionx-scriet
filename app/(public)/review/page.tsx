@@ -35,9 +35,9 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const team = teams.find((t) => t.id === wanted) ?? teams[0];
 
   const { data: statusRows } = team
-    ? await supabase.from("recruitment_team_status").select("application_id, rank, stage, stage_updated_at").eq("team_id", team.id)
+    ? await supabase.from("recruitment_team_status").select("application_id, rank, added_by_admin, stage, stage_updated_at").eq("team_id", team.id)
     : { data: [] };
-  const statuses = (statusRows ?? []) as { application_id: string; rank: number; stage: Stage; stage_updated_at: string }[];
+  const statuses = (statusRows ?? []) as { application_id: string; rank: number; added_by_admin?: boolean; stage: Stage; stage_updated_at: string }[];
   const ids = statuses.map((s) => s.application_id);
   const [{ data: applicationRows }, { data: reviewRows }] = await Promise.all([
     ids.length
@@ -134,7 +134,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
                     </Td>
                     <Td>{a.department as string}</Td>
                     <Td>{a.year as string}</Td>
-                    <Td className="tabular-nums">{s.rank}</Td>
+                    <Td className="tabular-nums">{s.added_by_admin ? "Not applied" : s.rank}</Td>
                     <Td>
                       <Pill tone={STAGE_TONE[s.stage]}>{STAGE_LABELS[s.stage]}</Pill>
                     </Td>
