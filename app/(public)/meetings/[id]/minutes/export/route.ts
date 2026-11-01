@@ -35,7 +35,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     ...attendanceByTeam(m.attendance).flatMap((group) =>
       group.people.map((p) => ({
         section: `Attendance: ${group.name}`,
-        item: p.name,
+        item: p.seat.teams.length > 1 ? `${p.name} (also ${p.seat.teams.slice(1).map((team) => team.name).join(", ")})` : p.name,
         detail: `${istTime(p.first_join)} to ${istTime(p.last_leave)} · ${p.minutes} min`,
       })),
     ),

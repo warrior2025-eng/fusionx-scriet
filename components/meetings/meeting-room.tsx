@@ -135,7 +135,7 @@ function Tile({ trackRef, person, api, pinned, onPin, small, fit }: { trackRef: 
             {micMuted && !isShare && <MicOff size={12} aria-label="Muted" className="shrink-0" />}
             <span className="truncate">{isShare ? `${name}'s screen` : p.isLocal ? `${name} (you)` : name}</span>
           </p>
-          {!small && !isShare && person && <p className="truncate text-white/80">{person.seat.label}</p>}
+          {!small && !isShare && person && <p className="truncate text-white/80" title={person.seat.label}>{person.seat.short}</p>}
         </div>
         {badge && !isShare && <span className="shrink-0 rounded-sm bg-accent px-1.5 py-0.5 text-[10px] font-semibold">{badge}</span>}
       </div>

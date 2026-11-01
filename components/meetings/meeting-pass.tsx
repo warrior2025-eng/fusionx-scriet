@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CalendarClock, DoorOpen, FileText, Radio, XCircle } from "lucide-react";
 import { useServerClock } from "@/components/interview/use-server-clock";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { istDateTime } from "@/lib/events/format";
-import { passPhase, untilText, type MeetingPhase, type Pass, type PassOwner } from "@/lib/meetings/shared";
+import { passPhase, untilText, type MeetingPhase, type Pass, type PassOwner, type Seat } from "@/lib/meetings/shared";
 import { cn } from "@/lib/utils";
 
 function Strip({ pass, phase, now, onEnter }: { pass: Pass; phase: MeetingPhase; now: number; onEnter?: () => void }) {
@@ -64,6 +64,29 @@ function Strip({ pass, phase, now, onEnter }: { pass: Pass; phase: MeetingPhase;
   );
 }
 
+/** All the person's invited teams; on a small screen the first with "+1", and the rest on a tap. */
+function SeatLine({ seat }: { seat: Seat }) {
+  const [open, setOpen] = useState(false);
+  if (seat.teams.length < 2) return <p className="truncate text-ink/70">{seat.label}</p>;
+  return (
+    <>
+      <p className="hidden text-ink/70 sm:block">{seat.label}</p>
+      <div className="sm:hidden">
+        <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="text-left text-ink/70 underline decoration-dotted underline-offset-2">
+          {seat.short}
+        </button>
+        {open && (
+          <ul className="mt-1 space-y-0.5 text-xs text-ink/70">
+            {seat.teams.map((team) => (
+              <li key={team.name}>{team.label}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>
+  );
+}
+
 function Face({ pass, owner, phase, now, onEnter, side, hidden }: { pass: Pass; owner: PassOwner | null; phase: MeetingPhase; now: number; onEnter?: () => void; side: "front" | "back"; hidden: boolean }) {
   const name = owner?.name ?? "Member";
   return (
@@ -98,7 +121,7 @@ function Face({ pass, owner, phase, now, onEnter, side, hidden }: { pass: Pass; 
           )}
           <div className="min-w-0 text-sm">
             <p className="truncate font-medium text-ink">{name}</p>
-            <p className="truncate text-ink/70">{pass.seat.label}</p>
+            <SeatLine seat={pass.seat} />
           </div>
         </div>
         {pass.cant_reason && <p className="text-xs text-ink/65">You said you can&rsquo;t make it: {pass.cant_reason}</p>}

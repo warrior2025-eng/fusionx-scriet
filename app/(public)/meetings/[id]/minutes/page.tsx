@@ -113,7 +113,14 @@ export default async function MinutesPage({ params }: { params: Promise<{ id: st
                     <tbody>
                       {group.people.map((p) => (
                         <tr key={p.name} className="border-t border-line">
-                          <td className="py-1.5 pr-3">{p.name}</td>
+                          <td className="py-1.5 pr-3">
+                            {p.name}
+                            {p.seat.teams.slice(1).map((team) => (
+                              <span key={team.name} title={team.label} className="ml-1.5 inline-block rounded-sm border border-line px-1 py-px text-[10px] text-ink/70">
+                                {team.name}
+                              </span>
+                            ))}
+                          </td>
                           <td className="py-1.5 pr-3">{istTime(p.first_join)}</td>
                           <td className="py-1.5 pr-3">{istTime(p.last_leave)}</td>
                           <td className="py-1.5 tabular-nums">{p.minutes}</td>

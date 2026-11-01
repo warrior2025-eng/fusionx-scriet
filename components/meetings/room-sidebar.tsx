@@ -108,7 +108,16 @@ function PersonRow({ person, api, handOrder }: { person: RoomPerson; api: RoomAp
           {badge && <Badge tone="accent">{badge}</Badge>}
           {person.seat.lead && <Badge>Lead</Badge>}
         </p>
-        <p className="truncate text-xs text-ink/65">{person.seat.label}</p>
+        <p className="truncate text-xs text-ink/65">{person.seat.primary}</p>
+        {person.seat.teams.length > 1 && (
+          <p className="mt-0.5 flex flex-wrap gap-1">
+            {person.seat.teams.slice(1).map((team) => (
+              <span key={team.name} title={team.label} className="rounded-sm border border-line px-1 py-px text-[10px] text-ink/70">
+                {team.name}
+              </span>
+            ))}
+          </p>
+        )}
         {person.cant && <p className="text-xs text-ink/70">Can&rsquo;t make it: {person.cant}</p>}
         {!person.in_room && !person.cant && person.ring_answer === "cant" && <p className="text-xs text-ink/70">Answered the ring: can&rsquo;t join</p>}
       </div>

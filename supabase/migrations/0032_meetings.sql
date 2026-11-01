@@ -59,6 +59,7 @@ create table meeting_audience (
 );
 create index idx_meeting_audience_meeting on meeting_audience (meeting_id);
 create index idx_meeting_audience_group on meeting_audience (core_group_id) where core_group_id is not null;
+create unique index ux_meeting_audience_once on meeting_audience (meeting_id, kind, coalesce(core_group_id::text, role, team_id::text, user_id::text));
 
 create table meeting_invites (
   meeting_id uuid not null references meetings(id) on delete cascade,
@@ -243,17 +244,42 @@ returns text language sql immutable as $$
   select '/meetings/' || p_meeting::text || '?for=' || meeting_pass_tag(p_meeting, p_user);
 $$;
 
--- The seat on a pass and a tile: "FusionX Core · Head of Execution", "Design & Branding · Lead", or "Guest".
-create function meeting_seat(p_user uuid)
+-- The seat on a pass and a tile: every invited team the person is in, FusionX Core first, then the
+-- hubs in order, then the others: "Design & Branding · Lead + FusionX Event Crew · Member". Someone
+-- invited another way shows their own first team, or "Guest".
+create function meeting_seat(p_meeting uuid, p_user uuid)
 returns jsonb language sql security definer stable set search_path = public as $$
-  select coalesce(
-    (select jsonb_build_object(
-       'label', g.name || ' · ' || case when m.is_lead and m.title = 'Member' then 'Lead' else m.title end,
-       'group', g.name, 'order', g.display_order, 'lead', m.is_lead)
-     from core_group_members m join core_groups g on g.id = m.group_id
-     where m.user_id = p_user
-     order by (g.kind = 'core') desc, g.display_order limit 1),
-    jsonb_build_object('label', 'Guest', 'group', 'Others', 'order', 100000, 'lead', false));
+  with invited as (
+    select g.name, g.name || ' · ' || case when m.is_lead and m.title = 'Member' then 'Lead' else m.title end as label, m.is_lead as lead,
+      g.display_order + case g.kind when 'core' then 0 when 'hub' then 1000 else 2000 end as rank
+    from meeting_audience a join core_groups g on g.id = a.core_group_id
+    join core_group_members m on m.group_id = g.id and m.user_id = p_user
+    where a.meeting_id = p_meeting and a.kind = 'core_group'
+    union all
+    select t.name, t.name || ' · ' || initcap(tm.role), false, 3000
+    from meeting_audience a join teams t on t.id = a.team_id
+    join team_members tm on tm.team_id = t.id and tm.user_id = p_user
+    where a.meeting_id = p_meeting and a.kind = 'team'
+  ), own as (
+    select g.name, g.name || ' · ' || case when m.is_lead and m.title = 'Member' then 'Lead' else m.title end as label, m.is_lead as lead,
+      g.display_order + case g.kind when 'core' then 0 when 'hub' then 1000 else 2000 end as rank
+    from core_group_members m join core_groups g on g.id = m.group_id
+    where m.user_id = p_user and not exists (select 1 from invited)
+    order by rank limit 1
+  ), seats as (
+    select * from invited union all select * from own
+  )
+  select case when count(*) = 0
+    then jsonb_build_object('label', 'Guest', 'short', 'Guest', 'primary', 'Guest', 'group', 'Others', 'order', 100000, 'lead', false, 'teams', '[]'::jsonb)
+    else jsonb_build_object(
+      'label', string_agg(s.label, ' + ' order by s.rank, s.name),
+      'short', case when count(*) > 1 then (array_agg(s.name order by s.rank, s.name))[1] || ' +' || (count(*) - 1) else min(s.label) end,
+      'primary', (array_agg(s.label order by s.rank, s.name))[1],
+      'group', (array_agg(s.name order by s.rank, s.name))[1],
+      'order', min(s.rank), 'lead', bool_or(s.lead),
+      'teams', jsonb_agg(jsonb_build_object('name', s.name, 'label', s.label) order by s.rank, s.name))
+    end
+  from seats s;
 $$;
 
 create function meeting_audit(p_action text, p_meeting uuid, p_note text)
@@ -366,7 +392,8 @@ begin
       case when item ->> 'kind' = 'core_group' then (item ->> 'id')::uuid end,
       case when item ->> 'kind' = 'role' then item ->> 'id' end,
       case when item ->> 'kind' = 'team' then (item ->> 'id')::uuid end,
-      case when item ->> 'kind' = 'person' then (item ->> 'id')::uuid end);
+      case when item ->> 'kind' = 'person' then (item ->> 'id')::uuid end)
+    on conflict do nothing;
   end loop;
   if not exists (select 1 from meeting_audience where meeting_id = p_meeting) then
     raise exception 'Choose who the meeting is for';
@@ -375,7 +402,7 @@ begin
   delete from meeting_cohosts c where c.meeting_id = p_meeting and c.source = 'chosen'
     and not (c.user_id::text in (select jsonb_array_elements_text(coalesce(p -> 'cohosts', '[]'::jsonb))));
   insert into meeting_cohosts (meeting_id, user_id, source, made_by)
-  select p_meeting, v::uuid, 'chosen', auth.uid() from jsonb_array_elements_text(coalesce(p -> 'cohosts', '[]'::jsonb)) v
+  select distinct p_meeting, v::uuid, 'chosen', auth.uid() from jsonb_array_elements_text(coalesce(p -> 'cohosts', '[]'::jsonb)) v
   on conflict (meeting_id, user_id) do update set source = 'chosen', removed_at = null, made_by = auth.uid(), made_at = now();
 
   delete from meeting_agenda_items where meeting_id = p_meeting;
@@ -533,7 +560,7 @@ returns jsonb language sql security definer stable set search_path = public as $
     'phase', meeting_phase(mt), 'inside', meeting_inside_count(mt.id),
     'host', coalesce((select p.full_name from profiles p where p.id = mt.created_by), 'FusionX'),
     'agenda', coalesce((select jsonb_agg(a.title order by a.position) from meeting_agenda_items a where a.meeting_id = mt.id), '[]'::jsonb),
-    'seat', meeting_seat(p_user),
+    'seat', meeting_seat(mt.id, p_user),
     'cant_reason', (select i.cant_reason from meeting_invites i where i.meeting_id = mt.id and i.user_id = p_user),
     'is_host', meeting_is_host(mt.id, p_user),
     'join_muted', mt.join_muted,
@@ -781,7 +808,7 @@ begin
     'people', coalesce((select jsonb_agg(jsonb_build_object(
         'id', t.user_id, 'name', p.full_name, 'avatar_url', case when p.avatar_url ~* '^https?://\S+$' then p.avatar_url end,
         'detail', nullif(concat_ws(' · ', p.department, p.year), ''),
-        'seat', meeting_seat(t.user_id), 'host_kind', meeting_host_kind(p_meeting, t.user_id),
+        'seat', meeting_seat(p_meeting, t.user_id), 'host_kind', meeting_host_kind(p_meeting, t.user_id),
         'in_room', a.first_joined_at is not null and a.left_at is null and a.last_seen_at > now() - interval '30 seconds',
         'hand', a.hand_raised_at, 'cant', i.cant_reason, 'joined', a.first_joined_at is not null,
         'ring_answer', (select r.answer from meeting_rings r where r.meeting_id = p_meeting and r.user_id = t.user_id order by r.created_at desc limit 1),
@@ -1035,7 +1062,7 @@ begin
     'decisions', coalesce((select n.decisions from meeting_notes n where n.meeting_id = p_meeting), '[]'::jsonb),
     'actions', coalesce((select jsonb_agg(jsonb_build_object('id', x.id, 'task', x.task, 'owner_id', x.owner_id, 'owner', p.full_name, 'due_on', x.due_on, 'done', x.done_at is not null) order by x.created_at)
       from meeting_action_items x left join profiles p on p.id = x.owner_id where x.meeting_id = p_meeting), '[]'::jsonb),
-    'attendance', coalesce((select jsonb_agg(jsonb_build_object('name', p.full_name, 'seat', meeting_seat(a.user_id),
+    'attendance', coalesce((select jsonb_agg(jsonb_build_object('name', p.full_name, 'seat', meeting_seat(p_meeting, a.user_id),
         'first_join', a.first_joined_at, 'last_leave', coalesce(a.left_at, a.last_seen_at), 'minutes', round(a.total_seconds / 60.0)::integer))
       from meeting_attendance a join profiles p on p.id = a.user_id where a.meeting_id = p_meeting and a.first_joined_at is not null), '[]'::jsonb),
     'cant', coalesce((select jsonb_agg(jsonb_build_object('name', p.full_name, 'reason', i.cant_reason))
@@ -1081,7 +1108,7 @@ revoke all on meetings, meeting_audience, meeting_invites, meeting_cohosts, meet
 -- ── who may call what ──────────────────────────────────────────────────
 revoke all on function
   meeting_is_admin_user(uuid), meeting_host_kind(uuid, uuid), meeting_is_host(uuid, uuid), meeting_is_invited(uuid, uuid),
-  meeting_inside_count(uuid), meeting_pass_tag(uuid, uuid), meeting_pass_link(uuid, uuid), meeting_seat(uuid), meeting_audit(text, uuid, text),
+  meeting_inside_count(uuid), meeting_pass_tag(uuid, uuid), meeting_pass_link(uuid, uuid), meeting_seat(uuid, uuid), meeting_audit(text, uuid, text),
   meeting_audience_users(uuid), meeting_sync_invites(uuid, boolean), meeting_core_member_changed(), meeting_apply_details(uuid, jsonb),
   meeting_save(uuid, jsonb), meeting_start_instant(jsonb), meeting_cancel(uuid), meeting_finish(uuid, uuid), send_meeting_reminders(),
   meeting_pass_json(meetings, uuid), my_meeting_passes(), meeting_view(uuid, text), my_meeting_signal(), meeting_cant_make_it(uuid, text),

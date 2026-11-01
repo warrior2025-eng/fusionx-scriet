@@ -1,3 +1,5 @@
+import type { Seat } from "./shared";
+
 export type Minutes = {
   id: string;
   title: string;
@@ -13,7 +15,7 @@ export type Minutes = {
   notes: string;
   decisions: string[];
   actions: { id: string; task: string; owner_id: string | null; owner: string | null; due_on: string | null; done: boolean }[];
-  attendance: { name: string; seat: { label: string; group: string; order: number }; first_join: string | null; last_leave: string | null; minutes: number }[];
+  attendance: { name: string; seat: Seat; first_join: string | null; last_leave: string | null; minutes: number }[];
   cant: { name: string; reason: string }[];
   hosts: { name: string; kind: string }[];
 };

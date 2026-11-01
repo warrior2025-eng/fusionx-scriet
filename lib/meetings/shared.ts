@@ -2,7 +2,8 @@
 
 export type MeetingPhase = "upcoming" | "doors" | "live" | "ended" | "cancelled";
 
-export type Seat = { label: string; group: string; order: number; lead: boolean };
+/** `label` lists every invited team, `short` is the first with "+1", `primary` is the first with its title. */
+export type Seat = { label: string; short: string; primary: string; group: string; order: number; lead: boolean; teams: { name: string; label: string }[] };
 
 export type Pass = {
   id: string;
