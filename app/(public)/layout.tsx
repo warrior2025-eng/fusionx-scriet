@@ -11,6 +11,7 @@ import { resultsVisible } from "@/lib/recruitment/results";
 import { createClient } from "@/lib/supabase/server";
 import { CandidateEntryBar } from "@/components/recruitment/candidate-entry";
 import { getCandidateEntry, getLiveInterviewDay } from "@/lib/recruitment/my-entry";
+import { getMeetingSignal } from "@/lib/meetings/data";
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
   // Two rounds of queries instead of one after another: everything that does not need the user, with the
@@ -23,7 +24,7 @@ export default async function PublicLayout({ children }: { children: React.React
     getContent("footer.columns"),
   ]);
   const supabase = user ? await createClient() : null;
-  const [roles, profileRow, reviewerCount, candidate, liveDay] = user && supabase
+  const [roles, profileRow, reviewerCount, candidate, liveDay, meetings] = user && supabase
     ? await Promise.all([
         getCurrentRoles(),
         supabase.from("profiles").select("full_name, avatar_url").eq("id", user.id).single().then((r) => r.data),
@@ -31,8 +32,10 @@ export default async function PublicLayout({ children }: { children: React.React
         // The candidate's "My Interview / My Result" and a reviewer's live interview day (migration 0028; null before it).
         getCandidateEntry(),
         getLiveInterviewDay(),
+        // Passes and calls (migration 0032; null before it).
+        getMeetingSignal(),
       ])
-    : [[], null, 0, null, null];
+    : [[], null, 0, null, null, null];
   // Only reviewers get "Reviewer panel · Live" (admins keep their admin links).
   const reviewerLive = reviewerCount ? liveDay : null;
 
@@ -99,7 +102,7 @@ export default async function PublicLayout({ children }: { children: React.React
         recruitment={showRecruitment ? recruitmentLink : null}
         user={
           user
-            ? { email: user.email ?? "", fullName: profile?.full_name ?? "Member", avatarUrl: profile?.avatar_url ?? null, panels, candidate, reviewerLive }
+            ? { email: user.email ?? "", fullName: profile?.full_name ?? "Member", avatarUrl: profile?.avatar_url ?? null, panels, candidate, reviewerLive, meetings }
             : null
         }
       />

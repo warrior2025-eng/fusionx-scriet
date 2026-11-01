@@ -47,7 +47,7 @@ export type ParticipantMeta = { kind: TokenKind; booking_id?: string; slot_id?: 
 const b64url = (value: string | Buffer) => Buffer.from(value).toString("base64url");
 const unix = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 
-function keys() {
+export function keys() {
   const url = process.env.LIVEKIT_URL;
   const key = process.env.LIVEKIT_API_KEY;
   const secret = process.env.LIVEKIT_API_SECRET;
@@ -55,7 +55,7 @@ function keys() {
   return { url, key, secret };
 }
 
-function sign(claims: Record<string, unknown>, secret: string): string {
+export function sign(claims: Record<string, unknown>, secret: string): string {
   const head = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const body = b64url(JSON.stringify(claims));
   const signature = createHmac("sha256", secret).update(`${head}.${body}`).digest("base64url");
@@ -104,7 +104,11 @@ export function accessToken(input: {
 // ── the server API (RoomService), for removing people from the day room ──
 export type RoomParticipant = { identity: string; name: string; metadata: string; joinedAt: number; meta: ParticipantMeta | null };
 
-async function roomService<T>(method: "ListParticipants" | "RemoveParticipant", room: string, body: Record<string, unknown>): Promise<T | null> {
+export async function roomService<T>(
+  method: "ListParticipants" | "RemoveParticipant" | "UpdateParticipant" | "MutePublishedTrack" | "SendData" | "DeleteRoom",
+  room: string,
+  body: Record<string, unknown>,
+): Promise<T | null> {
   const { url, key, secret } = keys();
   const now = Math.floor(Date.now() / 1000);
   const token = sign({ iss: key, sub: "fusionx-server", nbf: now - 10, exp: now + 60, video: { room, roomAdmin: true } }, secret);
