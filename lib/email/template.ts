@@ -23,16 +23,19 @@ export function notificationEmail(input: {
   title: string;
   body: string | null;
   link: string | null;
+  /** For someone with no account: the button's words and the line at the bottom. */
+  label?: string;
+  footer?: string;
 }): { subject: string; html: string; text: string } {
   const site = input.siteUrl.replace(/\/$/, "");
   const href = absoluteLink(site, input.link);
   const title = input.title.replace(/\s+/g, " ").trim().slice(0, 150);
   const body = (input.body ?? "").trim();
   const pass = input.link?.match(MEETING_PASS);
-  const label = pass ? "Open your pass" : input.link && MEETING_MINUTES.test(input.link) ? "Open the minutes" : `Open on ${input.siteName}`;
+  const label = input.label ?? (pass ? "Open your pass" : input.link && MEETING_MINUTES.test(input.link) ? "Open the minutes" : `Open on ${input.siteName}`);
   // Resend's batch sending takes no attachments, so the .ics is one click away (and opens only for its owner).
   const calendar = pass && !/^Cancelled/.test(title) ? `${site}/meetings/${pass[1]}/calendar.ics` : null;
-  const footer = `You are receiving this because you have an account on ${input.siteName}. All your notifications: ${site}/notifications`;
+  const footer = input.footer ?? `You are receiving this because you have an account on ${input.siteName}. All your notifications: ${site}/notifications`;
 
   const text = [title, body, href ? `${label}: ${href}` : "", calendar ? `Add to calendar: ${calendar}` : "", `--\n${footer}`].filter(Boolean).join("\n\n");
 
@@ -49,7 +52,7 @@ export function notificationEmail(input: {
 ${body ? `<p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#4a5578;">${escape(body).replace(/\n/g, "<br>")}</p>` : ""}
 ${href ? `<a href="${escape(href)}" style="display:inline-block;background:#004df6;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold;padding:11px 20px;">${escape(label)}</a>${calendar ? `<a href="${escape(calendar)}" style="display:inline-block;margin-left:14px;color:#004df6;font-size:14px;font-weight:bold;">Add to calendar</a>` : ""}` : ""}
 </td></tr>
-<tr><td style="padding:16px 28px;border-top:1px solid #d9dfee;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#5e6a8c;">You are receiving this because you have an account on ${escape(input.siteName)}. <a href="${escape(site)}/notifications" style="color:#004df6;">All your notifications</a></td></tr>
+<tr><td style="padding:16px 28px;border-top:1px solid #d9dfee;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#5e6a8c;">${input.footer ? escape(input.footer) : `You are receiving this because you have an account on ${escape(input.siteName)}. <a href="${escape(site)}/notifications" style="color:#004df6;">All your notifications</a>`}</td></tr>
 </table>
 </td></tr>
 </table>
@@ -57,4 +60,23 @@ ${href ? `<a href="${escape(href)}" style="display:inline-block;background:#004d
 </html>`;
 
   return { subject: title, html, text };
+}
+
+/** To an address with no account yet: an invitation, a new time or a cancellation. */
+export function meetingSignupEmail(input: { siteName: string; siteUrl: string; email: string; kind: "invite" | "rescheduled" | "cancelled"; title: string; at: string }) {
+  const signUp = "Sign up at fxscriet.com with this email address to get your Meeting Pass.";
+  const texts = {
+    invite: { title: `You're invited to '${input.title}' on FusionX`, body: `You're invited to '${input.title}' on FusionX on ${input.at}. ${signUp}` },
+    rescheduled: { title: `Rescheduled: ${input.title}`, body: `Now on ${input.at}. ${signUp}` },
+    cancelled: { title: `Cancelled: ${input.title}`, body: `The meeting on ${input.at} will not take place.` },
+  }[input.kind];
+  return notificationEmail({
+    siteName: input.siteName,
+    siteUrl: input.siteUrl,
+    name: null,
+    ...texts,
+    link: input.kind === "cancelled" ? null : `/signup?email=${encodeURIComponent(input.email)}&next=/meetings`,
+    label: "Sign up and get your pass",
+    footer: `You are receiving this because an admin of ${input.siteName} invited this address to a meeting.`,
+  });
 }

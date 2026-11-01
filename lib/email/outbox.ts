@@ -4,7 +4,7 @@ import { siteName as defaultSiteName } from "@/lib/site-config";
 import { getContent } from "@/lib/data/site-content";
 import { createAdminClient } from "@/lib/supabase/server";
 import { BATCH_LIMIT, emailConfig, sendBatch } from "./resend";
-import { notificationEmail } from "./template";
+import { meetingSignupEmail, notificationEmail } from "./template";
 
 /**
  * Notifications → email. The database keeps the queue (migration 0015): a
@@ -68,7 +68,28 @@ export async function deliverPendingEmails({ force = false }: { force?: boolean 
     sent += result.count;
     if (claimed.length < BATCH_LIMIT) break;
   }
+  sent += await deliverMeetingSignupEmails(supabase, config, siteName);
   return { state: "sent", sent };
+}
+
+/** Addresses invited to a meeting that have no account yet. A problem here leaves the rest of the mail alone. */
+async function deliverMeetingSignupEmails(supabase: ReturnType<typeof createAdminClient>, config: NonNullable<ReturnType<typeof emailConfig>>, siteName: string): Promise<number> {
+  type Invite = { id: string; email: string; kind: "invite" | "rescheduled" | "cancelled"; title: string; at_time: string };
+  const { data, error } = await supabase.rpc("claim_meeting_email_invites", { p_limit: BATCH_LIMIT });
+  if (error) {
+    console.error("meeting email invites could not be read:", error.message);
+    return 0;
+  }
+  const claimed = (data ?? []) as Invite[];
+  const result = await sendBatch(
+    claimed.map((n) => ({ to: n.email, ...meetingSignupEmail({ siteName, siteUrl: siteUrl(), email: n.email, kind: n.kind, title: n.title, at: n.at_time }) })),
+    config,
+    `meeting-invites:${claimed.map((n) => `${n.id}:${n.kind}`).sort().join(",")}:${Math.floor(Date.now() / 3600000)}`,
+  );
+  if (result.ok) return result.count;
+  await supabase.rpc("release_meeting_email_invites", { p_items: claimed.map((n) => ({ id: n.id, kind: n.kind })) });
+  console.error("meeting email invites failed:", result.error);
+  return 0;
 }
 
 /**

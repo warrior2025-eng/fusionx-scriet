@@ -186,7 +186,7 @@ export async function EntityListPage({
                   </Td>
                   {def.listColumns.map((column) => (
                     <Td key={column.label}>
-                      {column.value(row)}
+                      {column.pill ? <Pill tone={column.pill(row)}>{column.value(row)}</Pill> : column.value(row)}
                     </Td>
                   ))}
                   <Td>

@@ -6,9 +6,12 @@ import { safeNext } from "@/lib/auth/safe-next";
 
 export const metadata: Metadata = { title: "Create account" };
 
-export default async function SignUpPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+export default async function SignUpPage({ searchParams }: { searchParams: Promise<{ next?: string; email?: string }> }) {
   const settings = await getOrganizationSettings();
-  const next = safeNext((await searchParams).next);
+  const params = await searchParams;
+  const next = safeNext(params.next);
+  // From a meeting's email invite: the address it was sent to, ready to use.
+  const email = params.email && params.email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(params.email) ? params.email : "";
 
   if (!settings.signup_enabled) {
     return (
@@ -27,7 +30,7 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
   return (
     <div className="border border-ink/10 rounded-sm bg-surface p-7">
       <h1 className="text-lg font-semibold text-ink mb-6">Create your account</h1>
-      <SignUpForm next={next} />
+      <SignUpForm next={next} email={email} />
     </div>
   );
 }

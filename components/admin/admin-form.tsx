@@ -10,6 +10,7 @@ import { toIstInput } from "@/lib/events/format";
 import { cn } from "@/lib/utils";
 import { ImageField } from "./image-field";
 import { toastResult } from "./toast";
+import { UserField } from "./user-field";
 
 const FormContext = createContext<{ errors: Record<string, string>; pending: boolean }>({ errors: {}, pending: false });
 
@@ -273,6 +274,8 @@ export function EntityFields({ fields, values }: { fields: FieldDef[]; values: R
                 className={span}
               />
             );
+          case "user":
+            return <UserField key={f.name} name={f.name} label={f.label} hint={f.hint} defaultValue={String(value)} className={span} />;
           case "textarea":
             return (
               <TextareaField
