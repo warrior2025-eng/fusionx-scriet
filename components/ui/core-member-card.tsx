@@ -6,6 +6,7 @@ import { GitHubIcon, LinkedInIcon, socialLink } from "@/components/ui/person-car
 import { ReadMore } from "@/components/ui/read-more";
 import type { CoreMember } from "@/lib/data/core-teams";
 import { cn, memberDetail } from "@/lib/utils";
+import { linkHref } from "@/lib/validation/link";
 
 /**
  * A team member, from their own profile, in the same card as PersonCard.
@@ -14,10 +15,10 @@ import { cn, memberDetail } from "@/lib/utils";
  */
 export function CoreMemberCard({ member, compact }: { member: CoreMember; compact?: boolean }) {
   const links = [
-    member.linkedin_url && { href: member.linkedin_url, label: "LinkedIn", icon: <LinkedInIcon /> },
-    member.github_url && { href: member.github_url, label: "GitHub", icon: <GitHubIcon /> },
-    member.portfolio_url && { href: member.portfolio_url, label: "Portfolio", icon: <Globe size={16} aria-hidden /> },
-  ].filter(Boolean) as { href: string; label: string; icon: React.ReactNode }[];
+    { href: linkHref(member.linkedin_url, "linkedin"), label: "LinkedIn", icon: <LinkedInIcon /> },
+    { href: linkHref(member.github_url, "github"), label: "GitHub", icon: <GitHubIcon /> },
+    { href: linkHref(member.portfolio_url, "website"), label: "Portfolio", icon: <Globe size={16} aria-hidden /> },
+  ].filter((link): link is { href: string; label: string; icon: React.ReactElement } => Boolean(link.href));
 
   const avatar = member.avatar_url ? (
     // eslint-disable-next-line @next/next/no-img-element -- see above
@@ -32,6 +33,25 @@ export function CoreMemberCard({ member, compact }: { member: CoreMember; compac
     <InitialsAvatar name={member.full_name} className={compact ? undefined : "h-16 w-16 text-base"} />
   );
   const lead = member.is_lead && <Badge className="mt-2">Lead</Badge>;
+  const bio = member.bio && <ReadMore text={member.bio} lines={3} limit={130} className={compact ? "mt-3" : "mt-5"} />;
+  const linkList = links.length > 0 && (
+    <ul className={cn("flex gap-1", compact ? "mt-2" : "mt-auto pt-5")}>
+      {links.map((link) => (
+        <li key={link.label}>
+          <a
+            href={link.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`${member.full_name} on ${link.label}`}
+            title={link.label}
+            className={socialLink}
+          >
+            {link.icon}
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
 
   if (compact) {
     return (
@@ -41,6 +61,8 @@ export function CoreMemberCard({ member, compact }: { member: CoreMember; compac
           <h3 className="font-serif text-lg font-medium text-ink">{member.full_name}</h3>
           <p className="mt-1 text-sm leading-relaxed text-ink/70">{member.title}</p>
           {lead}
+          {bio}
+          {linkList}
         </div>
       </CutCard>
     );
@@ -58,25 +80,8 @@ export function CoreMemberCard({ member, compact }: { member: CoreMember; compac
           {lead}
         </div>
       </div>
-      {member.bio && <ReadMore text={member.bio} lines={2} limit={90} className="mt-5" />}
-      {links.length > 0 && (
-        <ul className="mt-auto flex gap-1 pt-5">
-          {links.map((link) => (
-            <li key={link.label}>
-              <a
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`${member.full_name} on ${link.label}`}
-                title={link.label}
-                className={socialLink}
-              >
-                {link.icon}
-              </a>
-            </li>
-          ))}
-        </ul>
-      )}
+      {bio}
+      {linkList}
     </CutCard>
   );
 }

@@ -2,10 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { isStaff } from "@/lib/permissions";
 import type { ProjectStatus } from "@/types/database";
+import { projectSchema } from "@/lib/validations";
 
 export type ProjectActionState = {
   status: "idle" | "error";
@@ -13,16 +13,6 @@ export type ProjectActionState = {
   fieldErrors?: Record<string, string>;
 };
 
-const projectSchema = z.object({
-  title: z.string().trim().min(3, "Title is too short").max(160),
-  description: z.string().trim().min(20, "Add a fuller description (at least 20 characters)").max(4000),
-  domain: z.string().trim().max(80).optional().or(z.literal("")),
-  status: z.enum(["idea", "building", "prototype", "testing", "completed", "continued"]),
-  technologies: z.string().trim().max(300).optional().or(z.literal("")),
-  github_url: z.string().trim().url().optional().or(z.literal("")),
-  demo_url: z.string().trim().url().optional().or(z.literal("")),
-  is_published: z.union([z.literal("on"), z.undefined()]).optional(),
-});
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];

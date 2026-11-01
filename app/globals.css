@@ -714,3 +714,10 @@ a:hover > .arrow-nudge {
   .meeting-reaction { animation: fade-in 0.01ms; opacity: 1; }
   .meeting-tile-in { animation: none; }
 }
+
+/* Every field a form reports as wrong (components/ui/form-errors.tsx). */
+input[aria-invalid="true"],
+textarea[aria-invalid="true"],
+select[aria-invalid="true"] {
+  border-color: #dc2626 !important;
+}

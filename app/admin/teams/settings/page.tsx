@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { saveContent } from "@/actions/admin-content";
 import { saveFocusCategories, saveTeamsWhatsapp } from "@/actions/admin-teams";
-import { AdminForm, CheckboxField, TextField, TextareaField } from "@/components/admin/admin-form";
+import { AdminForm, CheckboxField, LinkField, TextField, TextareaField } from "@/components/admin/admin-form";
 import { AdminPage, Panel } from "@/components/admin/ui";
 import { requireCapability } from "@/lib/admin/guard";
 import { getContent } from "@/lib/data/site-content";
@@ -62,7 +62,7 @@ export default async function TeamsSettingsPage() {
 
         <Panel title="FusionX Teams WhatsApp group (private)" description="Never shown on the site. Only members of a verified team see a button that opens it.">
           <AdminForm action={saveTeamsWhatsapp} submitLabel="Save link" warnUnsaved={false}>
-            <TextField name="url" label="Group invite link" type="url" placeholder="https://chat.whatsapp.com/…" defaultValue={(link?.url as string | undefined) ?? ""} hint="Clear it to remove the button." />
+            <LinkField kind="whatsapp_group" name="url" label="Group invite link" placeholder="https://chat.whatsapp.com/…" defaultValue={(link?.url as string | undefined) ?? ""} hint="Clear it to remove the button." />
           </AdminForm>
         </Panel>
 

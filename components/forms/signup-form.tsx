@@ -1,46 +1,45 @@
 "use client";
 
-import { useActionState } from "react";
 import Link from "next/link";
 import { signUpAction, type AuthActionState } from "@/actions/auth";
 import { OAuthButtons } from "@/components/forms/oauth-buttons";
 import { Label, Input, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
+import { useFormSubmit } from "@/components/ui/form-errors";
+import { signUpSchema } from "@/lib/validations";
 
 const initialState: AuthActionState = { status: "idle" };
 
 export function SignUpForm({ next = "/", email = "" }: { next?: string; email?: string }) {
-  const [state, formAction, pending] = useActionState(signUpAction, initialState);
+  const { pending, errors, summary, formProps } = useFormSubmit(signUpAction, initialState, { schema: signUpSchema, prefix: "" });
 
   return (
     <div>
       <OAuthButtons next={next} />
 
-      <form action={formAction} className="space-y-5">
+      <form {...formProps} className="space-y-5">
         <input type="hidden" name="next" value={next} />
 
-        {state.status === "error" && state.message && !Object.keys(state.fieldErrors ?? {}).length && (
-          <p className="text-sm text-red-600">{state.message}</p>
-        )}
+        {summary}
         <div>
           <Label htmlFor="full_name">Full name</Label>
           <Input id="full_name" name="full_name" autoComplete="name" required />
-          <FieldError>{state.fieldErrors?.full_name}</FieldError>
+          <FieldError id="full_name-error">{errors.full_name}</FieldError>
         </div>
         <div>
           <Label htmlFor="email">Email</Label>
           <Input id="email" name="email" type="email" autoComplete="email" defaultValue={email} required />
-          <FieldError>{state.fieldErrors?.email}</FieldError>
+          <FieldError id="email-error">{errors.email}</FieldError>
         </div>
         <div>
           <Label htmlFor="password">Password</Label>
           <Input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} />
-          <FieldError>{state.fieldErrors?.password}</FieldError>
+          <FieldError id="password-error">{errors.password}</FieldError>
         </div>
         <div>
           <Label htmlFor="confirm_password">Confirm password</Label>
           <Input id="confirm_password" name="confirm_password" type="password" autoComplete="new-password" required minLength={8} />
-          <FieldError>{state.fieldErrors?.confirm_password}</FieldError>
+          <FieldError id="confirm_password-error">{errors.confirm_password}</FieldError>
         </div>
         <Button type="submit" loading={pending} className="w-full">
           Create account

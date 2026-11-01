@@ -14,7 +14,7 @@ import { requireCapability, type AdminContext } from "@/lib/admin/guard";
 import { LinkButton } from "@/components/ui/button";
 import { cn, memberDetail } from "@/lib/utils";
 import { ActionButton } from "./action-button";
-import { AddMembersButton, CoreGroupButton, MemberAvatar, MemberTitleField, RecruitmentCandidatesButton } from "./core-team-dialogs";
+import { AddMembersButton, CoreGroupButton, CoreMemberSwitches, MemberAvatar, MemberTitleField, RecruitmentCandidatesButton } from "./core-team-dialogs";
 import { AdminPage, Pill } from "./ui";
 
 const TABS = [
@@ -54,6 +54,8 @@ type Member = {
   year: string | null;
   incomplete: boolean;
   show_on_core: boolean;
+  is_profile_public: boolean;
+  is_contact_public: boolean;
   is_active: boolean;
   last_reminded_at: string | null;
   /** Reminded in the last 24 hours, so the button is off until then. */
@@ -200,13 +202,9 @@ function MemberRow({ member, peers }: { member: Member; peers: Member[] }) {
               </Pill>
             )}
             {!member.is_visible && <Pill>Hidden</Pill>}
-            {!member.show_on_core && (
-              <Pill>
-                <span className="normal-case">Turned off by them</span>
-              </Pill>
-            )}
             {!member.is_active && <Pill tone="bad">Deactivated</Pill>}
           </div>
+          <CoreMemberSwitches userId={member.user_id} name={name} profile={member.is_profile_public} contact={member.is_contact_public} core={member.show_on_core} />
         </div>
       </div>
       <MemberTitleField key={member.title} memberId={id} name={name} title={member.title} />

@@ -1,3 +1,4 @@
+import { linkHref } from "@/lib/validation/link";
 import Image from "next/image";
 import Link from "next/link";
 import type { OrganizationSettings } from "@/types/database";
@@ -12,8 +13,8 @@ export function SiteFooter({ settings, columns }: { settings: OrganizationSettin
   const name = settings.chapter_name;
   const email = settings.official_email || socialLinks.email;
   const connect = [
-    { href: settings.instagram_url || socialLinks.instagram, label: `${name} on Instagram`, icon: <InstagramIcon />, external: true },
-    { href: settings.linkedin_url || socialLinks.linkedin, label: `${name} on LinkedIn`, icon: <LinkedInIcon />, external: true },
+    { href: linkHref(settings.instagram_url, "instagram") || socialLinks.instagram, label: `${name} on Instagram`, icon: <InstagramIcon />, external: true },
+    { href: linkHref(settings.linkedin_url, "linkedin") || socialLinks.linkedin, label: `${name} on LinkedIn`, icon: <LinkedInIcon />, external: true },
     { href: `mailto:${email}`, label: `Email ${name}`, icon: <Mail size={20} aria-hidden />, external: false },
   ];
 

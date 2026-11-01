@@ -2,8 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { researchSchema } from "@/lib/validations";
 
 export type ResearchActionState = {
   status: "idle" | "error";
@@ -11,15 +11,6 @@ export type ResearchActionState = {
   fieldErrors?: Record<string, string>;
 };
 
-const researchSchema = z.object({
-  title: z.string().trim().min(3, "Title is too short").max(200),
-  abstract: z.string().trim().min(30, "Add a fuller abstract (at least 30 characters)").max(4000),
-  domain: z.string().trim().max(80).optional().or(z.literal("")),
-  status: z.enum(["idea", "researching", "experimentation", "draft", "submitted", "published"]),
-  publication_info: z.string().trim().max(300).optional().or(z.literal("")),
-  document_url: z.string().trim().url().optional().or(z.literal("")),
-  is_published: z.union([z.literal("on"), z.undefined()]).optional(),
-});
 
 export async function createResearch(
   _prev: ResearchActionState,

@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { linkHref } from "@/lib/validation/link";
 
 export const metadata: Metadata = {
   title: "Resources",
@@ -40,7 +41,7 @@ export default async function ResourcesPage() {
             {resources.map((r, i) => (
               <ScrollReveal key={r.id} delay={i * 80}>
                 <a
-                  href={r.url ?? "#"}
+                  href={linkHref(r.url) ?? "#"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="card-elevated rounded-sm p-7 block group h-full"

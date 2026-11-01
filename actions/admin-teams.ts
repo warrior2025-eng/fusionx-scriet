@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/admin/audit";
 import { authorize, FORBIDDEN } from "@/lib/admin/guard";
 import { friendlyDbError } from "@/lib/recruitment/data";
 import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
+import { linkField } from "@/lib/validation/link";
 
 /**
  * FusionX Teams, from the admin panel.
@@ -153,8 +154,9 @@ export async function saveFocusCategories(_prev: ActionState, formData: FormData
 export async function saveTeamsWhatsapp(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const ctx = await authorize("teams.manage");
   if (!ctx) return FORBIDDEN;
-  const url = text(formData, "url");
-  if (url && !/^https:\/\/\S{6,300}$/i.test(url)) return fail("Please fix the highlighted fields.", { url: "Use a full https:// link" });
+  const link = linkField("Group invite link", "whatsapp_group", { max: 300 }).safeParse(text(formData, "url"));
+  if (!link.success) return fail("Please fix the highlighted fields.", { url: link.error.issues[0].message });
+  const url = link.data;
   const { error } = url
     ? await ctx.supabase.from("private_links").upsert({ key: "fusionx_teams_whatsapp", url, updated_by: ctx.user.id, updated_at: new Date().toISOString() }, { onConflict: "key" })
     : await ctx.supabase.from("private_links").delete().eq("key", "fusionx_teams_whatsapp");

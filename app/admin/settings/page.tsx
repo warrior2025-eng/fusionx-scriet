@@ -4,7 +4,7 @@ import { saveContent } from "@/actions/admin-content";
 import { sendTestEmailToMe, sendWaitingEmails } from "@/actions/admin-email";
 import { saveBanner, saveIdentity, saveRegistration } from "@/actions/admin-settings";
 import { ActionButton } from "@/components/admin/action-button";
-import { AdminForm, CheckboxField, SelectField, TextField, TextareaField } from "@/components/admin/admin-form";
+import { AdminForm, CheckboxField, SelectField, LinkField, TextField, TextareaField } from "@/components/admin/admin-form";
 import { ImageField } from "@/components/admin/image-field";
 import { AdminPage, Panel } from "@/components/admin/ui";
 import { requireCapability } from "@/lib/admin/guard";
@@ -84,9 +84,9 @@ export default async function SettingsPage() {
                 type="email"
                 defaultValue={settings.official_email ?? ""}
               />
-              <TextField name="instagram_url" label="Instagram (optional)" type="url" defaultValue={settings.instagram_url ?? ""} />
-              <TextField name="linkedin_url" label="LinkedIn (optional)" type="url" defaultValue={settings.linkedin_url ?? ""} />
-              <TextField name="github_url" label="GitHub (optional)" type="url" defaultValue={settings.github_url ?? ""} />
+              <LinkField kind="instagram" name="instagram_url" label="Instagram (optional)" defaultValue={settings.instagram_url ?? ""} />
+              <LinkField kind="linkedin" name="linkedin_url" label="LinkedIn (optional)" defaultValue={settings.linkedin_url ?? ""} />
+              <LinkField kind="github" name="github_url" label="GitHub (optional)" defaultValue={settings.github_url ?? ""} />
             </div>
           </AdminForm>
         </Panel>
@@ -99,7 +99,7 @@ export default async function SettingsPage() {
               defaultValue={settings.announcement_banner ?? ""}
               maxLength={200}
             />
-            <TextField
+            <LinkField allowPath
               name="announcement_banner_link"
               label="Link (optional)"
               hint="Makes the banner clickable. A path like /events or a full https:// link."

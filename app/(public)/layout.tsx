@@ -1,3 +1,4 @@
+import { linkHref } from "@/lib/validation/link";
 import Link from "next/link";
 import { Maintenance } from "@/components/maintenance";
 import { SiteHeader } from "@/components/navigation/site-header";
@@ -88,8 +89,8 @@ export default async function PublicLayout({ children }: { children: React.React
         </p>
       )}
       {bannerIsLive(settings) &&
-        (settings.announcement_banner_link ? (
-          <Link href={settings.announcement_banner_link} className={`${bannerClass} underline-offset-2 hover:underline`}>
+        (linkHref(settings.announcement_banner_link, "any", { allowPath: true }) ? (
+          <Link href={linkHref(settings.announcement_banner_link, "any", { allowPath: true }) as string} className={`${bannerClass} underline-offset-2 hover:underline`}>
             {settings.announcement_banner}
           </Link>
         ) : (

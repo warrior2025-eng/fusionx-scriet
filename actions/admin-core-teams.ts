@@ -179,7 +179,7 @@ export async function addCoreMembers(groupId: string, userIds: string[], title: 
   const ctx = await authorize("team");
   if (!ctx) return FORBIDDEN;
   const parsed = addSchema.safeParse({ groupId, userIds, title });
-  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Please check the form.");
+  if (!parsed.success) return fail([...new Set(parsed.error.issues.map((issue) => issue.message))].join(" ") || "Please check the form.");
   const { data, error } = await ctx.supabase.rpc("core_add_members", { p_group: groupId, p_users: parsed.data.userIds, p_title: parsed.data.title || "Member" });
   if (error) return fail(friendlyDbError(error.message, "Could not add them."));
   touched();
@@ -207,7 +207,7 @@ export async function setCoreMemberTitle(memberId: string, title: string): Promi
   const ctx = await authorize("team");
   if (!ctx) return FORBIDDEN;
   const parsed = z.string().trim().min(1, "Give them a title").max(80, "Keep the title under 80 characters").safeParse(title);
-  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Please check the title.");
+  if (!parsed.success) return fail([...new Set(parsed.error.issues.map((issue) => issue.message))].join(" ") || "Please check the title.");
   const member = await memberOf(ctx, memberId);
   if (!member) return fail("This member is no longer in the team.");
   const { error } = await ctx.supabase.from("core_group_members").update({ title: parsed.data }).eq("id", memberId);
@@ -288,4 +288,19 @@ export async function remindCoreMembers(groupId: string, userId: string | null):
   if (sent === 0) return fail(skipped > 0 ? "Already reminded in the last 24 hours." : "Nobody here has an incomplete profile.");
   const also = skipped > 0 ? ` ${skipped} already reminded in the last 24 hours.` : "";
   return ok(`${sent === 1 ? "Reminder sent." : `${sent} reminders sent.`}${also}`);
+}
+
+/** The three switches on a member's row. The database checks the role again and writes the audit entry. */
+export async function setCoreMemberVisibility(userId: string, values: { profile: boolean; contact: boolean; core: boolean }): Promise<ActionState> {
+  const ctx = await authorize("team");
+  if (!ctx) return FORBIDDEN;
+  if (!uuid.safeParse(userId).success) return fail("That person no longer exists.");
+  const parsed = z.object({ profile: z.boolean(), contact: z.boolean(), core: z.boolean() }).safeParse(values);
+  if (!parsed.success) return fail("Choose on or off for each switch.");
+  const { error } = await ctx.supabase.rpc("core_set_member_visibility", { p_user: userId, p_profile: parsed.data.profile, p_contact: parsed.data.contact, p_core: parsed.data.core });
+  if (error) return fail(friendlyDbError(error.message, "Could not change this. Please try again."));
+  revalidatePath("/admin/team");
+  revalidatePath("/core");
+  revalidatePath("/");
+  return ok("Saved.");
 }

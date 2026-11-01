@@ -6,6 +6,7 @@ import { fail, ok, type ActionState } from "@/lib/admin/action-state";
 import { friendlyDbError } from "@/lib/recruitment/data";
 import { createClient } from "@/lib/supabase/server";
 import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
+import { linkField } from "@/lib/validation/link";
 
 /**
  * The candidate's side of the results: agreeing to the announcement, and
@@ -51,12 +52,7 @@ export async function respondToOffer(cycleId: string, accept: boolean, teamId: s
 export async function submitTask(teamId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!uuid.safeParse(teamId).success) return fail("Task not found.");
   const raw = formData.get("submission_link");
-  const link = z
-    .string()
-    .trim()
-    .max(500, "At most 500 characters")
-    .refine((v) => v === "" || (/^https:\/\/\S+$/i.test(v) && URL.canParse(v)), "Use a full link that starts with https://")
-    .safeParse(typeof raw === "string" ? raw : "");
+  const link = linkField("Link to your work", "any").safeParse(typeof raw === "string" ? raw : "");
   if (!link.success) return fail("Please fix the highlighted fields.", { submission_link: link.error.issues[0].message });
   const { supabase, user } = await signedIn();
   if (!user) return fail("Please sign in.");

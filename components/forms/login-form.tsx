@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { loginAction, type AuthActionState } from "@/actions/auth";
 import { OAuthButtons } from "@/components/forms/oauth-buttons";
 import { Label, Input, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
+import { useFormSubmit } from "@/components/ui/form-errors";
+import { loginSchema } from "@/lib/validations";
 
 const initialState: AuthActionState = { status: "idle" };
 
@@ -17,7 +18,7 @@ const OAUTH_ERRORS: Record<string, string> = {
 };
 
 export function LoginForm() {
-  const [state, formAction, pending] = useActionState(loginAction, initialState);
+  const { pending, errors, summary, formProps } = useFormSubmit(loginAction, initialState, { schema: loginSchema, prefix: "" });
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/";
   const justVerified = searchParams.get("verify") === "1";
@@ -33,7 +34,7 @@ export function LoginForm() {
 
       <OAuthButtons next={next} />
 
-      <form action={formAction} className="space-y-5">
+      <form {...formProps} className="space-y-5">
         <input type="hidden" name="next" value={next} />
 
         {justVerified && (
@@ -41,19 +42,17 @@ export function LoginForm() {
             Check your email to verify your account, then sign in.
           </p>
         )}
-        {state.status === "error" && state.message && (
-          <p className="text-sm text-red-600">{state.message}</p>
-        )}
+        {summary}
 
         <div>
           <Label htmlFor="email">Email</Label>
           <Input id="email" name="email" type="email" autoComplete="email" required />
-          <FieldError>{state.fieldErrors?.email}</FieldError>
+          <FieldError id="email-error">{errors.email}</FieldError>
         </div>
         <div>
           <Label htmlFor="password">Password</Label>
           <Input id="password" name="password" type="password" autoComplete="current-password" required />
-          <FieldError>{state.fieldErrors?.password}</FieldError>
+          <FieldError id="password-error">{errors.password}</FieldError>
         </div>
         <Button type="submit" loading={pending} className="w-full">
           Sign in

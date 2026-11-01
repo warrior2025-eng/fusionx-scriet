@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { ArrowRight } from "lucide-react";
+import { linkHref } from "@/lib/validation/link";
 
 export const generateMetadata = (): Promise<Metadata> =>
   pageMetadata("opportunities", {
@@ -62,9 +63,9 @@ export default async function OpportunitiesPage() {
                         Deadline: {new Date(o.deadline).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
                       </p>
                     ) : <span />}
-                    {o.registration_url && (
+                    {linkHref(o.registration_url) && (
                       <a
-                        href={o.registration_url}
+                        href={linkHref(o.registration_url) ?? undefined}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="group inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-accent hover:underline"

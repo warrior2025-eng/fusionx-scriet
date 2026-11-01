@@ -1,6 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { submitTask } from "@/actions/recruitment-results";
-import { AdminForm, TextField } from "@/components/admin/admin-form";
+import { AdminForm, LinkField } from "@/components/admin/admin-form";
 import { CutCard } from "@/components/ui/cut-card";
 import { istDateTime } from "@/lib/events/format";
 import type { MyTask } from "@/lib/recruitment/data";
@@ -40,10 +40,9 @@ export function TaskCard({ task }: { task: MyTask }) {
         {task.status !== "reviewed" && (
           <div className="mt-4">
             <AdminForm action={submitTask.bind(null, task.team_id)} submitLabel={done ? "Update submission" : "Mark as submitted"} warnUnsaved={false}>
-              <TextField
+              <LinkField
                 name="submission_link"
                 label="Link to your work (optional)"
-                type="url"
                 placeholder="https://"
                 defaultValue={task.submission_link ?? ""}
               />

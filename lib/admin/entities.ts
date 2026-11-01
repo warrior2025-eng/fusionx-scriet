@@ -3,6 +3,7 @@ import type { Capability } from "@/lib/permissions/capabilities";
 import { ICON_NAMES } from "@/lib/site-content/schema";
 import type { createClient } from "@/lib/supabase/server";
 import { fromIstInput } from "@/lib/events/format";
+import { linkField, type LinkKind } from "@/lib/validation/link";
 import type { BucketId } from "./storage";
 
 /**
@@ -54,6 +55,10 @@ export type FieldDef = {
   square?: boolean;
   /** Sits beside its neighbour on wide screens. */
   half?: boolean;
+  /** Url fields: what kind of link this is, for fixing it. */
+  linkKind?: LinkKind;
+  /** Url fields: a contact link, where mailto: is fine. */
+  allowMailto?: boolean;
 };
 
 type Row = Record<string, unknown>;
@@ -172,9 +177,9 @@ export const ENTITIES = {
         half: true,
         hint: "Used for meeting passes. Without a link, their email is matched to an account.",
       },
-      { name: "linkedin_url", label: "LinkedIn", type: "url", half: true },
-      { name: "github_url", label: "GitHub", type: "url", half: true },
-      { name: "portfolio_url", label: "Portfolio", type: "url", half: true },
+      { name: "linkedin_url", label: "LinkedIn", type: "url", linkKind: "linkedin", half: true },
+      { name: "github_url", label: "GitHub", type: "url", linkKind: "github", half: true },
+      { name: "portfolio_url", label: "Portfolio", type: "url", linkKind: "website", half: true },
       { name: "is_visible", label: "Visible on the site", type: "checkbox", initial: true },
     ],
     publicPaths: ["/core", "/"],
@@ -316,6 +321,7 @@ export const ENTITIES = {
         name: "registration_url",
         label: "External registration link",
         type: "url",
+        allowMailto: true,
         hint: "Leave empty to take registrations on this site.",
       },
       { name: "registration_open", label: "Registration open", type: "checkbox", initial: true, half: true },
@@ -438,7 +444,7 @@ export const ENTITIES = {
           { value: "closed", label: "Closed" },
         ],
       },
-      { name: "registration_url", label: "Details / registration link", type: "url" },
+      { name: "registration_url", label: "Details / registration link", type: "url", allowMailto: true },
       PUBLISH_FIELD,
     ],
     publicPaths: ["/opportunities"],
@@ -510,7 +516,7 @@ export const ENTITIES = {
       { name: "expertise", label: "Expertise", type: "tags", hint: "Separate with commas." },
       { name: "experience", label: "Experience", type: "text", max: 300 },
       { name: "availability", label: "Availability", type: "text", max: 200, half: true },
-      { name: "linkedin_url", label: "LinkedIn", type: "url", half: true },
+      { name: "linkedin_url", label: "LinkedIn", type: "url", linkKind: "linkedin", half: true },
       { name: "bio", label: "Bio", type: "textarea", max: 1000, rows: 4, counter: true },
       PUBLISH_FIELD,
     ],
@@ -538,9 +544,7 @@ export function publishLabel(def: EntityDef, row: Row): string {
 // Form parsing
 // ---------------------------------------------------------------------------
 
-const HTTP_URL = /^https?:\/\/[^\s]+$/i;
-
-function fieldSchema(f: FieldDef): z.ZodType {
+export function fieldSchema(f: FieldDef): z.ZodType {
   const required = (label: string) => `${label} is required`;
   switch (f.type) {
     case "text":
@@ -557,11 +561,7 @@ function fieldSchema(f: FieldDef): z.ZodType {
         .max(f.max ?? 60)
         .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Use lowercase letters, numbers and hyphens only");
     case "url":
-      return z
-        .string()
-        .trim()
-        .max(500)
-        .refine((v) => (v === "" ? !f.required : HTTP_URL.test(v) && URL.canParse(v)), "Enter a full link starting with https://");
+      return linkField(f.label, f.linkKind ?? "any", { required: f.required, allowMailto: f.allowMailto });
     case "email":
       return z
         .string()

@@ -1,18 +1,25 @@
 "use client";
 
-import { createContext, useContext, useEffect, useId, useState, useTransition } from "react";
+import { createContext, useContext, useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea, FieldError, FieldHint } from "@/components/ui/field";
+import { useFormSubmit } from "@/components/ui/form-errors";
+import { LinkInput } from "@/components/ui/link-input";
 import { IDLE, type ActionState } from "@/lib/admin/action-state";
-import type { FieldDef } from "@/lib/admin/entities";
+import { fieldSchema, type FieldDef } from "@/lib/admin/entities";
+import type { LinkKind } from "@/lib/validation/link";
 import { toIstInput } from "@/lib/events/format";
 import { cn } from "@/lib/utils";
 import { ImageField } from "./image-field";
 import { toastResult } from "./toast";
 import { UserField } from "./user-field";
 
-const FormContext = createContext<{ errors: Record<string, string>; pending: boolean }>({ errors: {}, pending: false });
+const FormContext = createContext<{ errors: Record<string, string>; pending: boolean; setFieldError: (name: string, message?: string) => void }>({
+  errors: {},
+  pending: false,
+  setFieldError: () => {},
+});
 
 /** The validation error for a field of the surrounding <AdminForm>, if any. */
 export function useFieldError(name: string) {
@@ -21,9 +28,9 @@ export function useFieldError(name: string) {
 
 /**
  * The form every admin write goes through. Calls the server action directly
- * (so a failed save keeps what was typed), shows inline field errors and a
- * toast, disables itself while saving, and warns before leaving with unsaved
- * changes.
+ * (so a failed save keeps what was typed), shows every field's error with a
+ * summary above and a toast, disables itself while saving, and warns before
+ * leaving with unsaved changes.
  */
 export function AdminForm({
   action,
@@ -43,12 +50,21 @@ export function AdminForm({
   warnUnsaved?: boolean;
 }) {
   const router = useRouter();
-  const [state, setState] = useState<ActionState>(IDLE);
   const [dirty, setDirty] = useState(false);
   // Bumped after each successful save so the fields remount on the freshly
   // saved values (clearing file inputs and image previews).
   const [version, setVersion] = useState(0);
-  const [pending, startTransition] = useTransition();
+  const { pending, errors, setFieldError, summary, formProps } = useFormSubmit(action, IDLE, {
+    onResult: (result) => {
+      toastResult(result);
+      if (result.status === "success") {
+        setDirty(false);
+        setVersion((v) => v + 1);
+        if (result.redirectTo) router.push(result.redirectTo);
+        else router.refresh();
+      }
+    },
+  });
 
   useEffect(() => {
     if (!dirty) return;
@@ -57,35 +73,14 @@ export function AdminForm({
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
-  function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    startTransition(async () => {
-      const result = await action(state, formData);
-      setState(result);
-      toastResult(result);
-      if (result.status === "success") {
-        setDirty(false);
-        setVersion((v) => v + 1);
-        if (result.redirectTo) router.push(result.redirectTo);
-        else router.refresh();
-      }
-    });
-  }
-
   return (
-    <form onSubmit={onSubmit} onChange={warnUnsaved ? () => setDirty(true) : undefined} noValidate className={className}>
-      <FormContext value={{ errors: state.fieldErrors ?? {}, pending }}>
+    <form {...formProps} onChange={warnUnsaved ? () => setDirty(true) : undefined} className={className}>
+      {summary}
+      <FormContext value={{ errors, pending, setFieldError }}>
         <fieldset key={version} disabled={pending} className="min-w-0 space-y-5">
           {children}
         </fieldset>
       </FormContext>
-
-      {state.status === "error" && state.message && (
-        <p role="alert" className="mt-5 border border-red-500/40 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
-          {state.message}
-        </p>
-      )}
 
       <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-line pt-5">
         <Button type="submit" loading={pending}>
@@ -120,7 +115,30 @@ export function Field({
       {label && <Label htmlFor={htmlFor ?? name}>{label}</Label>}
       {children}
       {hint && !error && <FieldHint>{hint}</FieldHint>}
-      <FieldError>{error}</FieldError>
+      <FieldError id={`${htmlFor ?? name}-error`}>{error}</FieldError>
+    </div>
+  );
+}
+
+/** A link that fixes itself (components/ui/link-input.tsx), wired to the surrounding form. */
+export function LinkField({
+  name,
+  label,
+  hint,
+  kind = "any",
+  allowPath,
+  allowMailto,
+  className,
+  ...props
+}: { name: string; label: string; hint?: string; kind?: LinkKind; allowPath?: boolean; allowMailto?: boolean; className?: string } & Omit<React.ComponentProps<typeof LinkInput>, "label" | "kind" | "error">) {
+  const error = useFieldError(name);
+  const generated = useId();
+  const id = props.id ?? `${name}-${generated}`;
+  return (
+    <div className={className}>
+      <Label htmlFor={id}>{label}</Label>
+      <LinkInput {...props} id={id} name={name} kind={kind} label={label.replace(/\s*\(optional\)\s*$/i, "")} allowPath={allowPath} allowMailto={allowMailto} error={error} />
+      {hint && !error && <FieldHint>{hint}</FieldHint>}
     </div>
   );
 }
@@ -138,7 +156,7 @@ export function TextField({
   const id = props.id ?? `${name}-${generated}`;
   return (
     <Field name={name} label={label} hint={hint} className={className} htmlFor={id}>
-      <Input name={name} aria-invalid={error ? true : undefined} {...props} id={id} />
+      <Input name={name} aria-invalid={error ? true : undefined} aria-describedby={error ? `${id}-error` : undefined} {...props} id={id} />
     </Field>
   );
 }
@@ -174,6 +192,7 @@ export function TextareaField({
         rows={rows}
         defaultValue={defaultValue}
         aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
         onChange={counter ? (e) => setLength(e.target.value.length) : undefined}
       />
       {counter && max && (
@@ -251,13 +270,22 @@ export function CheckboxField({
 
 /** Renders an entity's fields (lib/admin/entities.ts) with their current values. */
 export function EntityFields({ fields, values }: { fields: FieldDef[]; values: Record<string, unknown> | null }) {
+  const { setFieldError } = useContext(FormContext);
+  // The server's rules, as the person leaves a field.
+  const checkField = (event: React.FocusEvent<HTMLDivElement>) => {
+    const target = event.target as unknown as HTMLInputElement;
+    const f = fields.find((x) => x.name === target.name);
+    if (!f || ["image", "checkbox", "tags", "lines", "user"].includes(f.type)) return;
+    const result = fieldSchema(f).safeParse(target.value);
+    setFieldError(f.name, result.success ? undefined : result.error.issues[0]?.message);
+  };
   const current = (f: FieldDef) => {
     const stored = values?.[f.column ?? f.name];
     return stored === undefined || stored === null ? (values ? "" : (f.initial ?? "")) : stored;
   };
 
   return (
-    <div className="grid gap-5 sm:grid-cols-2">
+    <div className="grid gap-5 sm:grid-cols-2" onBlur={checkField}>
       {fields.map((f) => {
         const span = f.half ? "" : "sm:col-span-2";
         const value = current(f);
@@ -271,6 +299,20 @@ export function EntityFields({ fields, values }: { fields: FieldDef[]; values: R
                 hint={f.hint}
                 square={f.square}
                 currentUrl={typeof value === "string" && value ? value : null}
+                className={span}
+              />
+            );
+          case "url":
+            return (
+              <LinkField
+                key={f.name}
+                name={f.name}
+                label={f.required ? f.label : `${f.label} (optional)`}
+                hint={f.hint}
+                kind={f.linkKind}
+                allowMailto={f.allowMailto}
+                placeholder={f.placeholder}
+                defaultValue={String(value)}
                 className={span}
               />
             );
@@ -345,7 +387,7 @@ export function EntityFields({ fields, values }: { fields: FieldDef[]; values: R
                 hint={f.hint}
                 placeholder={f.placeholder}
                 type={
-                  f.type === "date" ? "date" : f.type === "datetime" ? "datetime-local" : f.type === "time" ? "time" : f.type === "number" ? "number" : f.type === "email" ? "email" : f.type === "url" ? "url" : "text"
+                  f.type === "date" ? "date" : f.type === "datetime" ? "datetime-local" : f.type === "time" ? "time" : f.type === "number" ? "number" : f.type === "email" ? "email" : "text"
                 }
                 min={f.type === "number" ? 0 : undefined}
                 maxLength={f.max}

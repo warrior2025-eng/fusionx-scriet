@@ -22,7 +22,7 @@ import { DEFAULT_CHECKLIST } from "@/lib/interview/shared";
 import { RoomStatus } from "@/components/interview/room-status";
 import { FormPdfButton } from "@/components/admin/export-buttons";
 import { ActionButton } from "@/components/admin/action-button";
-import { AdminForm, CheckboxField, SelectField, TextField, TextareaField } from "@/components/admin/admin-form";
+import { AdminForm, CheckboxField, SelectField, LinkField, TextField, TextareaField } from "@/components/admin/admin-form";
 import { CycleTabs } from "@/components/admin/recruitment-parts";
 import { AdminPage, Panel, Pill, Table, Td, Th, formatDate, param, type ListParams } from "@/components/admin/ui";
 import { requireCapability } from "@/lib/admin/guard";
@@ -450,10 +450,9 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
                   {dayLink?.published_at ? <Pill tone="good">Published {formatDate(dayLink.published_at, true)}</Pill> : dayLink && <Pill>Not published</Pill>}
                 </p>
                 <AdminForm action={saveMeetLink.bind(null, id, selected.id, null)} submitLabel="Save link" warnUnsaved={false}>
-                  <TextField
+                  <LinkField kind="meet"
                     name="meet_url"
                     label="Meet link for the whole day"
-                    type="url"
                     placeholder="https://meet.google.com/abc-defg-hij"
                     defaultValue={dayLink?.meet_url ?? ""}
                     hint="Clear it to remove the link."
@@ -594,10 +593,9 @@ export default async function CycleSlotsPage({ params, searchParams }: { params:
                             </AdminForm>
                             {selected.mode === "online_meet" && (
                               <AdminForm action={saveMeetLink.bind(null, id, selected.id, slot.id)} submitLabel="Save link" warnUnsaved={false}>
-                                <TextField
+                                <LinkField kind="meet"
                                   name="meet_url"
                                   label="This slot's own Meet link (optional)"
-                                  type="url"
                                   placeholder="https://meet.google.com/abc-defg-hij"
                                   defaultValue={slotLink?.meet_url ?? ""}
                                 />

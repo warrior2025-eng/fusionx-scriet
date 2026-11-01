@@ -1,3 +1,4 @@
+import { linkHref } from "@/lib/validation/link";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -138,7 +139,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
           )}
           {(team.github_url || team.demo_url) && (
             <p className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-              {[team.github_url, team.demo_url].filter((url): url is string => Boolean(url) && /^https?:\/\//i.test(url ?? "")).map((url) => (
+              {[linkHref(team.github_url, "github"), linkHref(team.demo_url)].filter((url): url is string => Boolean(url)).map((url) => (
                 <a key={url} href={url} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1.5 break-all font-medium text-accent">
                   <ExternalLink size={14} aria-hidden /> {url}
                 </a>

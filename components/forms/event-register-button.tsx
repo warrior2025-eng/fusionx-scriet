@@ -6,6 +6,7 @@ import { ArrowRight, Check } from "lucide-react";
 import { cancelRegistration, registerForEvent } from "@/actions/events";
 import { Button, LinkButton } from "@/components/ui/button";
 import type { RegistrationAvailability, RegistrationStatus } from "@/lib/events/format";
+import { linkHref } from "@/lib/validation/link";
 
 /**
  * The registration control on an event page. One of:
@@ -90,10 +91,10 @@ export function EventRegisterButton({
     );
   }
 
-  if (availability === "external" && externalUrl) {
+  if (availability === "external" && linkHref(externalUrl)) {
     return (
       <a
-        href={externalUrl}
+        href={linkHref(externalUrl) ?? undefined}
         target="_blank"
         rel="noopener noreferrer"
         className="group inline-flex items-center gap-2 rounded-sm bg-accent px-6 py-3 font-medium text-white hover:bg-accent/90"
