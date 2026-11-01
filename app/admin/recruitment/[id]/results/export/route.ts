@@ -55,7 +55,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       { header: "Email", value: (r) => emails.get(r.user_id) ?? "" },
       { header: "Department", value: (r) => r.department ?? "" },
       { header: "Year", value: (r) => r.year ?? "" },
-      { header: "Choice", value: (r) => String(r.pref_rank) },
+      { header: "Choice", value: (r) => (r.added_by_admin ? "Not applied" : String(r.pref_rank)) },
       { header: "Interview", value: (r) => ATTENDANCE_LABELS[r.attendance] },
       { header: "Average score", value: (r) => (r.average !== null ? r.average.toFixed(1) : "") },
       { header: "Decision", value: (r) => (isFinal(r.stage) ? DECISION_LABELS[r.stage as "selected"] : "Undecided") },

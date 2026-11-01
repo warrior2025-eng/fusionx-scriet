@@ -32,6 +32,9 @@ export type BoardRow = {
   promoted_at: string | null;
   multi_hub_allowed: boolean;
   added_after_results: boolean;
+  /** Added by an admin to a hub the candidate did not apply to. */
+  added_by_admin: boolean;
+  added_reason: string | null;
   whatsapp_added: boolean;
   induction_attended: boolean;
   onboarding_notes: string | null;
@@ -86,7 +89,7 @@ export async function loadBoard(supabase: Supabase, cycleId: string): Promise<{ 
     read<Status>((part) =>
       supabase
         .from("recruitment_team_status")
-        .select("application_id, team_id, rank, stage, decision_reason, waitlist_rank, final_note, offer_status, promoted_at, multi_hub_allowed, added_after_results, whatsapp_added, induction_attended, onboarding_notes")
+        .select("application_id, team_id, rank, stage, decision_reason, waitlist_rank, final_note, offer_status, promoted_at, multi_hub_allowed, added_after_results, added_by_admin, added_reason, whatsapp_added, induction_attended, onboarding_notes")
         .in("application_id", part),
     ),
     read<{ application_id: string; team_id: string; reviewer_id: string; score: number | null; private_notes: string | null }>((part) =>
@@ -130,6 +133,8 @@ export async function loadBoard(supabase: Supabase, cycleId: string): Promise<{ 
         promoted_at: s.promoted_at,
         multi_hub_allowed: s.multi_hub_allowed === true,
         added_after_results: s.added_after_results === true,
+        added_by_admin: s.added_by_admin === true,
+        added_reason: s.added_reason,
         whatsapp_added: s.whatsapp_added === true,
         induction_attended: s.induction_attended === true,
         onboarding_notes: s.onboarding_notes,

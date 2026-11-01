@@ -42,6 +42,7 @@ type StatusRow = {
   team_id: string;
   team_name: string;
   rank: number;
+  added_by_admin?: boolean;
   stage: Stage | "in_review";
   stage_updated_at: string;
   interview_at: string | null;
@@ -164,7 +165,7 @@ export default async function RecruitmentStatusPage({ searchParams }: { searchPa
         {shown &&
           rows.map((row) => (
             <CutCard key={row.team_id} className="h-auto">
-              <p className="text-sm text-ink/65">{ORDINALS[row.rank - 1] ?? row.rank} choice</p>
+              <p className="text-sm text-ink/65">{row.added_by_admin ? "Selected by the panel" : `${ORDINALS[row.rank - 1] ?? row.rank} choice`}</p>
               <h2 className="mt-1 font-serif text-xl font-medium text-ink">{row.team_name}</h2>
               <StageTimeline
                 label={`Progress for ${row.team_name}`}
@@ -172,7 +173,7 @@ export default async function RecruitmentStatusPage({ searchParams }: { searchPa
                   stage: row.stage === "not_selected" && shown.outcome === "absent" ? "absent" : row.stage,
                   resultsOut: true,
                   taskDone: (taskFor(row.team_id)?.status ?? "not_started") !== "not_started",
-                })}
+                }).filter((step) => !row.added_by_admin || step.label === "Result" || step.label === "Task")}
               />
             </CutCard>
           ))}

@@ -5,7 +5,7 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 export type AdminApplication = Application & {
   /** One entry per preferred team, in order of preference. */
-  teams: { team_id: string; rank: number; stage: Stage; average: number | null; reviews: number; final_note: string | null; interview_at: string | null }[];
+  teams: { team_id: string; rank: number; added_by_admin: boolean; stage: Stage; average: number | null; reviews: number; final_note: string | null; interview_at: string | null }[];
 };
 
 export type ApplicationFilters = { q?: string; team?: string; rank?: string; stage?: string; department?: string; year?: string; score?: string };
@@ -26,13 +26,13 @@ export async function loadCycleApplications(supabase: Supabase, cycleId: string)
   if (applications.length === 0) return [];
   const ids = applications.map((a) => a.id);
   const [{ data: statusRows }, { data: reviewRows }] = await Promise.all([
-    supabase.from("recruitment_team_status").select("application_id, team_id, rank, stage, final_note, interview_at").in("application_id", ids),
+    supabase.from("recruitment_team_status").select("application_id, team_id, rank, added_by_admin, stage, final_note, interview_at").in("application_id", ids),
     supabase.from("recruitment_reviews").select("application_id, team_id, score").in("application_id", ids),
   ]);
   const reviews = (reviewRows ?? []) as { application_id: string; team_id: string; score: number | null }[];
   return applications.map((application) => ({
     ...application,
-    teams: ((statusRows ?? []) as { application_id: string; team_id: string; rank: number; stage: Stage; final_note: string | null; interview_at: string | null }[])
+    teams: ((statusRows ?? []) as { application_id: string; team_id: string; rank: number; added_by_admin: boolean; stage: Stage; final_note: string | null; interview_at: string | null }[])
       .filter((s) => s.application_id === application.id)
       .sort((a, b) => a.rank - b.rank)
       .map((s) => {
@@ -40,6 +40,7 @@ export async function loadCycleApplications(supabase: Supabase, cycleId: string)
         return {
           team_id: s.team_id,
           rank: s.rank,
+          added_by_admin: s.added_by_admin === true,
           stage: s.stage,
           final_note: s.final_note,
           interview_at: s.interview_at,

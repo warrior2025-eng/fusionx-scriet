@@ -292,6 +292,18 @@ export async function selectAdditionalHub(cycleId: string, applicationId: string
   return ok("Selected. They have been notified, and the public lists are updated.", { viewHref: "/recruitment/results" });
 }
 
+/** A hub the candidate did not apply to, with a reason. Before the results nothing is sent; after them they are told once. */
+export async function selectUnappliedHub(cycleId: string, applicationId: string, teamId: string, reason: string, keep: boolean): Promise<ActionState> {
+  const ctx = await admin(cycleId);
+  if (!ctx || !uuid.safeParse(applicationId).success || !uuid.safeParse(teamId).success) return FORBIDDEN;
+  const why = z.string().trim().min(3, "Give a short reason").max(300, "At most 300 characters").safeParse(reason);
+  if (!why.success) return fail(why.error.issues[0].message);
+  const { data, error } = await ctx.supabase.rpc("select_unapplied_hub", { p_application: applicationId, p_team: teamId, p_reason: why.data, p_keep: keep });
+  if (error) return fail(friendlyDbError(error.message, "Could not select them in that hub."));
+  touched(cycleId);
+  return ok((data as { notified?: boolean } | null)?.notified ? "Selected. They have been notified, and the public lists are updated." : "Selected. Nothing is sent before the results.");
+}
+
 export async function removeFromWaitlist(cycleId: string, applicationId: string, teamId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
   const ctx = await admin(cycleId);
   if (!ctx || !uuid.safeParse(applicationId).success || !uuid.safeParse(teamId).success) return FORBIDDEN;

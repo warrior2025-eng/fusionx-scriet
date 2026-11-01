@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 /** The five-step progress row on the status page (steps from timeline() in lib/recruitment/stages.ts). */
 export function StageTimeline({ steps, label }: { steps: TimelineStep[]; label: string }) {
   return (
-    <ol className="mt-6 grid grid-cols-5 gap-1.5" aria-label={label}>
+    <ol className={cn("mt-6 grid gap-1.5", steps.length < 5 ? "grid-cols-2" : "grid-cols-5")} aria-label={label}>
       {steps.map((step, i) => {
         const on = step.state === "done" || step.state === "current";
         return (
