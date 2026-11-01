@@ -24,9 +24,9 @@ export function ProfileForm({ profile, email }: { profile: Profile; email: strin
         key={profile.avatar_url ?? "none"}
         name="avatar"
         label="Profile photo (optional)"
-        hint="JPEG, PNG or WEBP. You choose the square crop after picking the file."
+        hint="JPG, PNG, WEBP, GIF, BMP, HEIC or AVIF, up to 15 MB. You choose the square crop, and it is shrunk for you."
         currentUrl={profile.avatar_url}
-        square
+        photo
       />
 
       <div>

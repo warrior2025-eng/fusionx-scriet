@@ -18,8 +18,88 @@ const MAX_ZOOM = 4;
  */
 type Crop = { zoom: number; cx: number; cy: number };
 type Source = { file: File; url: string; width: number; height: number };
+type Decoded = ImageBitmap | HTMLImageElement;
 
 const CENTRED: Crop = { zoom: 1, cx: 0.5, cy: 0.5 };
+
+// The `photo` mode (a person's profile photo).
+const PHOTO_MAX_CHOSEN = 15 * 1024 * 1024;
+const PHOTO_MAX_SIDE = 800;
+const PHOTO_MAX_BYTES = 500 * 1024;
+const PHOTO_QUALITIES = [0.85, 0.75, 0.6, 0.45];
+const PHOTO_TYPES = /^image\/(jpeg|png|webp|gif|bmp|x-ms-bmp|heic|heif|avif)$/i;
+// Some systems give a HEIC or AVIF file no type at all, so its name counts too.
+const PHOTO_NAMES = /\.(jpe?g|png|webp|gif|bmp|heic|heif|avif)$/i;
+const SOME_BROWSERS_ONLY = /(^image\/(heic|heif|avif)$)|(\.(heic|heif|avif)$)/i;
+const PICK_JPG_OR_PNG = "Please choose a JPG or PNG photo";
+const NOT_AN_IMAGE = "This file isn't an image";
+const TOO_LARGE = "Photo too large even after shrinking";
+
+/** Why a chosen file cannot be a photo, before trying to read it. */
+function photoProblem(file: File): string | null {
+  if (/svg/i.test(file.type) || /\.svgz?$/i.test(file.name)) return `SVG files can't be used. ${PICK_JPG_OR_PNG}`;
+  if (!PHOTO_TYPES.test(file.type) && !PHOTO_NAMES.test(file.name)) return file.type.startsWith("image/") ? PICK_JPG_OR_PNG : NOT_AN_IMAGE;
+  if (file.size > PHOTO_MAX_CHOSEN) return "This photo is over 15 MB. Please choose a smaller one";
+  return null;
+}
+
+/**
+ * Reads the picture the right way up. The browser does the reading, so what it
+ * can open depends on it: Safari opens HEIC, most others do not. The <img> is
+ * for browsers whose createImageBitmap knows fewer formats than their <img>.
+ */
+async function decode(source: { file: File; url: string }): Promise<Decoded> {
+  try {
+    return await createImageBitmap(source.file, { imageOrientation: "from-image" });
+  } catch {
+    const image = new Image();
+    image.src = source.url;
+    await image.decode();
+    return image;
+  }
+}
+
+const widthOf = (image: Decoded) => ("naturalWidth" in image ? image.naturalWidth : image.width);
+const heightOf = (image: Decoded) => ("naturalHeight" in image ? image.naturalHeight : image.height);
+const release = (image: Decoded) => void ("close" in image && image.close());
+const toBlob = (canvas: HTMLCanvasElement, type: string, quality: number) =>
+  new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
+
+function drawCrop(canvas: HTMLCanvasElement, image: Decoded, crop: Crop, out: number, background?: string) {
+  const width = widthOf(image);
+  const height = heightOf(image);
+  const side = Math.min(width, height) / crop.zoom;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no canvas");
+  canvas.width = canvas.height = out;
+  if (background) {
+    ctx.fillStyle = background;
+    ctx.fillRect(0, 0, out, out);
+  }
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(image, crop.cx * width - side / 2, crop.cy * height - side / 2, side, side, 0, 0, out, out);
+}
+
+/** The chosen square at no more than 800×800, as WEBP (JPEG where the browser cannot write WEBP), under 500 KB. */
+async function cropPhoto(source: Source, crop: Crop): Promise<File> {
+  const image = await decode(source);
+  const canvas = document.createElement("canvas");
+  const out = Math.min(PHOTO_MAX_SIDE, Math.round(Math.min(widthOf(image), heightOf(image)) / crop.zoom));
+  drawCrop(canvas, image, crop, out);
+  // A browser that cannot write WEBP quietly returns a PNG instead.
+  const webp = (await toBlob(canvas, "image/webp", PHOTO_QUALITIES[0]))?.type === "image/webp";
+  // JPEG has no transparency, so a see-through picture goes on white.
+  if (!webp) drawCrop(canvas, image, crop, out, "#ffffff");
+  release(image);
+  const type = webp ? "image/webp" : "image/jpeg";
+  for (const quality of PHOTO_QUALITIES) {
+    const blob = await toBlob(canvas, type, quality);
+    if (blob?.type === type && blob.size <= PHOTO_MAX_BYTES) {
+      return new File([blob], `photo.${webp ? "webp" : "jpg"}`, { type });
+    }
+  }
+  throw new Error(TOO_LARGE);
+}
 
 /** Keeps the crop window inside the picture. */
 function clampCrop(crop: Crop, source: Source): Crop {
@@ -58,13 +138,18 @@ async function cropSquare(source: Source, crop: Crop): Promise<File> {
  *
  * Submits the file under `name`, and `${name}__remove=on` when the current
  * image should be deleted.
+ *
+ * With `photo` (implies `square`), any common image up to 15 MB can be chosen:
+ * only the cropped, shrunk result can ever be submitted, and a file the browser
+ * cannot read is refused with a message rather than sent as it is.
  */
 export function ImageField({
   name,
   label,
   hint,
   currentUrl,
-  square,
+  square: squareProp,
+  photo,
   accept = "image/jpeg,image/png,image/webp",
   className,
 }: {
@@ -73,9 +158,11 @@ export function ImageField({
   hint?: string;
   currentUrl: string | null;
   square?: boolean;
+  photo?: boolean;
   accept?: string;
   className?: string;
 }) {
+  const square = squareProp || photo;
   const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const dragRef = useRef<{ x: number; y: number } | null>(null);
@@ -105,6 +192,7 @@ export function ImageField({
     const file = input.files?.[0];
     setLocalError(null);
     if (!file) return discard();
+    if (photo) return choosePhoto(input, file);
     if (!accept.split(",").includes(file.type)) {
       discard();
       return setLocalError("That file type isn't allowed here.");
@@ -130,20 +218,46 @@ export function ImageField({
     }
   }
 
+  // The original leaves the form at once: only the finished crop is ever sent.
+  async function choosePhoto(input: HTMLInputElement, file: File) {
+    input.value = "";
+    setPreview(null);
+    setSource(null);
+    setApplied(null);
+    const problem = photoProblem(file);
+    if (problem) return setLocalError(problem);
+    setRemove(false);
+    setWorking(true);
+    const url = URL.createObjectURL(file);
+    try {
+      const image = await decode({ file, url });
+      const next = { file, url, width: widthOf(image), height: heightOf(image) };
+      release(image);
+      setSource(next);
+      setCrop(CENTRED);
+      dialogRef.current?.showModal();
+    } catch {
+      URL.revokeObjectURL(url);
+      setLocalError(SOME_BROWSERS_ONLY.test(file.type) || SOME_BROWSERS_ONLY.test(file.name) ? PICK_JPG_OR_PNG : NOT_AN_IMAGE);
+    } finally {
+      setWorking(false);
+    }
+  }
+
   async function applyCrop() {
     if (!source || !inputRef.current) return;
     setWorking(true);
     try {
       const fixed = clampCrop(crop, source);
-      const file = await cropSquare(source, fixed);
+      const file = await (photo ? cropPhoto(source, fixed) : cropSquare(source, fixed));
       const transfer = new DataTransfer();
       transfer.items.add(file);
       inputRef.current.files = transfer.files;
       setApplied(fixed);
       setPreview(URL.createObjectURL(file));
       dialogRef.current?.close();
-    } catch {
-      setLocalError("This picture could not be cropped. Try another one.");
+    } catch (error) {
+      setLocalError(error instanceof Error && error.message === TOO_LARGE ? TOO_LARGE : "This picture could not be cropped. Try another one.");
       dialogRef.current?.close();
     } finally {
       setWorking(false);
@@ -206,7 +320,8 @@ export function ImageField({
             id={name}
             name={name}
             type="file"
-            accept={accept}
+            // "image/*" and not a list with HEIC: an iPhone then hands over a JPEG of a HEIC photo.
+            accept={photo ? "image/*" : accept}
             onChange={onChange}
             className="block w-full text-sm text-ink/80 file:mr-3 file:cursor-pointer file:border file:border-ink/30 file:bg-transparent file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink"
           />
@@ -239,6 +354,7 @@ export function ImageField({
             </div>
           )}
           {hint && <FieldHint>{hint}</FieldHint>}
+          {photo && <p role="status" className="text-sm text-ink/70">{working ? "Processing your photo…" : ""}</p>}
           <FieldError>{localError ?? serverError}</FieldError>
         </div>
       </div>
@@ -293,6 +409,8 @@ export function ImageField({
                   className="mt-1 block w-full accent-accent"
                 />
               </label>
+
+              {photo && working && <p role="status" className="mt-3 text-sm text-ink/70">Shrinking your photo…</p>}
 
               <div className="mt-5 flex flex-wrap justify-end gap-3">
                 <Button type="button" variant="secondary" size="sm" onClick={() => dialogRef.current?.close()}>
