@@ -13,6 +13,15 @@ export type ProfileActionState = {
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2MB
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+// These links now show on the public Core page, so only web addresses are accepted.
+const webLink = z
+  .string()
+  .trim()
+  .url()
+  .refine((value) => /^https?:\/\//i.test(value), "Use a link starting with https://")
+  .optional()
+  .or(z.literal(""));
+
 const profileSchema = z.object({
   full_name: z.string().trim().min(2, "Enter your full name").max(120),
   department: z.string().trim().max(120).optional().or(z.literal("")),
@@ -20,11 +29,12 @@ const profileSchema = z.object({
   bio: z.string().trim().max(600).optional().or(z.literal("")),
   skills: z.string().trim().max(300).optional().or(z.literal("")),
   interests: z.string().trim().max(300).optional().or(z.literal("")),
-  portfolio_url: z.string().trim().url().optional().or(z.literal("")),
-  github_url: z.string().trim().url().optional().or(z.literal("")),
-  linkedin_url: z.string().trim().url().optional().or(z.literal("")),
+  portfolio_url: webLink,
+  github_url: webLink,
+  linkedin_url: webLink,
   is_profile_public: z.union([z.literal("on"), z.undefined()]).optional(),
   is_contact_public: z.union([z.literal("on"), z.undefined()]).optional(),
+  show_on_core: z.union([z.literal("on"), z.undefined()]).optional(),
 });
 
 export async function updateProfile(
@@ -43,6 +53,7 @@ export async function updateProfile(
     linkedin_url: formData.get("linkedin_url") || "",
     is_profile_public: formData.get("is_profile_public") ?? undefined,
     is_contact_public: formData.get("is_contact_public") ?? undefined,
+    show_on_core: formData.get("show_on_core") ?? undefined,
   };
 
   const parsed = profileSchema.safeParse(raw);
@@ -73,6 +84,7 @@ export async function updateProfile(
     linkedin_url,
     is_profile_public,
     is_contact_public,
+    show_on_core,
   } = parsed.data;
 
   // Avatar upload — optional. Path is prefixed with the user's own id, which
@@ -99,6 +111,14 @@ export async function updateProfile(
     avatarUrl = `${supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl}?t=${Date.now()}`;
   }
 
+  // "Remove the current image": the photo leaves the profile, and any file of
+  // theirs leaves storage so the old address stops working.
+  const removeAvatar = !avatarUrl && formData.get("avatar__remove") === "on";
+  if (removeAvatar) {
+    const { data: files } = await supabase.storage.from("avatars").list(user.id);
+    if (files?.length) await supabase.storage.from("avatars").remove(files.map((f) => `${user.id}/${f.name}`));
+  }
+
   const { error } = await supabase
     .from("profiles")
     .update({
@@ -113,7 +133,9 @@ export async function updateProfile(
       linkedin_url: linkedin_url || null,
       is_profile_public: is_profile_public === "on",
       is_contact_public: is_contact_public === "on",
+      show_on_core: show_on_core === "on",
       ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+      ...(removeAvatar ? { avatar_url: null } : {}),
     })
     .eq("id", user.id);
 

@@ -92,6 +92,7 @@ export interface Profile {
   membership_type: MembershipType;
   is_profile_public: boolean;
   is_contact_public: boolean;
+  show_on_core: boolean;
   is_active: boolean;
   deactivated_at: string | null;
   deactivated_by: string | null;

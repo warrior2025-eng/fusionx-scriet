@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { updateProfile, type ProfileActionState } from "@/actions/profile";
-import { Label, Input, Textarea, FieldError } from "@/components/ui/field";
+import { ImageField } from "@/components/admin/image-field";
+import { Label, Input, Textarea, FieldError, FieldHint } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import type { Profile } from "@/types/database";
 
@@ -10,6 +11,7 @@ const initialState: ProfileActionState = { status: "idle" };
 
 export function ProfileForm({ profile, email }: { profile: Profile; email: string }) {
   const [state, formAction, pending] = useActionState(updateProfile, initialState);
+  const [bio, setBio] = useState(profile.bio ?? "");
 
   return (
     <form action={formAction} className="space-y-6">
@@ -17,26 +19,15 @@ export function ProfileForm({ profile, email }: { profile: Profile; email: strin
         <p className={`text-sm ${state.status === "success" ? "text-accent" : "text-red-500"}`}>{state.message}</p>
       )}
 
-      <div className="flex items-center gap-4">
-        {profile.avatar_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={profile.avatar_url} alt="" className="h-16 w-16 rounded-full object-cover border border-ink/10" />
-        ) : (
-          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-accent text-lg font-semibold text-white">
-            {profile.full_name?.[0]?.toUpperCase() ?? "?"}
-          </span>
-        )}
-        <div>
-          <Label htmlFor="avatar">Profile photo (optional, under 2MB)</Label>
-          <input
-            id="avatar"
-            name="avatar"
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="block text-sm text-ink/70 file:mr-3 file:rounded-sm file:border file:border-ink/15 file:bg-surface file:px-3 file:py-1.5 file:text-sm file:text-ink hover:file:border-ink/40"
-          />
-        </div>
-      </div>
+      {/* Remounted after a save, so it shows the saved photo rather than the local preview. */}
+      <ImageField
+        key={profile.avatar_url ?? "none"}
+        name="avatar"
+        label="Profile photo (optional)"
+        hint="JPEG, PNG or WEBP. You choose the square crop after picking the file."
+        currentUrl={profile.avatar_url}
+        square
+      />
 
       <div>
         <Label>Email</Label>
@@ -62,7 +53,8 @@ export function ProfileForm({ profile, email }: { profile: Profile; email: strin
 
       <div>
         <Label htmlFor="bio">Bio (optional)</Label>
-        <Textarea id="bio" name="bio" rows={4} defaultValue={profile.bio ?? ""} />
+        <Textarea id="bio" name="bio" rows={4} maxLength={600} value={bio} onChange={(e) => setBio(e.target.value)} />
+        <FieldHint>{bio.length}/600. The Core page card shows the first 300 characters.</FieldHint>
       </div>
 
       <div>
@@ -103,6 +95,14 @@ export function ProfileForm({ profile, email }: { profile: Profile; email: strin
           <input type="checkbox" name="is_contact_public" defaultChecked={profile.is_contact_public} className="accent-accent" />
           Show my contact links (portfolio/GitHub/LinkedIn) publicly
         </label>
+      </div>
+
+      <div className="space-y-1 pt-4 border-t border-ink/10">
+        <label className="flex items-center gap-2 text-sm text-ink/70">
+          <input type="checkbox" name="show_on_core" defaultChecked={profile.show_on_core ?? true} className="accent-accent" />
+          Show my profile on the Core page
+        </label>
+        <FieldHint>On by default. It matters only if an admin adds you to a team: your name, photo, department, year and bio then show on the Core page.</FieldHint>
       </div>
 
       <Button type="submit" loading={pending}>
