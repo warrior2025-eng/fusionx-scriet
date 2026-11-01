@@ -3,6 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { ResultsCountdown } from "@/components/recruitment/results-countdown";
 import { ResultsLists } from "@/components/recruitment/results-lists";
+import { ResultsPoster } from "@/components/recruitment/results-poster";
 import { LinkButton } from "@/components/ui/button";
 import { CutCard } from "@/components/ui/cut-card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -34,6 +35,16 @@ export default async function RecruitmentResultsPage() {
       <div className="mt-8">
         {results.state === "none" ? (
           <EmptyState title="No results yet." description="When recruitment results are announced, they will appear here." />
+        ) : results.state === "hidden" ? (
+          <CutCard className="h-auto" data-results-hidden>
+            <p className="leading-relaxed text-ink">
+              The {results.publish_at ? new Date(results.publish_at).getFullYear() : "recruitment"} results are no longer listed here. Selected members can see their result on their{" "}
+              <Link href="/recruitment/status" className="font-medium text-accent underline underline-offset-2">
+                status page
+              </Link>
+              .
+            </p>
+          </CutCard>
         ) : results.state === "pending" ? (
           <CutCard className="h-auto">
             <p className="leading-relaxed text-ink">{announcement(results.publish_at)}</p>
@@ -54,7 +65,8 @@ export default async function RecruitmentResultsPage() {
               </Link>
               .
             </p>
-            <ResultsLists results={results} />
+            {results.poster && <ResultsPoster url={results.poster.url} alt={results.poster.alt} />}
+            {!(results.poster?.only) && <ResultsLists results={results} />}
           </>
         )}
       </div>

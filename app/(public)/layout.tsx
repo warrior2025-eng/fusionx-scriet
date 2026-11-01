@@ -8,7 +8,7 @@ import { getContent } from "@/lib/data/site-content";
 import { getCurrentRoles, getCurrentUser } from "@/lib/permissions";
 import { capabilitiesFor } from "@/lib/permissions/capabilities";
 import { cycleState, getCurrentCycle } from "@/lib/recruitment/data";
-import { resultsVisible } from "@/lib/recruitment/results";
+import { publicResultsHidden, resultsVisible } from "@/lib/recruitment/results";
 import { createClient } from "@/lib/supabase/server";
 import { CandidateEntryBar } from "@/components/recruitment/candidate-entry";
 import { getCandidateEntry, getLiveInterviewDay } from "@/lib/recruitment/my-entry";
@@ -62,7 +62,7 @@ export default async function PublicLayout({ children }: { children: React.React
   // Recruitment in the header: while a cycle is open ("auto"), always, or never.
   const recruitmentOpen = cycleState(cycle) === "open";
   // From the publish time on (decided by the clock, no redeploy): a "Results" badge that leads to the lists.
-  const resultsOut = resultsVisible(cycle) && cycle?.results_banner_on !== false;
+  const resultsOut = resultsVisible(cycle) && !publicResultsHidden(cycle) && cycle?.results_banner_on !== false;
   const showRecruitment = navLinks.recruitment === "on" || (navLinks.recruitment === "auto" && (recruitmentOpen || resultsOut));
   const recruitmentLink = resultsOut
     ? { badge: "Results", href: "/recruitment/results" }

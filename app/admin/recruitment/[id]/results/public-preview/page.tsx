@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ResultsLists } from "@/components/recruitment/results-lists";
+import { ResultsPoster } from "@/components/recruitment/results-poster";
 import { AdminPage } from "@/components/admin/ui";
 import { requireCapability } from "@/lib/admin/guard";
 import type { PublicResults } from "@/lib/recruitment/results";
@@ -27,7 +28,12 @@ export default async function PreviewPublicResultsPage({ params }: { params: Pro
         { label: "Public preview" },
       ]}
     >
-      {results.state === "published" || results.state === "preview" ? <ResultsLists results={results} /> : <p className="text-sm text-ink/70">Nothing to show.</p>}
+      {results.state === "published" || results.state === "preview" ? (
+        <>
+          {results.poster && <ResultsPoster url={results.poster.url} alt={results.poster.alt} />}
+          {!results.poster?.only && <ResultsLists results={results} />}
+        </>
+      ) : <p className="text-sm text-ink/70">Nothing to show.</p>}
     </AdminPage>
   );
 }

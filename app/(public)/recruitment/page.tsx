@@ -12,7 +12,7 @@ import { Section } from "@/components/ui/section";
 import { getContent } from "@/lib/data/site-content";
 import { istDateTime } from "@/lib/events/format";
 import { cycleState, getCurrentCycle, getVisibleTeams, type CycleState } from "@/lib/recruitment/data";
-import { CONSENT_NOTICE } from "@/lib/recruitment/results";
+import { CONSENT_NOTICE, publicResultsHidden } from "@/lib/recruitment/results";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Recruitment" };
@@ -101,7 +101,7 @@ export default async function RecruitmentPage() {
                   {(state === "open" || state === "upcoming") && <p className="mt-5 max-w-2xl text-sm leading-relaxed text-ink/70">{CONSENT_NOTICE}</p>}
                 </div>
                 <div className="flex flex-col gap-2">
-                  {state === "results" && (
+                  {state === "results" && !publicResultsHidden(cycle) && (
                     <LinkButton href="/recruitment/results" size="lg">
                       See the results <ArrowRight size={16} className="arrow-nudge" />
                     </LinkButton>
