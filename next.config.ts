@@ -24,6 +24,7 @@ const nextConfig: NextConfig = {
     // The PDF exports (lib/admin/pdf-table.ts).
     "/admin/**/export": ["./assets/fonts/*.ttf", "./public/icon.png"],
     "/admin/recruitment/*/results/social": ["./assets/fonts/*.ttf", "./public/icon.png"],
+    "/meetings/*/minutes/export": ["./assets/fonts/*.ttf", "./public/icon.png"],
   },
   // One address for the site. "www" used to serve the same pages a second
   // time, which search engines treat as a duplicate site.

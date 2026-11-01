@@ -5,6 +5,8 @@ import { getOrganizationSettings } from "@/lib/data/organization";
 import { ROLE_LABELS, type Capability } from "@/lib/permissions/capabilities";
 import type { AppRole } from "@/types/database";
 import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
+import { MeetingRingBanner } from "@/components/meetings/meeting-signal";
+import { getMeetingSignal } from "@/lib/meetings/data";
 
 // Every section, with the capability it needs. The sidebar shows only what
 // the current role can use; each page and action checks again on its own.
@@ -34,6 +36,7 @@ const NAV: { heading: string; items: (AdminNavItem & { cap: Capability })[] }[] 
       { href: "/admin/research", label: "Research", icon: "research", cap: "moderation" },
       { href: "/admin/recruitment", label: "Recruitment", icon: "applications", cap: "recruitment.content" },
       { href: "/admin/interviews", label: "Interviews", icon: "events", cap: "recruitment" },
+      { href: "/admin/meetings", label: "Meetings", icon: "meetings", cap: "meetings" },
       { href: "/admin/teams", label: "FusionX Teams", icon: "teams", cap: "moderation" },
       { href: "/admin/messages", label: "Messages", icon: "messages", cap: "messages" },
       { href: "/admin/notifications", label: "Broadcast", icon: "notifications", cap: "broadcast" },
@@ -59,7 +62,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   deliverEmailsAfterResponse();
 
-  const settings = await getOrganizationSettings();
+  const [settings, meetingSignal] = await Promise.all([getOrganizationSettings(), getMeetingSignal()]);
   const groups: AdminNavGroup[] = NAV.map((group) => ({
     heading: group.heading,
     items: group.items
@@ -77,6 +80,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       siteName={settings.chapter_name}
     >
       {children}
+      <MeetingRingBanner initial={meetingSignal} />
     </AdminShell>
   );
 }

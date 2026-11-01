@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BellRing, ChevronDown, ChevronUp, Eye, EyeOff, Trash2 } from "lucide-react";
+import { BellRing, CalendarPlus, ChevronDown, ChevronUp, Eye, EyeOff, Trash2 } from "lucide-react";
 import {
   deleteCoreGroup,
   moveCoreGroup,
@@ -11,6 +11,7 @@ import {
   setCoreMemberVisible,
 } from "@/actions/admin-core-teams";
 import { requireCapability, type AdminContext } from "@/lib/admin/guard";
+import { LinkButton } from "@/components/ui/button";
 import { cn, memberDetail } from "@/lib/utils";
 import { ActionButton } from "./action-button";
 import { AddMembersButton, CoreGroupButton, MemberAvatar, MemberTitleField, RecruitmentCandidatesButton } from "./core-team-dialogs";
@@ -155,6 +156,9 @@ function TeamCard({ group, members, first, last }: { group: Group; members: Memb
       <div className="mt-4 flex flex-wrap gap-2">
         <AddMembersButton groupId={group.id} groupName={group.name} />
         {group.kind === "hub" && <RecruitmentCandidatesButton groupId={group.id} groupName={group.name} />}
+        <LinkButton href={`/admin/meetings/new?team=${group.id}`} variant="secondary" size="sm">
+          <CalendarPlus size={15} aria-hidden /> Schedule a meeting with this team
+        </LinkButton>
         {toRemind && (
           <ActionButton action={remindCoreMembers.bind(null, group.id, null)}>
             <BellRing size={15} /> Remind all incomplete

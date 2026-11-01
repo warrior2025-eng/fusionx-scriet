@@ -676,3 +676,41 @@ a:hover > .arrow-nudge {
     background: #ffffff !important;
   }
 }
+
+/* =========================================================================
+   MEETINGS — the pass's flip, a new tile, floating reactions. Under reduced
+   motion the pass fades and nothing floats.
+   ========================================================================= */
+.meeting-pass { display: grid; perspective: 1400px; }
+.meeting-pass__inner { display: grid; transform-style: preserve-3d; transition: transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.meeting-pass[data-flipped="true"] .meeting-pass__inner { transform: rotateY(180deg); }
+.meeting-pass__face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.meeting-pass__face--back { transform: rotateY(180deg); }
+@media (prefers-reduced-motion: reduce) {
+  .meeting-pass__inner { transform: none !important; }
+  .meeting-pass__face--back { transform: none; }
+  .meeting-pass__face { transition: opacity 0.3s; }
+  .meeting-pass[data-flipped="true"] .meeting-pass__face--front,
+  .meeting-pass[data-flipped="false"] .meeting-pass__face--back { opacity: 0; pointer-events: none; }
+}
+:root[data-lowend] .meeting-pass__inner { transform: none !important; }
+:root[data-lowend] .meeting-pass__face--back { transform: none; }
+:root[data-lowend] .meeting-pass[data-flipped="true"] .meeting-pass__face--front,
+:root[data-lowend] .meeting-pass[data-flipped="false"] .meeting-pass__face--back { opacity: 0; pointer-events: none; }
+
+@keyframes meeting-tile-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+.meeting-tile-in { animation: meeting-tile-in 0.35s ease-out; }
+
+@keyframes meeting-float {
+  0% { opacity: 0; transform: translateY(0) scale(0.7); }
+  15% { opacity: 1; transform: translateY(-20px) scale(1); }
+  100% { opacity: 0; transform: translateY(-220px) scale(1.1); }
+}
+.meeting-reaction { animation: meeting-float 2.6s ease-out forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .meeting-reaction { animation: fade-in 0.01ms; opacity: 1; }
+  .meeting-tile-in { animation: none; }
+}

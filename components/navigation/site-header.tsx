@@ -10,6 +10,8 @@ import { LinkButton } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { logoutAction } from "@/actions/auth";
 import { CandidateEntryButton, ReviewerLiveButton } from "@/components/recruitment/candidate-entry";
+import { MeetingLiveButton, MeetingRingBanner, MeetingsMenuLink } from "@/components/meetings/meeting-signal";
+import type { MeetingSignal } from "@/lib/meetings/data";
 import type { CandidateEntry } from "@/lib/recruitment/entry-stage";
 import type { LiveDay } from "@/lib/recruitment/my-entry";
 
@@ -47,6 +49,8 @@ type SiteUser = {
   candidate?: CandidateEntry | null;
   /** A reviewer while today's interviews are on: "Reviewer panel · Live". */
   reviewerLive?: LiveDay | null;
+  /** Passes and calls: the "Meetings" item, "Join meeting · Live", the incoming-call banner. */
+  meetings?: MeetingSignal | null;
 };
 
 function initials(name: string) {
@@ -209,6 +213,7 @@ function ProfileMenu({ user }: { user: SiteUser }) {
               )}
             </Link>
           ))}
+          <MeetingsMenuLink initial={user.meetings ?? null} onNavigate={() => setOpen(false)} className="block px-3.5 py-2 text-sm font-medium text-ink hover:bg-ink/5" />
           <Link href="/profile" onClick={() => setOpen(false)} className="block px-3.5 py-2 text-sm text-ink/70 hover:bg-ink/5 hover:text-ink">
             My Profile
           </Link>
@@ -352,6 +357,11 @@ export function SiteHeader({
               Sign in
             </Link>
           )}
+          {user && (
+            <span className="ml-1 empty:hidden">
+              <MeetingLiveButton initial={user.meetings ?? null} place="header" />
+            </span>
+          )}
           {user?.reviewerLive && (
             <span className="ml-1">
               <ReviewerLiveButton live={user.reviewerLive} place="header" />
@@ -381,6 +391,11 @@ export function SiteHeader({
       {/* Mobile Nav */}
       {open && (
         <nav aria-label="Main" className="lg:hidden border-t border-ink/10 bg-paper px-6 py-4 flex flex-col gap-1">
+          {user && (
+            <div className="mb-3 empty:hidden">
+              <MeetingLiveButton initial={user.meetings ?? null} place="mobile-menu" onNavigate={() => setOpen(false)} />
+            </div>
+          )}
           {(user?.candidate || user?.reviewerLive) && (
             <div className="mb-3 flex flex-col gap-2">
               {user.reviewerLive && <ReviewerLiveButton live={user.reviewerLive} place="mobile-menu" onNavigate={() => setOpen(false)} />}
@@ -430,6 +445,7 @@ export function SiteHeader({
                   {panel.label}
                 </Link>
               ))}
+              <MeetingsMenuLink initial={user.meetings ?? null} onNavigate={() => setOpen(false)} className="py-2.5 text-sm font-medium text-ink border-b border-ink/5" />
               <Link href="/profile" onClick={() => setOpen(false)} className="py-2.5 text-sm text-ink/75 hover:text-ink border-b border-ink/5">
                 My Profile
               </Link>
@@ -462,6 +478,7 @@ export function SiteHeader({
           </div>
         </nav>
       )}
+      {user && <MeetingRingBanner initial={user.meetings ?? null} />}
     </header>
   );
 }

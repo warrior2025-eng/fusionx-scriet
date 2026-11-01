@@ -27,6 +27,8 @@ export type Capability =
   | "recruitment"
   /** Recruitment text only: descriptions, questions, message templates. */
   | "recruitment.content"
+  /** Meetings: create, edit, cancel. Who may act inside a meeting is decided per meeting, on the server. */
+  | "meetings"
   /** FusionX Teams: verify, feature, delete, members, settings. */
   | "teams.manage"
   /** Issue event certificates, manage signatures and check-in volunteers. */
@@ -54,6 +56,7 @@ const ADMIN: readonly Capability[] = [
   "team",
   "recruitment",
   "recruitment.content",
+  "meetings",
   "teams.manage",
   "certificates",
   "users",

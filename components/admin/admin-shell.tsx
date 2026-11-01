@@ -27,6 +27,7 @@ import {
   UserCog,
   Users,
   UsersRound,
+  Video,
   X,
   Trophy,
 } from "lucide-react";
@@ -47,6 +48,7 @@ const ICONS = {
   projects: FolderKanban,
   research: Microscope,
   teams: Users,
+  meetings: Video,
   applications: ClipboardList,
   users: UserCog,
   messages: Inbox,

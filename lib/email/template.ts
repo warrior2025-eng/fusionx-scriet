@@ -6,6 +6,10 @@
 const escape = (value: string) =>
   value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
+/** A meeting's invitation, reminder and so on: "Open your pass", and the calendar file beside it. */
+const MEETING_PASS = /^\/meetings\/([0-9a-f-]{36})(\?|$)/i;
+const MEETING_MINUTES = /^\/meetings\/[0-9a-f-]{36}\/minutes$/i;
+
 /** A notification's link, as a full address. Only the site's own paths are linked. */
 export function absoluteLink(siteUrl: string, link: string | null): string | null {
   if (!link || !/^\/(?!\/)/.test(link)) return null;
@@ -24,9 +28,13 @@ export function notificationEmail(input: {
   const href = absoluteLink(site, input.link);
   const title = input.title.replace(/\s+/g, " ").trim().slice(0, 150);
   const body = (input.body ?? "").trim();
+  const pass = input.link?.match(MEETING_PASS);
+  const label = pass ? "Open your pass" : input.link && MEETING_MINUTES.test(input.link) ? "Open the minutes" : `Open on ${input.siteName}`;
+  // Resend's batch sending takes no attachments, so the .ics is one click away (and opens only for its owner).
+  const calendar = pass && !/^Cancelled/.test(title) ? `${site}/meetings/${pass[1]}/calendar.ics` : null;
   const footer = `You are receiving this because you have an account on ${input.siteName}. All your notifications: ${site}/notifications`;
 
-  const text = [title, body, href ? `Open: ${href}` : "", `--\n${footer}`].filter(Boolean).join("\n\n");
+  const text = [title, body, href ? `${label}: ${href}` : "", calendar ? `Add to calendar: ${calendar}` : "", `--\n${footer}`].filter(Boolean).join("\n\n");
 
   // Navy, white and the logo blue; tables and inline styles, as email clients need.
   const html = `<!doctype html>
@@ -39,7 +47,7 @@ export function notificationEmail(input: {
 <tr><td style="padding:28px;font-family:Arial,Helvetica,sans-serif;color:#0a1230;">
 <h1 style="margin:0 0 14px;font-size:20px;line-height:1.3;font-weight:bold;color:#0a1230;">${escape(title)}</h1>
 ${body ? `<p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#4a5578;">${escape(body).replace(/\n/g, "<br>")}</p>` : ""}
-${href ? `<a href="${escape(href)}" style="display:inline-block;background:#004df6;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold;padding:11px 20px;">Open on ${escape(input.siteName)}</a>` : ""}
+${href ? `<a href="${escape(href)}" style="display:inline-block;background:#004df6;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold;padding:11px 20px;">${escape(label)}</a>${calendar ? `<a href="${escape(calendar)}" style="display:inline-block;margin-left:14px;color:#004df6;font-size:14px;font-weight:bold;">Add to calendar</a>` : ""}` : ""}
 </td></tr>
 <tr><td style="padding:16px 28px;border-top:1px solid #d9dfee;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#5e6a8c;">You are receiving this because you have an account on ${escape(input.siteName)}. <a href="${escape(site)}/notifications" style="color:#004df6;">All your notifications</a></td></tr>
 </table>
