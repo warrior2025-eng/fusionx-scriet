@@ -11,7 +11,14 @@ export type ProfileActionState = {
 };
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2MB
-const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+function imageKind(b: Uint8Array): { type: string; ext: string } | null {
+  const text = (start: number, end: number) => String.fromCharCode(...b.slice(start, end));
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { type: "image/jpeg", ext: "jpg" };
+  if (b[0] === 0x89 && text(1, 4) === "PNG") return { type: "image/png", ext: "png" };
+  if (text(0, 4) === "RIFF" && text(8, 12) === "WEBP") return { type: "image/webp", ext: "webp" };
+  return null;
+}
 
 // These links now show on the public Core page, so only web addresses are accepted.
 const webLink = z
@@ -92,17 +99,19 @@ export async function updateProfile(
   let avatarUrl: string | undefined;
   const avatarFile = formData.get("avatar") as File | null;
   if (avatarFile && avatarFile.size > 0) {
-    if (!ALLOWED_IMAGE_TYPES.includes(avatarFile.type)) {
-      return { status: "error", message: "Avatar must be a JPEG, PNG, or WEBP file." };
-    }
     if (avatarFile.size > MAX_IMAGE_BYTES) {
       return { status: "error", message: "Avatar must be under 2MB." };
     }
-    const ext = avatarFile.name.split(".").pop() || "jpg";
-    const path = `${user.id}/avatar.${ext}`;
+    // The browser's word for the type and the file's name are not trusted: what
+    // is stored, and how it is served, follows the file's first bytes.
+    const kind = imageKind(new Uint8Array(await avatarFile.slice(0, 12).arrayBuffer()));
+    if (!kind) {
+      return { status: "error", message: "Avatar must be a JPEG, PNG, or WEBP file." };
+    }
+    const path = `${user.id}/avatar.${kind.ext}`;
     const { error: uploadError } = await supabase.storage
       .from("avatars")
-      .upload(path, avatarFile, { contentType: avatarFile.type, upsert: true });
+      .upload(path, avatarFile, { contentType: kind.type, upsert: true });
     if (uploadError) {
       return { status: "error", message: "Could not upload the avatar. Please try again." };
     }
