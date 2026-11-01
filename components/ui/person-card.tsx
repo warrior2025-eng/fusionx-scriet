@@ -6,7 +6,7 @@ import { ReadMore } from "@/components/ui/read-more";
 import type { OrgPerson } from "@/types/database";
 
 // lucide-react no longer ships brand marks, so these two are drawn here.
-function LinkedInIcon() {
+export function LinkedInIcon() {
   return (
     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden>
       <path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5ZM3 9.75h4v11H3v-11Zm6.5 0h3.8v1.5h.05c.53-1 1.83-1.75 3.4-1.75 3.6 0 4.25 2.2 4.25 5.1v6.15h-4v-5.4c0-1.3-.03-2.95-1.85-2.95-1.85 0-2.15 1.4-2.15 2.85v5.5h-3.5v-11Z" />
@@ -14,7 +14,7 @@ function LinkedInIcon() {
   );
 }
 
-function GitHubIcon() {
+export function GitHubIcon() {
   return (
     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden>
       <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.15-1.11-1.46-1.11-1.46-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2Z" />
@@ -22,7 +22,7 @@ function GitHubIcon() {
   );
 }
 
-const socialLink =
+export const socialLink =
   "inline-flex h-8 w-8 items-center justify-center rounded-sm text-ink/65 transition-colors duration-150 hover:bg-ink/5 hover:text-accent";
 
 /**

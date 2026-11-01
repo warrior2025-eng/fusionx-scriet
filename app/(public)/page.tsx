@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { DateBlock } from "@/components/ui/date-block";
 import { NamedIcon } from "@/components/ui/named-icon";
 import { PersonCard } from "@/components/ui/person-card";
+import { CoreMemberCard } from "@/components/ui/core-member-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { ScrollProgress } from "@/components/ui/scroll-progress";
@@ -19,6 +20,7 @@ import { CandidateEntryCard } from "@/components/recruitment/candidate-entry";
 import { getCandidateEntry } from "@/lib/recruitment/my-entry";
 import { FusionXHero } from "@/components/hero/fusionx-hero";
 import { getOrganizationSettings } from "@/lib/data/organization";
+import { getCoreTeams } from "@/lib/data/core-teams";
 import { getPeople, peopleIn } from "@/lib/data/people";
 import { getHubs } from "@/lib/data/hubs";
 import { HubCards } from "@/components/hubs/hub-cards";
@@ -85,6 +87,7 @@ export default async function HomePage() {
     journey,
     coreAreas,
     people,
+    coreTeams,
     hubs,
     projects,
     { data: events },
@@ -101,6 +104,7 @@ export default async function HomePage() {
     getContent("lists.journey"),
     getContent("lists.core_areas"),
     getPeople(),
+    getCoreTeams(),
     getHubs(),
     homeProjects(supabase),
     supabase
@@ -133,6 +137,7 @@ export default async function HomePage() {
 
   const founders = peopleIn(people, "founder");
   const facultyGuides = peopleIn(people, "faculty_guide");
+  const coreMembers = coreTeams.find((team) => team.kind === "core")?.members ?? [];
 
   // The sections after the hero, in order. Each can be switched off from the
   // admin panel (Page content); the numbering and the alternating bands
@@ -368,6 +373,11 @@ export default async function HomePage() {
             {founders.map((person, i) => (
               <ScrollReveal key={person.id} delay={i * 60} className="h-full">
                 <PersonCard person={person} compact />
+              </ScrollReveal>
+            ))}
+            {coreMembers.map((member, i) => (
+              <ScrollReveal key={member.id} delay={(founders.length + i) * 60} className="h-full">
+                <CoreMemberCard member={member} compact />
               </ScrollReveal>
             ))}
           </div>

@@ -44,12 +44,15 @@ export async function EntityListPage({
   searchParams,
   description,
   extraActions,
+  aboveList,
   rowLinks,
 }: {
   entity: EntityKey;
   searchParams: Promise<ListParams>;
   description?: string;
   extraActions?: React.ReactNode;
+  /** Shown above the search bar, e.g. the page's tabs. */
+  aboveList?: React.ReactNode;
   /** Extra per-row links, e.g. an event's registrations. */
   rowLinks?: (row: Row) => { href: string; label: string }[];
 }) {
@@ -116,6 +119,7 @@ export async function EntityListPage({
         </>
       }
     >
+      {aboveList}
       <Toolbar
         base={def.adminPath}
         params={params}

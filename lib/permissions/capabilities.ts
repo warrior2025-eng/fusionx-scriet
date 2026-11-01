@@ -21,7 +21,7 @@ export type Capability =
   | "moderation"
   /** Delete a member's project or research entry. */
   | "moderation.delete"
-  /** Team profiles (org_people). */
+  /** Team profiles (org_people) and the core teams. */
   | "team"
   /** Recruitment: cycles, WhatsApp links, reviewers, applications, publishing results. */
   | "recruitment"

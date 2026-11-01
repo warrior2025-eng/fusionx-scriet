@@ -3,7 +3,9 @@ import { Section, SectionHeading } from "@/components/ui/section";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { PersonCard } from "@/components/ui/person-card";
+import { CoreMemberCard } from "@/components/ui/core-member-card";
 import { siteName } from "@/lib/site-config";
+import { getCoreTeams } from "@/lib/data/core-teams";
 import { getPeople, peopleIn } from "@/lib/data/people";
 import { pageMetadata } from "@/lib/data/seo";
 import type { OrgPersonCategory } from "@/types/database";
@@ -23,10 +25,12 @@ const GROUPS: { category: OrgPersonCategory; eyebrow: string; title: string }[] 
   { category: "advisor", eyebrow: "Advisors", title: "Advice and support from outside the team." },
 ];
 
+const TEAM_EYEBROW = { core: "Core", hub: "Hub", custom: "Team" } as const;
+
 export default async function CorePage() {
   // Managed from the admin panel (Core). Until that data exists, getPeople
   // returns the people this page has always listed.
-  const people = await getPeople();
+  const [people, teams] = await Promise.all([getPeople(), getCoreTeams()]);
   const founders = peopleIn(people, "founder");
 
   return (
@@ -72,6 +76,21 @@ export default async function CorePage() {
           </Section>
         );
       })}
+
+      {teams.map((team) => (
+        <Section key={team.id} className="pt-0 md:pt-0">
+          <ScrollReveal>
+            <SectionHeading eyebrow={TEAM_EYEBROW[team.kind]} title={team.name} description={team.description ?? undefined} />
+          </ScrollReveal>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {team.members.map((member, i) => (
+              <ScrollReveal key={member.id} delay={(i + 1) * 100} className="h-full">
+                <CoreMemberCard member={member} />
+              </ScrollReveal>
+            ))}
+          </div>
+        </Section>
+      ))}
     </>
   );
 }
