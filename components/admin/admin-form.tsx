@@ -39,6 +39,7 @@ export function AdminForm({
   className,
   secondary,
   warnUnsaved = true,
+  beforeSend,
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   children: React.ReactNode;
@@ -48,6 +49,8 @@ export function AdminForm({
   secondary?: React.ReactNode;
   /** Off for forms that act on a selection rather than edit a record. */
   warnUnsaved?: boolean;
+  /** Return false to hold the save, and call proceed when it may go. */
+  beforeSend?: (form: HTMLFormElement, proceed: () => void) => boolean;
 }) {
   const router = useRouter();
   const [dirty, setDirty] = useState(false);
@@ -55,6 +58,7 @@ export function AdminForm({
   // saved values (clearing file inputs and image previews).
   const [version, setVersion] = useState(0);
   const { pending, errors, setFieldError, summary, formProps } = useFormSubmit(action, IDLE, {
+    beforeSend,
     onResult: (result) => {
       toastResult(result);
       if (result.status === "success") {

@@ -45,9 +45,11 @@ export function useFormSubmit<S extends FormResult>(
     /** Words before "Fix N fields below:". */
     prefix?: string;
     onResult?: (result: S, form: HTMLFormElement | null) => void;
+    /** Return false to hold the send, and call proceed when it may go. */
+    beforeSend?: (form: HTMLFormElement, proceed: () => void) => boolean;
   } = {},
 ) {
-  const { schema, prefix = "Not saved. ", onResult } = options;
+  const { schema, prefix = "Not saved. ", onResult, beforeSend } = options;
   const formRef = useRef<HTMLFormElement>(null);
   const [state, setState] = useState<S>(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -147,6 +149,7 @@ export function useFormSubmit<S extends FormResult>(
         return;
       }
     }
+    if (beforeSend && !beforeSend(form, () => send(formData))) return;
     send(formData);
   };
 

@@ -27,7 +27,7 @@ import { HubCards } from "@/components/hubs/hub-cards";
 import { pageMetadata } from "@/lib/data/seo";
 import { getContent } from "@/lib/data/site-content";
 import { getCurrentCycle } from "@/lib/recruitment/data";
-import { resultsVisible } from "@/lib/recruitment/results";
+import { publicResultsHidden, resultsVisible } from "@/lib/recruitment/results";
 import { createClient } from "@/lib/supabase/server";
 
 export const generateMetadata = (): Promise<Metadata> => pageMetadata("home", {});
@@ -411,7 +411,7 @@ export default async function HomePage() {
   const visibleSections = sections.filter((section) => section.visible);
 
   // From the results' publish time on (by the clock, no redeploy), unless switched off in the admin panel.
-  const resultsBanner = resultsVisible(cycle) && cycle?.results_banner_on !== false ? cycle?.results_banner_text : null;
+  const resultsBanner = resultsVisible(cycle) && !publicResultsHidden(cycle) && cycle?.results_banner_on !== false ? cycle?.results_banner_text : null;
 
   return (
     <>

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { fail, ok, zodFieldErrors, type ActionState } from "@/lib/admin/action-state";
 import { logAudit } from "@/lib/admin/audit";
+import { isUpload, uploadImage } from "@/lib/admin/storage";
 import { authorize, FORBIDDEN } from "@/lib/admin/guard";
 import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
 import { fromIstInput } from "@/lib/events/format";
@@ -40,19 +41,9 @@ async function admin(cycleId: string) {
 }
 
 // ── decisions ──────────────────────────────────────────────────────────
-const rowSchema = z.object({
-  decision: z.enum(DECISIONS),
-  original: z.enum(DECISIONS),
-  message: z.string().max(1000, "At most 1000 characters"),
-  originalMessage: z.string().max(1000),
-  reason: z.string().max(300),
-  hubs: z.enum(["", "keep", "move"]),
-  hubsReason: z.string().max(300),
-});
-
 /**
- * Saves the board for one hub: every row whose decision or message changed,
- * and the ticked rows set to the bulk decision.
+ * Saves the board for one hub: only the rows the admin changed, and the ticked rows set to the
+ * bulk decision. Each says what it was showing; a row that has moved since is refused, not overwritten.
  */
 export async function saveDecisions(cycleId: string, teamId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
   const ctx = await admin(cycleId);
@@ -62,41 +53,48 @@ export async function saveDecisions(cycleId: string, teamId: string, _prev: Acti
   if (bulk && !(DECISIONS as readonly string[]).includes(bulk)) return fail("Choose a decision for the ticked rows.");
   if (bulk && ticked.size === 0) return fail("Tick the rows to set, or clear the bulk decision.");
 
-  const rows = formData.getAll("row").filter((v): v is string => typeof v === "string" && uuid.safeParse(v).success);
+  const rows = new Set([...formData.getAll("row"), ...(bulk ? ticked : [])].filter((v): v is string => typeof v === "string" && uuid.safeParse(v).success));
   let saved = 0;
   const errors: string[] = [];
-  for (const id of rows.slice(0, 400)) {
-    const parsed = rowSchema.safeParse({
-      decision: bulk && ticked.has(id) ? bulk : text(formData, `dec_${id}`),
-      original: text(formData, `orig_${id}`) || "undecided",
-      message: text(formData, `msg_${id}`),
-      originalMessage: text(formData, `origmsg_${id}`),
-      reason: text(formData, `why_${id}`),
-      hubs: text(formData, `hubs_${id}`),
-      hubsReason: text(formData, `hubswhy_${id}`),
-    });
-    if (!parsed.success) {
-      errors.push(parsed.error.issues[0]?.message ?? "Invalid row");
+  for (const id of [...rows].slice(0, 400)) {
+    const inBulk = Boolean(bulk) && ticked.has(id);
+    const original = text(formData, `orig_${id}`) || "undecided";
+    const decision = inBulk ? bulk : text(formData, `dec_${id}`) || original;
+    const message = formData.has(`msg_${id}`) ? text(formData, `msg_${id}`) : null;
+    if (!(DECISIONS as readonly string[]).includes(decision) || !(DECISIONS as readonly string[]).includes(original)) {
+      errors.push("One row had an unknown decision.");
       continue;
     }
-    const v = parsed.data;
-    if (v.decision === v.original && v.message === v.originalMessage) continue;
+    if (message && message.length > 1000) {
+      errors.push("A message can be at most 1000 characters.");
+      continue;
+    }
+    if (decision === original && message === null) continue;
     const { error } = await ctx.supabase.rpc("set_final_decision", {
       p_application: id,
       p_team: teamId,
-      p_decision: v.decision,
-      p_note: v.message,
-      p_reason: v.reason || null,
-      p_hubs: v.hubs || null,
-      p_hubs_reason: v.hubsReason || null,
+      p_decision: decision,
+      p_note: message,
+      p_reason: text(formData, `why_${id}`).slice(0, 300) || null,
+      p_hubs: text(formData, `hubs_${id}`) || null,
+      p_hubs_reason: text(formData, `hubswhy_${id}`).slice(0, 300) || null,
+      p_expected: original,
+      p_source: inBulk ? "bulk" : "board",
     });
-    if (error) errors.push(friendlyDbError(error.message, "Could not save one decision."));
+    if (error) errors.push(`${text(formData, `name_${id}`) || "One row"}: ${friendlyDbError(error.message, "Could not save this decision.")}`);
     else saved++;
   }
   touched(cycleId);
-  if (errors.length && saved === 0) return fail(`Nothing saved. ${[...new Set(errors)].slice(0, 2).join(" ")}`);
-  if (errors.length) return ok(`${saved} saved. ${errors.length} not saved: ${[...new Set(errors)].slice(0, 2).join(" ")}`);
+  if (errors.length) return fail(`${saved ? `${saved} saved. ` : "Nothing saved. "}${[...new Set(errors)].slice(0, 5).join(" ")}`);
   return ok(saved ? `${saved} decision${saved === 1 ? "" : "s"} saved.` : "No changes to save.");
+}
+
+/** When the decisions last changed, so a board can tell it is behind. */
+export async function getBoardStamp(cycleId: string): Promise<string | null> {
+  const ctx = await admin(cycleId);
+  if (!ctx) return null;
+  const { data } = await ctx.supabase.rpc("results_board_stamp", { p_cycle: cycleId });
+  return (data as string | null) ?? null;
 }
 
 /** Every still-undecided candidate (of this hub, or of all hubs) gets one decision. */
@@ -137,6 +135,71 @@ export async function unlockDecisions(cycleId: string, _prev: ActionState, formD
   if (error) return fail(friendlyDbError(error.message, "Could not unlock."));
   touched(cycleId);
   return ok("Decisions unlocked. The reason is in the audit log.");
+}
+
+// ── correcting published results (super admins) ────────────────────────
+const correctionSchema = z.object({
+  reason: z.string().trim().min(3, "Give a reason (at least 3 characters)").max(500),
+  items: z
+    .array(z.object({ application_id: uuid, team_id: uuid, from: z.enum(["undecided", "selected", "waitlisted", "not_selected", "none"]), to: z.enum(["selected", "not_selected"]) }))
+    .min(1, "There is nothing to change")
+    .max(500),
+  notices: z.array(z.object({ application_id: uuid, message: z.string().trim().min(1, "Write the message, or untick the person").max(1000) })).max(500),
+});
+
+export async function applyCorrections(cycleId: string, input: z.input<typeof correctionSchema>): Promise<ActionState> {
+  const ctx = await admin(cycleId);
+  if (!ctx || !ctx.roles.includes("super_admin")) return FORBIDDEN;
+  const parsed = correctionSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Please check the form.");
+  const { data, error } = await ctx.supabase.rpc("apply_result_corrections", { p_cycle: cycleId, p_reason: parsed.data.reason, p_items: parsed.data.items, p_notices: parsed.data.notices });
+  if (error) return fail(friendlyDbError(error.message, "Could not apply the corrections. Nothing was changed."));
+  touched(cycleId);
+  const done = data as { changed: number; told: number };
+  return ok(`${done.changed} corrected. ${done.told} ${done.told === 1 ? "person" : "people"} told.`);
+}
+
+// ── the public page: poster and how long it stays ──────────────────────
+const publicSchema = z.object({
+  results_poster_alt: z.string().trim().min(3, "Describe the poster (required)").max(200, "At most 200 characters"),
+  results_poster_only: z.boolean(),
+  results_hide_after_days: z.coerce.number({ message: "Enter a number of days" }).int("Enter a whole number of days").min(1, "At least 1 day").max(365, "At most 365 days"),
+});
+
+export async function saveResultsPublic(cycleId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
+  const ctx = await admin(cycleId);
+  if (!ctx) return FORBIDDEN;
+  const parsed = publicSchema.safeParse({
+    results_poster_alt: text(formData, "results_poster_alt"),
+    results_poster_only: formData.get("results_poster_only") === "on",
+    results_hide_after_days: text(formData, "results_hide_after_days"),
+  });
+  if (!parsed.success) return fail("Please fix the highlighted fields.", zodFieldErrors(parsed.error));
+  const { data: before } = await ctx.supabase.from("recruitment_cycles").select("results_poster_url, results_poster_alt, results_poster_only, results_hide_after_days").eq("id", cycleId).maybeSingle();
+  if (!before) return fail("Cycle not found.");
+  const values: Record<string, unknown> = { ...parsed.data };
+  const file = formData.get("results_poster");
+  if (isUpload(file)) {
+    const uploaded = await uploadImage(ctx.supabase, "site-assets", file, "results-poster");
+    if ("error" in uploaded) return fail("Please fix the highlighted fields.", { results_poster: uploaded.error });
+    values.results_poster_url = uploaded.url;
+  } else if (formData.get("results_poster__remove") === "on") {
+    values.results_poster_url = null;
+  }
+  const { error } = await ctx.supabase.from("recruitment_cycles").update(values).eq("id", cycleId);
+  if (error) return fail(friendlyDbError(error.message, "Could not save."));
+  await logAudit(ctx, { action: "updated_results_public", table: "recruitment_cycles", id: cycleId, before, after: values });
+  touched(cycleId);
+  return ok("Saved.", { viewHref: "/recruitment/results" });
+}
+
+export async function setResultsPublic(cycleId: string, value: "hidden" | "shown"): Promise<ActionState> {
+  const ctx = await admin(cycleId);
+  if (!ctx) return FORBIDDEN;
+  const { error } = await ctx.supabase.rpc("results_set_public_override", { p_cycle: cycleId, p_value: value });
+  if (error) return fail(friendlyDbError(error.message, "Could not change this."));
+  touched(cycleId);
+  return ok(value === "hidden" ? "The public results are hidden." : "The public results are showing again.");
 }
 
 // ── date and schedule ──────────────────────────────────────────────────

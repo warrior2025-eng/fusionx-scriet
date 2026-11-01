@@ -9,7 +9,7 @@
  */
 
 export type Decision = "selected" | "waitlisted" | "not_selected";
-export type DecisionReason = "absent" | "one_hub" | "override" | "declined" | "expired" | "removed" | "moved";
+export type DecisionReason = "absent" | "one_hub" | "override" | "declined" | "expired" | "removed" | "moved" | "correction";
 export type OfferStatus = "pending" | "accepted" | "declined" | "expired";
 export type Attendance = "attended" | "no_show" | "booked" | "none";
 export type Outcome = "selected" | "waitlisted" | "not_selected" | "absent" | "declined" | "expired" | "in_review";
@@ -66,6 +66,7 @@ export type PublicHub = {
 export type PublicResults =
   | { state: "none" }
   | { state: "pending"; cycle_title: string; publish_at: string | null; scheduled: boolean }
+  | { state: "hidden"; cycle_title: string; publish_at: string | null }
   | {
       state: "published" | "preview";
       cycle_title: string;
@@ -76,6 +77,7 @@ export type PublicResults =
       /** Everyone selected counts once; places count once per hub (migration 0029). */
       selected_people?: number;
       selected_places?: number;
+      poster?: { url: string; alt: string | null; only: boolean } | null;
       just_published?: boolean;
     };
 
@@ -104,6 +106,11 @@ export type CycleResults = {
   show_waitlist_publicly?: boolean;
   results_banner_on?: boolean;
   results_banner_text?: string;
+  results_poster_url?: string | null;
+  results_poster_alt?: string | null;
+  results_poster_only?: boolean;
+  results_hide_after_days?: number;
+  results_public_override?: "hidden" | "shown" | null;
 };
 
 export const DECISION_LABELS: Record<Decision | "undecided", string> = {
@@ -121,6 +128,7 @@ export const REASON_LABELS: Record<DecisionReason, string> = {
   expired: "Offer expired",
   removed: "Removed from waitlist",
   moved: "Moved to another hub",
+  correction: "Corrected to the official list",
 };
 
 export const ATTENDANCE_LABELS: Record<Attendance, string> = {
@@ -145,6 +153,21 @@ export const CONSENT_NOTICE =
   "If you are selected or waitlisted, your name and hub will be announced on the FusionX@SCRIET website and official social media channels.";
 
 /** Mirrors recruitment_results_visible() for display only (never to reveal a decision). */
+/** When the public list goes by the clock, null before results are out. */
+export function publicResultsHideAt(cycle: ({ status: string } & CycleResults) | null): number | null {
+  const from = cycle?.results_published_at ?? cycle?.results_publish_at;
+  return from ? new Date(from).getTime() + (cycle?.results_hide_after_days ?? 5) * 24 * 60 * 60 * 1000 : null;
+}
+
+/** The public list is off the site (database: recruitment_public_hidden). A candidate's own status page is not affected. */
+export function publicResultsHidden(cycle: ({ status: string } & CycleResults) | null, now = Date.now()): boolean {
+  if (!cycle) return false;
+  if (cycle.results_public_override === "hidden") return true;
+  if (cycle.results_public_override === "shown") return false;
+  const at = publicResultsHideAt(cycle);
+  return at !== null && now >= at;
+}
+
 export function resultsVisible(cycle: ({ status: string } & CycleResults) | null, now = Date.now()): boolean {
   if (!cycle || cycle.status === "draft") return false;
   if (cycle.status === "results_published") return true;

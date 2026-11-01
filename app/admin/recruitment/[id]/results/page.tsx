@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { ArrowDown, ArrowUp, Eye } from "lucide-react";
 import {
   cancelSchedule,
-  lockDecisions,
   markRest,
   moveWaitlist,
   promote,
@@ -16,6 +15,8 @@ import {
   saveOnboarding,
   saveResultSettings,
   saveResultsDate,
+  saveResultsPublic,
+  setResultsPublic,
   scheduleResults,
   selectAdditionalHub,
   setTaskReviewed,
@@ -24,7 +25,8 @@ import {
 import { ExportButtons } from "@/components/admin/export-buttons";
 import { ActionButton } from "@/components/admin/action-button";
 import { AdminForm, CheckboxField, SelectField, LinkField, TextField, TextareaField } from "@/components/admin/admin-form";
-import { DecisionSelect } from "@/components/admin/decision-select";
+import { DecisionBoardForm, DecisionSelect, RowMessage, type BoardEffect } from "@/components/admin/decision-select";
+import { PosterField } from "@/components/admin/poster-field";
 import { UnappliedHubButton } from "@/components/admin/unapplied-hub-button";
 import { CycleTabs } from "@/components/admin/recruitment-parts";
 import { SelectAll } from "@/components/admin/select-all";
@@ -42,10 +44,12 @@ import {
   REASON_LABELS,
   fillTemplate,
   phaseOf,
+  publicResultsHidden,
+  publicResultsHideAt,
   resultsVisible,
   type Attendance,
 } from "@/lib/recruitment/results";
-import { isFinal, loadBoard, loadConfig, loadReadiness, type BoardRow, type BoardTeam } from "@/lib/recruitment/results-admin";
+import { isFinal, loadBoard, loadConfig, loadReadiness, loadRowNotes, type BoardRow, type BoardTeam, type RowNote } from "@/lib/recruitment/results-admin";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Admin: Recruitment results" };
@@ -62,12 +66,16 @@ export default async function CycleResultsPage({ params, searchParams }: { param
   if (!cycleRow) notFound();
   const cycle = cycleRow as Cycle;
 
-  const [{ teams, rows }, readiness, config, { data: templateRows }] = await Promise.all([
+  const [{ teams, rows }, readiness, config, { data: templateRows }, { data: boardStamp }, { data: snapshotDiff }] = await Promise.all([
     loadBoard(ctx.supabase, id),
     loadReadiness(ctx.supabase, id),
     loadConfig(ctx.supabase, id),
     ctx.supabase.from("recruitment_message_templates").select("key, body").eq("key", "social_post").maybeSingle(),
+    ctx.supabase.rpc("results_board_stamp", { p_cycle: id }),
+    ctx.supabase.rpc("results_snapshot_diff", { p_cycle: id }),
   ]);
+  const rowNotes = await loadRowNotes(ctx.supabase, id, ctx.user.id, teams);
+  const lockDiff = (snapshotDiff ?? []) as { application_id: string; team_id: string; name: string; hub: string; locked: string; now: string }[];
   if (!readiness) {
     return (
       <AdminPage title={`Results: ${cycle.title}`} crumbs={[{ label: "Recruitment", href: "/admin/recruitment" }, { label: cycle.title, href: `/admin/recruitment/${id}` }, { label: "Results" }]}>
@@ -192,6 +200,19 @@ export default async function CycleResultsPage({ params, searchParams }: { param
           </div>
         </Panel>
 
+        {lockDiff.length > 0 && !visible && (
+          <div role="alert" className="border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm text-ink" data-lock-diff>
+            <p className="font-medium text-red-600">Decisions changed after locking. Review again.</p>
+            <ul className="mt-2 list-disc pl-5">
+              {lockDiff.map((d) => (
+                <li key={`${d.application_id}:${d.team_id}`}>
+                  {d.name} in {d.hub}: locked as {DECISION_LABELS[d.locked as keyof typeof DECISION_LABELS] ?? d.locked}, now {DECISION_LABELS[d.now as keyof typeof DECISION_LABELS] ?? d.now}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* ── lock and schedule ── */}
         <Panel
           title="Lock and schedule"
@@ -205,17 +226,9 @@ export default async function CycleResultsPage({ params, searchParams }: { param
             <div className="space-y-6">
               <div className="flex flex-wrap items-center gap-3">
                 {!locked ? (
-                  <ActionButton
-                    variant="primary"
-                    action={lockDecisions.bind(null, id)}
-                    confirm={{
-                      title: "Lock all decisions?",
-                      body: "Reviewers can no longer change any decision. Absent candidates are set to not selected. Only an admin can unlock, with a reason.",
-                      confirmLabel: "Lock decisions",
-                    }}
-                  >
+                  <LinkButton href={`${base}/lock`} size="sm">
                     Lock decisions
-                  </ActionButton>
+                  </LinkButton>
                 ) : (
                   <Pill tone="good">Decisions locked</Pill>
                 )}
@@ -288,6 +301,46 @@ export default async function CycleResultsPage({ params, searchParams }: { param
                 header &ldquo;Results&rdquo; badge appear, and every applicant gets a notification (and an email when email is switched on). The database checks the
                 time itself, so this happens even if the scheduled job runs late.
               </p>
+            </div>
+          )}
+        </Panel>
+
+        {visible && ctx.roles.includes("super_admin") && (
+          <Panel title="Compare with official list" description="Check the published results against the official list, and correct any difference. Super admins only.">
+            <LinkButton href={`${base}/compare`} variant="secondary" size="sm">
+              Compare with official list
+            </LinkButton>
+          </Panel>
+        )}
+
+        <Panel
+          title="Public results page"
+          description={
+            !visible
+              ? "The poster and how long the names stay up. Nothing shows until the results are out."
+              : publicResultsHidden(cycle)
+                ? "Hidden from the public page now. Candidates still see their own result on their status page."
+                : cycle.results_public_override === "shown"
+                  ? "Showing, because you chose Show again."
+                  : `Showing until ${istDateTime(new Date(publicResultsHideAt(cycle) ?? 0).toISOString())}.`
+          }
+        >
+          <AdminForm action={saveResultsPublic.bind(null, id)} warnUnsaved={false}>
+            <PosterField name="results_poster" label="Results poster (optional)" currentUrl={cycle.results_poster_url ?? null} />
+            {cycle.results_poster_url && <CheckboxField name="results_poster__remove" label="Remove the poster" />}
+            <TextField name="results_poster_alt" label="Poster description, for people who can't see it" maxLength={200} defaultValue={cycle.results_poster_alt ?? "FusionX selection results 2026"} />
+            <CheckboxField name="results_poster_only" label="Show the poster instead of the list" defaultChecked={cycle.results_poster_only === true} />
+            <TextField name="results_hide_after_days" label="Hide public results after this many days" type="number" min={1} max={365} defaultValue={String(cycle.results_hide_after_days ?? 5)} className="max-w-xs" />
+          </AdminForm>
+          {visible && (
+            <div className="mt-4">
+              {publicResultsHidden(cycle) ? (
+                <ActionButton action={setResultsPublic.bind(null, id, "shown")}>Show again</ActionButton>
+              ) : (
+                <ActionButton action={setResultsPublic.bind(null, id, "hidden")} confirm={{ title: "Hide the public results now?", body: "The names and the poster leave the public page. Candidates keep their status pages.", confirmLabel: "Hide now" }}>
+                  Hide now
+                </ActionButton>
+              )}
             </div>
           )}
         </Panel>
@@ -407,6 +460,10 @@ export default async function CycleResultsPage({ params, searchParams }: { param
                   allRows={rows}
                   teams={teams}
                   visible={visible}
+                  stamp={(boardStamp as string | null) ?? null}
+                  oneHubMode={cycle.one_hub_mode ?? "not_selected"}
+                  rowNotes={rowNotes}
+                  multiAllowed={multiAllowed}
                   otherHubs={(r) => (multiAllowed(r.application_id) ? [] : (selectedIn.get(r.application_id) ?? []).filter((x) => x.team_id !== r.team_id).map((x) => teamName.get(x.team_id) ?? ""))}
                 />
 
@@ -703,6 +760,10 @@ function DecisionTable({
   allRows,
   teams,
   visible,
+  stamp,
+  oneHubMode,
+  rowNotes,
+  multiAllowed,
   otherHubs,
 }: {
   rows: BoardRow[];
@@ -715,8 +776,19 @@ function DecisionTable({
   allRows: BoardRow[];
   teams: BoardTeam[];
   visible: boolean;
+  stamp: string | null;
+  oneHubMode: string;
+  rowNotes: Map<string, RowNote>;
+  multiAllowed: (applicationId: string) => boolean;
   otherHubs: (row: BoardRow) => string[];
 }) {
+  // Kept across hubs by the page, so each row is told apart by hub too, and starts again when its stored value moves.
+  const hubOf = (id: string) => teams.find((t) => t.id === id)?.name ?? "";
+  const effects: Record<string, BoardEffect> = {};
+  for (const r of rows) {
+    const others = allRows.filter((x) => x.application_id === r.application_id && x.team_id !== teamId);
+    if (others.length) effects[r.application_id] = { name: r.name, multi: multiAllowed(r.application_id), others: others.map((x) => ({ hub: hubOf(x.team_id), decision: decisionOf(x), reason: x.reason })) };
+  }
   const table = (
     <Table label="Final decisions">
       <thead>
@@ -741,10 +813,10 @@ function DecisionTable({
         {rows.map((r) => {
           const d = decisionOf(r);
           return (
-            <tr key={r.application_id}>
+            <tr key={`${teamId}:${r.application_id}`}>
               {editable && (
                 <Td>
-                  <input type="hidden" name="row" value={r.application_id} />
+                  <input type="hidden" name={`name_${r.application_id}`} value={r.name} />
                   <input type="checkbox" name="ids" value={r.application_id} aria-label={`Select ${r.name}`} className="h-4 w-4 accent-accent" />
                 </Td>
               )}
@@ -761,6 +833,14 @@ function DecisionTable({
                 <Link href={`/admin/recruitment/${cycleId}/results/preview?app=${r.application_id}`} className="text-xs text-accent underline underline-offset-2">
                   Preview as candidate
                 </Link>
+                <Link href={`/admin/recruitment/${cycleId}/results/history?app=${r.application_id}`} className="ml-2 text-xs text-accent underline underline-offset-2">
+                  History
+                </Link>
+                {rowNotes.get(`${r.application_id}:${teamId}`)?.hub && (
+                  <span className="mt-1 block text-xs font-medium text-amber-700" data-row-note>
+                    {rowNotes.get(`${r.application_id}:${teamId}`)?.mine ? "Updated by your change in" : "Updated by a change in"} {rowNotes.get(`${r.application_id}:${teamId}`)?.hub}
+                  </span>
+                )}
                 {(editable || visible) && (
                   <div className="mt-1 text-xs">
                     <AnotherHub cycleId={cycleId} row={r} rows={allRows} teams={teams} visible={visible} />
@@ -797,6 +877,7 @@ function DecisionTable({
                   <>
                     <input type="hidden" name={`orig_${r.application_id}`} value={d} />
                     <DecisionSelect
+                      key={`${teamId}:${d}:${r.stage_updated_at}`}
                       applicationId={r.application_id}
                       name={r.name}
                       hub={hubName}
@@ -824,15 +905,7 @@ function DecisionTable({
               <Td className="min-w-[12rem]">
                 {editable ? (
                   <>
-                    <input type="hidden" name={`origmsg_${r.application_id}`} value={r.final_note ?? ""} />
-                    <input
-                      name={`msg_${r.application_id}`}
-                      defaultValue={r.final_note ?? ""}
-                      maxLength={1000}
-                      aria-label={`Message to ${r.name}`}
-                      placeholder="Uses the template when empty"
-                      className="w-full border border-line bg-paper px-2 py-1.5 text-sm text-ink"
-                    />
+                    <RowMessage key={`${teamId}:${r.final_note ?? ""}`} applicationId={r.application_id} name={r.name} defaultValue={r.final_note ?? ""} />
                   </>
                 ) : (
                   <span className="text-xs text-ink/70">{r.final_note}</span>
@@ -846,7 +919,7 @@ function DecisionTable({
   );
   if (!editable) return table;
   return (
-    <AdminForm action={saveDecisions.bind(null, cycleId, teamId)} submitLabel="Save decisions">
+    <DecisionBoardForm key={teamId} action={saveDecisions.bind(null, cycleId, teamId)} cycleId={cycleId} stamp={stamp} oneHubMode={oneHubMode} effects={effects}>
       {table}
       <div className="flex flex-wrap items-end gap-3">
         <SelectField
@@ -862,6 +935,6 @@ function DecisionTable({
           : "Selecting someone here sets their other hub to Not selected (see Result settings). If they are already selected in another hub, you choose: keep both or move them."}{" "}
         An absent candidate stays Not selected unless you give a reason.
       </p>
-    </AdminForm>
+    </DecisionBoardForm>
   );
 }

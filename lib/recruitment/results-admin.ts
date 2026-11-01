@@ -38,6 +38,8 @@ export type BoardRow = {
   whatsapp_added: boolean;
   induction_attended: boolean;
   onboarding_notes: string | null;
+  /** When the stored decision last moved: the board restarts from it. */
+  stage_updated_at: string | null;
 };
 
 export type ResultsConfig = {
@@ -89,7 +91,7 @@ export async function loadBoard(supabase: Supabase, cycleId: string): Promise<{ 
     read<Status>((part) =>
       supabase
         .from("recruitment_team_status")
-        .select("application_id, team_id, rank, stage, decision_reason, waitlist_rank, final_note, offer_status, promoted_at, multi_hub_allowed, added_after_results, added_by_admin, added_reason, whatsapp_added, induction_attended, onboarding_notes")
+        .select("application_id, team_id, rank, stage, decision_reason, waitlist_rank, final_note, offer_status, promoted_at, multi_hub_allowed, added_after_results, added_by_admin, added_reason, whatsapp_added, induction_attended, onboarding_notes, stage_updated_at")
         .in("application_id", part),
     ),
     read<{ application_id: string; team_id: string; reviewer_id: string; score: number | null; private_notes: string | null }>((part) =>
@@ -138,6 +140,7 @@ export async function loadBoard(supabase: Supabase, cycleId: string): Promise<{ 
         whatsapp_added: s.whatsapp_added === true,
         induction_attended: s.induction_attended === true,
         onboarding_notes: s.onboarding_notes,
+        stage_updated_at: s.stage_updated_at,
       };
     })
     .sort((x, y) => x.name.localeCompare(y.name));
@@ -155,3 +158,25 @@ export async function loadConfig(supabase: Supabase, cycleId: string): Promise<R
 }
 
 export const isFinal = (stage: Stage) => stage === "selected" || stage === "waitlisted" || stage === "not_selected";
+
+export type RowNote = { application_id: string; team_id: string; hub: string | null; mine: boolean };
+
+/** Rows whose latest change came from a save in another hub, to say so on the board. */
+export async function loadRowNotes(supabase: Supabase, cycleId: string, me: string, teams: BoardTeam[]): Promise<Map<string, RowNote>> {
+  const { data } = await supabase
+    .from("recruitment_decision_log")
+    .select("application_id, team_id, by_user, origin_team_id, at, recruitment_applications!inner(cycle_id)")
+    .eq("recruitment_applications.cycle_id", cycleId)
+    .order("at", { ascending: false })
+    .limit(2000);
+  const name = new Map(teams.map((t) => [t.id, t.name]));
+  const out = new Map<string, RowNote>();
+  const seen = new Set<string>();
+  for (const row of (data ?? []) as { application_id: string; team_id: string; by_user: string | null; origin_team_id: string | null }[]) {
+    const key = `${row.application_id}:${row.team_id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (row.origin_team_id) out.set(key, { application_id: row.application_id, team_id: row.team_id, hub: name.get(row.origin_team_id) ?? null, mine: row.by_user === me });
+  }
+  return out;
+}
