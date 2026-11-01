@@ -1,10 +1,13 @@
 "use client";
 
-import { useActionState } from "react";
-import { Label, Input, Textarea, Select, FieldError } from "@/components/ui/field";
+import { CountedTextarea } from "@/components/ui/counted-textarea";
+import { Label, Input, Select, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import type { ProjectActionState } from "@/actions/projects";
 import type { Project } from "@/types/database";
+import { useFormSubmit } from "@/components/ui/form-errors";
+import { projectSchema } from "@/lib/validations";
+import { LinkInput } from "@/components/ui/link-input";
 
 const statuses = ["idea", "building", "prototype", "testing", "completed", "continued"] as const;
 
@@ -15,30 +18,29 @@ export function ProjectForm({
   action: (prev: ProjectActionState, formData: FormData) => Promise<ProjectActionState>;
   project?: Project;
 }) {
-  const [state, formAction, pending] = useActionState(action, { status: "idle" } as ProjectActionState);
+  const { pending, errors, summary, formProps } = useFormSubmit(action, { status: "idle" } as ProjectActionState, { schema: projectSchema });
 
   return (
-    <form action={formAction} className="space-y-5">
-      {state.status === "error" && state.message && !Object.keys(state.fieldErrors ?? {}).length && (
-        <p className="text-sm text-red-500">{state.message}</p>
-      )}
+    <form {...formProps} className="space-y-5">
+      {summary}
 
       <div>
         <Label htmlFor="title">Title</Label>
         <Input id="title" name="title" required defaultValue={project?.title} />
-        <FieldError>{state.fieldErrors?.title}</FieldError>
+        <FieldError id="title-error">{errors.title}</FieldError>
       </div>
 
       <div>
         <Label htmlFor="description">Description</Label>
-        <Textarea id="description" name="description" rows={5} required defaultValue={project?.description} />
-        <FieldError>{state.fieldErrors?.description}</FieldError>
+        <CountedTextarea max={4000} id="description" name="description" rows={5} required defaultValue={project?.description} />
+        <FieldError id="description-error">{errors.description}</FieldError>
       </div>
 
       <div className="grid sm:grid-cols-2 gap-5">
         <div>
           <Label htmlFor="domain">Domain (optional)</Label>
           <Input id="domain" name="domain" placeholder="e.g. IoT, Web, AI/ML" defaultValue={project?.domain ?? ""} />
+          <FieldError id="domain-error">{errors.domain}</FieldError>
         </div>
         <div>
           <Label htmlFor="status">Status</Label>
@@ -87,13 +89,11 @@ export function ProjectForm({
       <div className="grid sm:grid-cols-2 gap-5">
         <div>
           <Label htmlFor="github_url">GitHub URL (optional)</Label>
-          <Input id="github_url" name="github_url" type="url" placeholder="https://" defaultValue={project?.github_url ?? ""} />
-          <FieldError>{state.fieldErrors?.github_url}</FieldError>
+          <LinkInput id="github_url" name="github_url" kind="github" label="GitHub URL" placeholder="github.com/riya/repo" defaultValue={project?.github_url ?? ""} error={errors.github_url} />
         </div>
         <div>
           <Label htmlFor="demo_url">Demo URL (optional)</Label>
-          <Input id="demo_url" name="demo_url" type="url" placeholder="https://" defaultValue={project?.demo_url ?? ""} />
-          <FieldError>{state.fieldErrors?.demo_url}</FieldError>
+          <LinkInput id="demo_url" name="demo_url" kind="any" label="Demo URL" placeholder="example.com/demo" defaultValue={project?.demo_url ?? ""} error={errors.demo_url} />
         </div>
       </div>
 

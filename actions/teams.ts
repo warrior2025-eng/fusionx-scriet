@@ -7,6 +7,7 @@ import { friendlyDbError } from "@/lib/recruitment/data";
 import { createClient } from "@/lib/supabase/server";
 import { parseEmails } from "@/lib/teams/data";
 import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
+import { linkField } from "@/lib/validation/link";
 
 /**
  * FusionX Teams, from a student's side. Every action validates its input and
@@ -16,11 +17,6 @@ import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
  */
 
 const uuid = z.string().uuid();
-const optionalUrl = z
-  .string()
-  .trim()
-  .max(300)
-  .refine((v) => v === "" || /^https?:\/\/\S+$/i.test(v), "Use a full https:// link");
 const email = z.string().email("One of these is not an email address").max(254);
 
 const detailsSchema = z.object({
@@ -28,8 +24,8 @@ const detailsSchema = z.object({
   description: z.string().trim().max(1000, "Keep this under 1000 characters"),
   project_title: z.string().trim().max(160),
   project_summary: z.string().trim().max(1500, "Keep this under 1500 characters"),
-  github_url: optionalUrl,
-  demo_url: optionalUrl,
+  github_url: linkField("GitHub link", "github", { max: 300 }),
+  demo_url: linkField("Drive or demo link", "any", { max: 300 }),
   skills_needed: z.string().trim().max(400),
   looking_for_members: z.boolean(),
   max_size: z.union([z.literal(""), z.coerce.number().int().min(1).max(50)]),

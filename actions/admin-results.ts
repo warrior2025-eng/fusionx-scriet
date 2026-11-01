@@ -8,6 +8,7 @@ import { authorize, FORBIDDEN } from "@/lib/admin/guard";
 import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
 import { fromIstInput } from "@/lib/events/format";
 import { friendlyDbError } from "@/lib/recruitment/data";
+import { linkField } from "@/lib/validation/link";
 
 /**
  * Results day, from the admin panel ("recruitment" capability: admins).
@@ -225,7 +226,7 @@ export async function saveResultSettings(cycleId: string, _prev: ActionState, fo
 const inductionSchema = z.object({
   induction_at: z.union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, "Choose a date and time")]),
   induction_mode: z.enum(["", "online", "in_person"]),
-  induction_link: z.union([z.literal(""), z.string().max(300).regex(/^https:\/\/\S{6,}$/i, "Use a full https:// link")]),
+  induction_link: linkField("Meeting link", "any", { max: 300 }),
   induction_venue: z.string().max(300),
   induction_note: z.string().max(1000),
   offer_days: z.coerce.number({ message: "Enter a number" }).int().min(1, "At least 1 day").max(30, "At most 30 days"),
@@ -333,11 +334,7 @@ export async function saveOnboarding(cycleId: string, applicationId: string, tea
 }
 
 // ── the post-result task (migration 0021) ──────────────────────────────
-const httpsLink = z
-  .string()
-  .trim()
-  .max(500, "At most 500 characters")
-  .refine((v) => v === "" || (/^https:\/\/\S+$/i.test(v) && URL.canParse(v)), "Use a full link that starts with https://");
+const httpsLink = linkField("Submission link", "any");
 const taskSchema = z.object({
   title: z.string().trim().min(2, "Add a title").max(200, "At most 200 characters"),
   description: z.string().trim().max(4000, "At most 4000 characters"),

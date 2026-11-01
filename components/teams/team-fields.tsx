@@ -1,4 +1,4 @@
-import { CheckboxField, SelectField, TextField, TextareaField } from "@/components/admin/admin-form";
+import { CheckboxField, SelectField, LinkField, TextField, TextareaField } from "@/components/admin/admin-form";
 import type { Team } from "@/lib/teams/data";
 
 /**
@@ -39,8 +39,8 @@ export function TeamDetailFields({
       <TextField name="project_title" label="Project or idea title" defaultValue={team?.project_title ?? ""} maxLength={160} />
       <TextareaField name="project_summary" label="Project summary" rows={4} max={1500} counter defaultValue={team?.project_summary ?? ""} />
       <div className="grid gap-5 sm:grid-cols-2">
-        <TextField name="github_url" label="GitHub link (optional)" type="url" placeholder="https://" defaultValue={team?.github_url ?? ""} />
-        <TextField name="demo_url" label="Drive or demo link (optional)" type="url" placeholder="https://" defaultValue={team?.demo_url ?? ""} />
+        <LinkField kind="github" name="github_url" label="GitHub link (optional)" placeholder="https://" defaultValue={team?.github_url ?? ""} />
+        <LinkField name="demo_url" label="Drive or demo link (optional)" placeholder="https://" defaultValue={team?.demo_url ?? ""} />
       </div>
       <TextField
         name="skills_needed"

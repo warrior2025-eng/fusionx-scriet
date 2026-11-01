@@ -23,7 +23,7 @@ import {
 } from "@/actions/admin-results";
 import { ExportButtons } from "@/components/admin/export-buttons";
 import { ActionButton } from "@/components/admin/action-button";
-import { AdminForm, CheckboxField, SelectField, TextField, TextareaField } from "@/components/admin/admin-form";
+import { AdminForm, CheckboxField, SelectField, LinkField, TextField, TextareaField } from "@/components/admin/admin-form";
 import { DecisionSelect } from "@/components/admin/decision-select";
 import { UnappliedHubButton } from "@/components/admin/unapplied-hub-button";
 import { CycleTabs } from "@/components/admin/recruitment-parts";
@@ -332,7 +332,7 @@ export default async function CycleResultsPage({ params, searchParams }: { param
                   ]}
                 />
               </div>
-              <TextField name="induction_link" label="Meeting link (optional)" type="url" placeholder="https://" defaultValue={config.induction_link ?? ""} />
+              <LinkField name="induction_link" label="Meeting link (optional)" placeholder="https://" defaultValue={config.induction_link ?? ""} />
               <TextField name="induction_venue" label="Venue (in person)" maxLength={300} defaultValue={config.induction_venue ?? ""} />
               <TextareaField name="induction_note" label="Note (optional)" rows={2} max={1000} defaultValue={config.induction_note ?? ""} />
               <div className="grid gap-5 sm:grid-cols-2">
@@ -561,7 +561,7 @@ export default async function CycleResultsPage({ params, searchParams }: { param
                       <TextareaField name="task_description" label="Description" rows={4} max={4000} defaultValue={hubTask?.description ?? ""} />
                       <div className="grid gap-5 sm:grid-cols-2">
                         <TextField name="task_deadline" label="Deadline (IST)" type="datetime-local" defaultValue={toIstInput(hubTask?.deadline ?? null)} />
-                        <TextField name="task_link" label="Submission link (optional)" type="url" placeholder="https://forms.gle/..." defaultValue={hubTask?.link ?? ""} hint="A Google Form, Drive folder or similar." />
+                        <LinkField name="task_link" label="Submission link (optional)" placeholder="https://forms.gle/..." defaultValue={hubTask?.link ?? ""} hint="A Google Form, Drive folder or similar." />
                       </div>
                       <CheckboxField
                         name="task_published"

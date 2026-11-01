@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { buildPipeline, coreAreas, journeyStages, siteName } from "@/lib/site-config";
+import { linkField } from "@/lib/validation/link";
 
 /**
  * The typed content store: every key in the `site_content` table, the Zod
@@ -69,12 +70,7 @@ const text = (max: number) => z.string().trim().min(1, "This can't be empty").ma
 const optionalText = (max: number) => z.string().trim().max(max, `Keep this under ${max} characters`);
 
 /** An internal path ("/join") or an http(s) URL. */
-const href = z
-  .string()
-  .trim()
-  .min(1, "Add a link")
-  .max(300)
-  .refine((v) => /^\/(?!\/)/.test(v) || /^https?:\/\//i.test(v), "Use a path like /join or a full https:// link");
+const href = linkField("Link", "any", { required: true, allowPath: true, max: 300 });
 
 const link = z.object({ label: text(60), href });
 

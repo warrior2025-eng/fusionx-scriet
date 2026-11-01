@@ -4,6 +4,7 @@ import { CutCard } from "@/components/ui/cut-card";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { ReadMore } from "@/components/ui/read-more";
 import type { OrgPerson } from "@/types/database";
+import { linkHref } from "@/lib/validation/link";
 
 // lucide-react no longer ships brand marks, so these two are drawn here.
 export function LinkedInIcon() {
@@ -32,9 +33,9 @@ export const socialLink =
  */
 export function PersonCard({ person, compact }: { person: OrgPerson; compact?: boolean }) {
   const links = [
-    person.linkedin_url && { href: person.linkedin_url, label: "LinkedIn", icon: <LinkedInIcon /> },
-    person.github_url && { href: person.github_url, label: "GitHub", icon: <GitHubIcon /> },
-    person.portfolio_url && { href: person.portfolio_url, label: "Portfolio", icon: <Globe size={16} aria-hidden /> },
+    linkHref(person.linkedin_url, "linkedin") && { href: linkHref(person.linkedin_url, "linkedin"), label: "LinkedIn", icon: <LinkedInIcon /> },
+    linkHref(person.github_url, "github") && { href: linkHref(person.github_url, "github"), label: "GitHub", icon: <GitHubIcon /> },
+    linkHref(person.portfolio_url, "website") && { href: linkHref(person.portfolio_url, "website"), label: "Portfolio", icon: <Globe size={16} aria-hidden /> },
     person.email && { href: `mailto:${person.email}`, label: "Email", icon: <Mail size={16} aria-hidden /> },
   ].filter(Boolean) as { href: string; label: string; icon: React.ReactNode }[];
 

@@ -1,11 +1,11 @@
 import { cn } from "@/lib/utils";
-import type { InputHTMLAttributes, LabelHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes } from "react";
+import type { ComponentProps, LabelHTMLAttributes } from "react";
 
 export function Label({ className, ...props }: LabelHTMLAttributes<HTMLLabelElement>) {
   return <label className={cn("block text-sm font-medium text-ink mb-1.5", className)} {...props} />;
 }
 
-export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className, ...props }: ComponentProps<"input">) {
   return (
     <input
       className={cn(
@@ -18,7 +18,7 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   );
 }
 
-export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
   return (
     <textarea
       className={cn(
@@ -31,7 +31,7 @@ export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTex
   );
 }
 
-export function Select({ className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+export function Select({ className, children, ...props }: ComponentProps<"select">) {
   return (
     <select
       className={cn(
@@ -46,9 +46,14 @@ export function Select({ className, children, ...props }: SelectHTMLAttributes<H
   );
 }
 
-export function FieldError({ children }: { children?: string }) {
+/** A field's own message. With an id of "<field id>-error" the field points at it. */
+export function FieldError({ children, id }: { children?: string; id?: string }) {
   if (!children) return null;
-  return <p className="mt-1 text-xs text-red-600">{children}</p>;
+  return (
+    <p id={id} className="mt-1 text-xs text-red-600">
+      {children}
+    </p>
+  );
 }
 
 export function FieldHint({ children }: { children: React.ReactNode }) {

@@ -1,14 +1,16 @@
 "use client";
 
-import { useActionState } from "react";
+import { CountedTextarea } from "@/components/ui/counted-textarea";
 import { submitContactMessage, type ContactActionState } from "@/actions/contact";
-import { Label, Input, Textarea, FieldError } from "@/components/ui/field";
+import { Label, Input, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
+import { useFormSubmit } from "@/components/ui/form-errors";
+import { contactMessageSchema } from "@/lib/validations";
 
 const initialState: ContactActionState = { status: "idle" };
 
 export function ContactForm() {
-  const [state, formAction, pending] = useActionState(submitContactMessage, initialState);
+  const { state, pending, errors, summary, formProps } = useFormSubmit(submitContactMessage, initialState, { schema: contactMessageSchema });
 
   if (state.status === "success") {
     return (
@@ -20,37 +22,35 @@ export function ContactForm() {
   }
 
   return (
-    <form action={formAction} className="space-y-5">
+    <form {...formProps} className="space-y-5">
       <div className="hidden" aria-hidden="true">
         <Label htmlFor="website">Website</Label>
         <Input id="website" name="website" tabIndex={-1} autoComplete="off" />
       </div>
 
-      {state.status === "error" && state.message && !Object.keys(state.fieldErrors ?? {}).length && (
-        <p className="text-sm text-red-600">{state.message}</p>
-      )}
+      {summary}
 
       <div className="grid sm:grid-cols-2 gap-5">
         <div>
           <Label htmlFor="name">Name</Label>
           <Input id="name" name="name" required />
-          <FieldError>{state.fieldErrors?.name}</FieldError>
+          <FieldError id="name-error">{errors.name}</FieldError>
         </div>
         <div>
           <Label htmlFor="email">Email</Label>
           <Input id="email" name="email" type="email" required />
-          <FieldError>{state.fieldErrors?.email}</FieldError>
+          <FieldError id="email-error">{errors.email}</FieldError>
         </div>
       </div>
       <div>
         <Label htmlFor="subject">Subject</Label>
         <Input id="subject" name="subject" required />
-        <FieldError>{state.fieldErrors?.subject}</FieldError>
+        <FieldError id="subject-error">{errors.subject}</FieldError>
       </div>
       <div>
         <Label htmlFor="message">Message</Label>
-        <Textarea id="message" name="message" rows={5} required />
-        <FieldError>{state.fieldErrors?.message}</FieldError>
+        <CountedTextarea max={3000} id="message" name="message" rows={5} required />
+        <FieldError id="message-error">{errors.message}</FieldError>
       </div>
       <Button type="submit" loading={pending}>
         Send message

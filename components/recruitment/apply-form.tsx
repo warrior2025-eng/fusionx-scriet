@@ -11,6 +11,7 @@ import { CONSENT_NOTICE } from "@/lib/recruitment/results";
 import { questionsFor, type Answer, type Question } from "@/lib/recruitment/shared";
 import { MODE_LABELS, dayLabel, slotRange, type SlotAvailability } from "@/lib/recruitment/slots";
 import { cn } from "@/lib/utils";
+import { LinkInput } from "@/components/ui/link-input";
 
 export type ApplyDraft = {
   full_name: string;
@@ -218,7 +219,7 @@ export function ApplyForm({
           <Input id={id} value={text} maxLength={q.max_length ?? 300} onChange={(e) => setAnswer(q.id, e.target.value)} />
         )}
         {q.type === "url" && (
-          <Input id={id} type="url" placeholder="https://" value={text} maxLength={300} onChange={(e) => setAnswer(q.id, e.target.value)} />
+          <LinkInput id={id} kind="any" label={q.label} placeholder="https://" value={text} maxLength={300} onValueChange={(v) => setAnswer(q.id, v)} />
         )}
         {q.type === "long_text" && (
           <>
@@ -401,13 +402,14 @@ export function ApplyForm({
           {(["portfolio", "github", "linkedin"] as const).map((key) => (
             <div key={key}>
               <Label htmlFor={`link-${key}`}>{key === "portfolio" ? "Portfolio (optional)" : key === "github" ? "GitHub (optional)" : "LinkedIn (optional)"}</Label>
-              <Input
+              <LinkInput
                 id={`link-${key}`}
-                type="url"
-                placeholder="https://"
+                kind={key === "portfolio" ? "website" : key}
+                label={key === "portfolio" ? "Portfolio" : key === "github" ? "GitHub" : "LinkedIn"}
+                placeholder={key === "portfolio" ? "riya.dev" : key === "github" ? "@riya" : "riya-sharma"}
                 maxLength={300}
                 value={form.links[key]}
-                onChange={(e) => update({ links: { ...form.links, [key]: e.target.value } })}
+                onValueChange={(v) => update({ links: { ...form.links, [key]: v } })}
               />
             </div>
           ))}

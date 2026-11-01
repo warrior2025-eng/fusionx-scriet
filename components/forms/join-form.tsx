@@ -1,15 +1,18 @@
 "use client";
 
-import { useActionState } from "react";
+import { CountedTextarea } from "@/components/ui/counted-textarea";
 import { submitApplication, type ApplicationActionState } from "@/actions/application";
-import { Label, Input, Textarea, Select, FieldError } from "@/components/ui/field";
+import { Label, Input, Select, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { functionalAreas, skillOptions } from "@/lib/site-config";
+import { useFormSubmit } from "@/components/ui/form-errors";
+import { joinApplicationSchema } from "@/lib/validations";
+import { LinkInput } from "@/components/ui/link-input";
 
 const initialState: ApplicationActionState = { status: "idle" };
 
 export function JoinForm({ isSignedIn }: { isSignedIn: boolean }) {
-  const [state, formAction, pending] = useActionState(submitApplication, initialState);
+  const { state, pending, errors, summary, formProps } = useFormSubmit(submitApplication, initialState, { schema: joinApplicationSchema });
 
   if (!isSignedIn) {
     return (
@@ -39,32 +42,30 @@ export function JoinForm({ isSignedIn }: { isSignedIn: boolean }) {
   }
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form {...formProps} className="space-y-6">
       {/* Honeypot — hidden from real users via CSS, left in the tab order for bots that fill every field */}
       <div className="hidden" aria-hidden="true">
         <Label htmlFor="website">Website</Label>
         <Input id="website" name="website" tabIndex={-1} autoComplete="off" />
       </div>
 
-      {state.status === "error" && state.message && !Object.keys(state.fieldErrors ?? {}).length && (
-        <p className="text-sm text-red-600">{state.message}</p>
-      )}
+      {summary}
 
       <div className="grid sm:grid-cols-2 gap-5">
         <div>
           <Label htmlFor="full_name">Full name</Label>
           <Input id="full_name" name="full_name" required />
-          <FieldError>{state.fieldErrors?.full_name}</FieldError>
+          <FieldError id="full_name-error">{errors.full_name}</FieldError>
         </div>
         <div>
           <Label htmlFor="college_email">College email</Label>
           <Input id="college_email" name="college_email" type="email" required />
-          <FieldError>{state.fieldErrors?.college_email}</FieldError>
+          <FieldError id="college_email-error">{errors.college_email}</FieldError>
         </div>
         <div>
           <Label htmlFor="department">Department</Label>
           <Input id="department" name="department" required />
-          <FieldError>{state.fieldErrors?.department}</FieldError>
+          <FieldError id="department-error">{errors.department}</FieldError>
         </div>
         <div>
           <Label htmlFor="year">Year</Label>
@@ -77,7 +78,7 @@ export function JoinForm({ isSignedIn }: { isSignedIn: boolean }) {
             <option>3rd Year</option>
             <option>4th Year</option>
           </Select>
-          <FieldError>{state.fieldErrors?.year}</FieldError>
+          <FieldError id="year-error">{errors.year}</FieldError>
         </div>
       </div>
 
@@ -106,41 +107,40 @@ export function JoinForm({ isSignedIn }: { isSignedIn: boolean }) {
             <option key={area}>{area}</option>
           ))}
         </Select>
-        <FieldError>{state.fieldErrors?.preferred_functional_area}</FieldError>
+        <FieldError id="preferred_functional_area-error">{errors.preferred_functional_area}</FieldError>
       </div>
 
       <div className="grid sm:grid-cols-3 gap-5">
         <div>
           <Label htmlFor="portfolio_url">Portfolio (optional)</Label>
-          <Input id="portfolio_url" name="portfolio_url" type="url" placeholder="https://" />
-          <FieldError>{state.fieldErrors?.portfolio_url}</FieldError>
+          <LinkInput id="portfolio_url" name="portfolio_url" kind="website" label="Portfolio" placeholder="riya.dev" error={errors.portfolio_url} />
         </div>
         <div>
           <Label htmlFor="github_url">GitHub (optional)</Label>
-          <Input id="github_url" name="github_url" type="url" placeholder="https://" />
-          <FieldError>{state.fieldErrors?.github_url}</FieldError>
+          <LinkInput id="github_url" name="github_url" kind="github" label="GitHub" placeholder="@riya" error={errors.github_url} />
         </div>
         <div>
           <Label htmlFor="linkedin_url">LinkedIn (optional)</Label>
-          <Input id="linkedin_url" name="linkedin_url" type="url" placeholder="https://" />
-          <FieldError>{state.fieldErrors?.linkedin_url}</FieldError>
+          <LinkInput id="linkedin_url" name="linkedin_url" kind="linkedin" label="LinkedIn" placeholder="riya-sharma" error={errors.linkedin_url} />
         </div>
       </div>
 
       <div>
         <Label htmlFor="project_interests">Project interests (optional)</Label>
-        <Textarea id="project_interests" name="project_interests" rows={3} />
+        <CountedTextarea max={1000} id="project_interests" name="project_interests" rows={3} />
+        <FieldError id="project_interests-error">{errors.project_interests}</FieldError>
       </div>
 
       <div>
         <Label htmlFor="research_interests">Research interests (optional)</Label>
-        <Textarea id="research_interests" name="research_interests" rows={3} />
+        <CountedTextarea max={1000} id="research_interests" name="research_interests" rows={3} />
+        <FieldError id="research_interests-error">{errors.research_interests}</FieldError>
       </div>
 
       <div>
         <Label htmlFor="motivation">Why do you want to join?</Label>
-        <Textarea id="motivation" name="motivation" rows={5} required />
-        <FieldError>{state.fieldErrors?.motivation}</FieldError>
+        <CountedTextarea max={2000} id="motivation" name="motivation" rows={5} required />
+        <FieldError id="motivation-error">{errors.motivation}</FieldError>
       </div>
 
       <Button type="submit" size="lg" loading={pending} className="w-full sm:w-auto">

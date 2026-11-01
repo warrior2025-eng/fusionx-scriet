@@ -6,6 +6,7 @@ import { authorize, FORBIDDEN, type AdminContext } from "@/lib/admin/guard";
 import { logAudit } from "@/lib/admin/audit";
 import { fail, ok, zodFieldErrors, type ActionState } from "@/lib/admin/action-state";
 import { isUpload, removeByUrl, uploadImage } from "@/lib/admin/storage";
+import { linkField } from "@/lib/validation/link";
 
 /**
  * Writes to the organization_settings singleton. All of these need the
@@ -16,18 +17,8 @@ import { isUpload, removeByUrl, uploadImage } from "@/lib/admin/storage";
 
 type Row = Record<string, unknown>;
 
-const optionalUrl = z
-  .string()
-  .trim()
-  .max(500)
-  .refine((v) => v === "" || (/^https?:\/\//i.test(v) && URL.canParse(v)), "Enter a full link starting with https://");
-
 /** An internal path or an http(s) URL, or empty. */
-const optionalHref = z
-  .string()
-  .trim()
-  .max(500)
-  .refine((v) => v === "" || /^\/(?!\/)/.test(v) || /^https?:\/\//i.test(v), "Use a path like /events or a full https:// link");
+const optionalHref = linkField("Link", "any", { allowPath: true });
 
 /** A datetime-local value, read as India time, or empty. */
 const optionalDateTime = z
@@ -72,9 +63,9 @@ const identitySchema = z.object({
     .trim()
     .max(200)
     .refine((v) => v === "" || z.email().safeParse(v).success, "Enter a valid email address"),
-  instagram_url: optionalUrl,
-  linkedin_url: optionalUrl,
-  github_url: optionalUrl,
+  instagram_url: linkField("Instagram", "instagram"),
+  linkedin_url: linkField("LinkedIn", "linkedin"),
+  github_url: linkField("GitHub", "github"),
   institutional_approval: z.enum(["faculty_guide_confirmed", "director_review_pending", "officially_approved"]),
 });
 

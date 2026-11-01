@@ -8,6 +8,7 @@ import {
   listCoreCandidates,
   saveCoreGroup,
   searchCoreUsers,
+  setCoreMemberVisibility,
   setCoreMemberTitle,
   type CoreCandidate,
   type CoreUserHit,
@@ -343,5 +344,50 @@ export function RecruitmentCandidatesButton({ groupId, groupName }: { groupId: s
         </div>
       </dialog>
     </>
+  );
+}
+
+/** Who decides what shows for a Core member: admins, here. */
+export function CoreMemberSwitches({ userId, name, profile, contact, core }: { userId: string; name: string; profile: boolean; contact: boolean; core: boolean }) {
+  const router = useRouter();
+  const [values, setValues] = useState({ profile, contact, core });
+  const [pending, startTransition] = useTransition();
+  const flip = (key: keyof typeof values) => {
+    const next = { ...values, [key]: !values[key] };
+    setValues(next);
+    startTransition(async () => {
+      const result = await setCoreMemberVisibility(userId, next);
+      if (result.status !== "success") {
+        setValues(values);
+        toastResult(result);
+      }
+      router.refresh();
+    });
+  };
+  const SWITCHES = [
+    ["profile", "Profile visible"],
+    ["contact", "Links shown"],
+    ["core", "On Core page"],
+  ] as const;
+  return (
+    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5" data-switches={name}>
+      {SWITCHES.map(([key, label]) => (
+        <button
+          key={key}
+          type="button"
+          role="switch"
+          aria-checked={values[key]}
+          aria-label={`${label}: ${name}`}
+          disabled={pending}
+          onClick={() => flip(key)}
+          className="inline-flex items-center gap-1.5 text-xs text-ink/75 disabled:opacity-60"
+        >
+          <span className={`relative inline-block h-4 w-7 rounded-full transition-colors ${values[key] ? "bg-accent" : "bg-ink/25"}`}>
+            <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${values[key] ? "left-3.5" : "left-0.5"}`} />
+          </span>
+          {label}
+        </button>
+      ))}
+    </div>
   );
 }

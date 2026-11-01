@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { deleteRecruitmentTeam, moveRecruitmentTeam, saveRecruitmentTeam, setTeamWhatsapp } from "@/actions/admin-recruitment";
 import { ActionButton } from "@/components/admin/action-button";
-import { AdminForm, CheckboxField, Field, TextField, TextareaField } from "@/components/admin/admin-form";
+import { AdminForm, CheckboxField, Field, LinkField, TextField, TextareaField } from "@/components/admin/admin-form";
 import { CycleTabs } from "@/components/admin/recruitment-parts";
 import { AdminPage, Panel, Pill } from "@/components/admin/ui";
 import { requireCapability } from "@/lib/admin/guard";
@@ -87,10 +87,9 @@ export default async function CycleTeamsPage({ params }: { params: Promise<{ id:
                 <div className="border-t border-line pt-6">
                   <h3 className="mb-3 text-sm font-semibold text-ink">WhatsApp group link (private)</h3>
                   <AdminForm action={setTeamWhatsapp.bind(null, id, team.id)} submitLabel="Save link" warnUnsaved={false}>
-                    <TextField
+                    <LinkField kind="whatsapp_group"
                       name="whatsapp_group_url"
                       label="Group invite link"
-                      type="url"
                       placeholder="https://chat.whatsapp.com/…"
                       defaultValue={links[team.id] ?? ""}
                       hint="Never shown on the site. Only candidates selected for this team see it, after results are published. Clear it to remove."

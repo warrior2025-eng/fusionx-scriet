@@ -1,10 +1,13 @@
 "use client";
 
-import { useActionState } from "react";
-import { Label, Input, Textarea, Select, FieldError } from "@/components/ui/field";
+import { CountedTextarea } from "@/components/ui/counted-textarea";
+import { Label, Input, Select, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import type { ResearchActionState } from "@/actions/research";
 import type { ResearchEntry } from "@/types/database";
+import { useFormSubmit } from "@/components/ui/form-errors";
+import { researchSchema } from "@/lib/validations";
+import { LinkInput } from "@/components/ui/link-input";
 
 const statuses = ["idea", "researching", "experimentation", "draft", "submitted", "published"] as const;
 
@@ -15,28 +18,27 @@ export function ResearchForm({
   action: (prev: ResearchActionState, formData: FormData) => Promise<ResearchActionState>;
   research?: ResearchEntry;
 }) {
-  const [state, formAction, pending] = useActionState(action, { status: "idle" } as ResearchActionState);
+  const { pending, errors, summary, formProps } = useFormSubmit(action, { status: "idle" } as ResearchActionState, { schema: researchSchema });
 
   return (
-    <form action={formAction} className="space-y-5">
-      {state.status === "error" && state.message && !Object.keys(state.fieldErrors ?? {}).length && (
-        <p className="text-sm text-red-500">{state.message}</p>
-      )}
+    <form {...formProps} className="space-y-5">
+      {summary}
 
       <div>
         <Label htmlFor="title">Title</Label>
         <Input id="title" name="title" required defaultValue={research?.title} />
-        <FieldError>{state.fieldErrors?.title}</FieldError>
+        <FieldError id="title-error">{errors.title}</FieldError>
       </div>
       <div>
         <Label htmlFor="abstract">Abstract</Label>
-        <Textarea id="abstract" name="abstract" rows={5} required defaultValue={research?.abstract} />
-        <FieldError>{state.fieldErrors?.abstract}</FieldError>
+        <CountedTextarea max={4000} id="abstract" name="abstract" rows={5} required defaultValue={research?.abstract} />
+        <FieldError id="abstract-error">{errors.abstract}</FieldError>
       </div>
       <div className="grid sm:grid-cols-2 gap-5">
         <div>
           <Label htmlFor="domain">Domain (optional)</Label>
           <Input id="domain" name="domain" placeholder="e.g. Machine Learning" defaultValue={research?.domain ?? ""} />
+          <FieldError id="domain-error">{errors.domain}</FieldError>
         </div>
         <div>
           <Label htmlFor="status">Status</Label>
@@ -60,8 +62,7 @@ export function ResearchForm({
       </div>
       <div>
         <Label htmlFor="document_url">Document link (optional)</Label>
-        <Input id="document_url" name="document_url" type="url" placeholder="https://" defaultValue={research?.document_url ?? ""} />
-        <FieldError>{state.fieldErrors?.document_url}</FieldError>
+        <LinkInput id="document_url" name="document_url" kind="any" label="Document link" placeholder="drive.google.com/file/d/abc" defaultValue={research?.document_url ?? ""} error={errors.document_url} />
       </div>
       <label className="flex items-center gap-2 text-sm text-ink/70">
         <input type="checkbox" name="is_published" defaultChecked={research?.is_published} className="accent-accent" />

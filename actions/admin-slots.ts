@@ -8,6 +8,7 @@ import { authorize, FORBIDDEN } from "@/lib/admin/guard";
 import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
 import { friendlyDbError } from "@/lib/recruitment/data";
 import { MEET_URL, slotTime } from "@/lib/recruitment/slots";
+import { normalizeLink } from "@/lib/validation/link";
 
 /**
  * Interview slots, from the admin panel. Everything here needs the
@@ -258,20 +259,14 @@ export async function setSlotCapacity(cycleId: string, slotId: string, _prev: Ac
 }
 
 // ── Meet links ─────────────────────────────────────────────────────────
-/** "meet.google.com/abc-defg-hij?authuser=0" → "https://meet.google.com/abc-defg-hij". */
-function normaliseMeetUrl(value: string): string {
-  let url = value.trim().toLowerCase().split(/[?#]/)[0].replace(/\/+$/, "");
-  if (url.startsWith("meet.google.com/")) url = `https://${url}`;
-  return url;
-}
-
 /** Saves (or, when empty, removes) the Meet link of a day, or of one slot of it. Never written to the audit log. */
 export async function saveMeetLink(cycleId: string, dayId: string, slotId: string | null, _prev: ActionState, formData: FormData): Promise<ActionState> {
   const ctx = await authorize("recruitment");
   if (!ctx) return FORBIDDEN;
   if (!uuid.safeParse(dayId).success || (slotId && !uuid.safeParse(slotId).success)) return fail("Not found.");
-  const raw = text(formData, "meet_url");
-  const url = raw ? normaliseMeetUrl(raw) : "";
+  const meet = normalizeLink(text(formData, "meet_url"), "meet", { label: "Meet link" });
+  if (!meet.ok) return fail("Please fix the highlighted fields.", { meet_url: meet.error });
+  const url = meet.value;
   if (url && !MEET_URL.test(url)) return fail("Please fix the highlighted fields.", { meet_url: "Use a Google Meet link like https://meet.google.com/abc-defg-hij" });
 
   let existing = ctx.supabase.from("recruitment_meet_links").select("id").eq("day_id", dayId);

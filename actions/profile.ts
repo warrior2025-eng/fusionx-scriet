@@ -1,13 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { profileSchema, tagList } from "@/lib/validation/profile";
 
 export type ProfileActionState = {
-  status: "idle" | "success" | "error";
+  /** partial: the text was saved and the photo was not. */
+  status: "idle" | "success" | "partial" | "error";
   message?: string;
   fieldErrors?: Record<string, string>;
+  signedOut?: boolean;
 };
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2MB
@@ -20,50 +22,22 @@ function imageKind(b: Uint8Array): { type: string; ext: string } | null {
   return null;
 }
 
-// These links now show on the public Core page, so only web addresses are accepted.
-const webLink = z
-  .string()
-  .trim()
-  .url()
-  .refine((value) => /^https?:\/\//i.test(value), "Use a link starting with https://")
-  .optional()
-  .or(z.literal(""));
+const field = (formData: FormData, name: string) => {
+  const value = formData.get(name);
+  return typeof value === "string" ? value : "";
+};
 
-const profileSchema = z.object({
-  full_name: z.string().trim().min(2, "Enter your full name").max(120),
-  department: z.string().trim().max(120).optional().or(z.literal("")),
-  year: z.string().trim().max(20).optional().or(z.literal("")),
-  bio: z.string().trim().max(600).optional().or(z.literal("")),
-  skills: z.string().trim().max(300).optional().or(z.literal("")),
-  interests: z.string().trim().max(300).optional().or(z.literal("")),
-  portfolio_url: webLink,
-  github_url: webLink,
-  linkedin_url: webLink,
-  is_profile_public: z.union([z.literal("on"), z.undefined()]).optional(),
-  is_contact_public: z.union([z.literal("on"), z.undefined()]).optional(),
-  show_on_core: z.union([z.literal("on"), z.undefined()]).optional(),
-});
+function touched() {
+  revalidatePath("/profile");
+  revalidatePath("/core");
+  revalidatePath("/", "layout");
+}
 
-export async function updateProfile(
-  _prev: ProfileActionState,
-  formData: FormData
-): Promise<ProfileActionState> {
-  const raw = {
-    full_name: formData.get("full_name"),
-    department: formData.get("department") || "",
-    year: formData.get("year") || "",
-    bio: formData.get("bio") || "",
-    skills: formData.get("skills") || "",
-    interests: formData.get("interests") || "",
-    portfolio_url: formData.get("portfolio_url") || "",
-    github_url: formData.get("github_url") || "",
-    linkedin_url: formData.get("linkedin_url") || "",
-    is_profile_public: formData.get("is_profile_public") ?? undefined,
-    is_contact_public: formData.get("is_contact_public") ?? undefined,
-    show_on_core: formData.get("show_on_core") ?? undefined,
-  };
+const savedAt = () =>
+  new Date().toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
 
-  const parsed = profileSchema.safeParse(raw);
+export async function updateProfile(_prev: ProfileActionState, formData: FormData): Promise<ProfileActionState> {
+  const parsed = profileSchema.safeParse(Object.fromEntries(Object.keys(profileSchema.shape).map((name) => [name, field(formData, name)])));
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
     for (const issue of parsed.error.issues) {
@@ -77,82 +51,73 @@ export async function updateProfile(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { status: "error", message: "Please sign in." };
+  if (!user) return { status: "error", message: "You were signed out. Sign in again; your changes are kept.", signedOut: true };
 
-  const {
-    full_name,
-    department,
-    year,
-    bio,
-    skills,
-    interests,
-    portfolio_url,
-    github_url,
-    linkedin_url,
-    is_profile_public,
-    is_contact_public,
-    show_on_core,
-  } = parsed.data;
+  const { full_name, department, year, bio, skills, interests, portfolio_url, github_url, linkedin_url } = parsed.data;
 
-  // Avatar upload — optional. Path is prefixed with the user's own id, which
-  // is what the storage RLS policy checks against.
-  let avatarUrl: string | undefined;
-  const avatarFile = formData.get("avatar") as File | null;
-  if (avatarFile && avatarFile.size > 0) {
-    if (avatarFile.size > MAX_IMAGE_BYTES) {
-      return { status: "error", message: "Avatar must be under 2MB." };
-    }
-    // The browser's word for the type and the file's name are not trusted: what
-    // is stored, and how it is served, follows the file's first bytes.
-    const kind = imageKind(new Uint8Array(await avatarFile.slice(0, 12).arrayBuffer()));
-    if (!kind) {
-      return { status: "error", message: "Avatar must be a JPEG, PNG, or WEBP file." };
-    }
-    const path = `${user.id}/avatar.${kind.ext}`;
-    const { error: uploadError } = await supabase.storage
-      .from("avatars")
-      .upload(path, avatarFile, { contentType: kind.type, upsert: true });
-    if (uploadError) {
-      return { status: "error", message: "Could not upload the avatar. Please try again." };
-    }
-    // Cache-bust so the new avatar shows immediately instead of a stale
-    // cached copy at the same URL.
-    avatarUrl = `${supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl}?t=${Date.now()}`;
-  }
+  // Admins decide these three for a Core member. Not knowing yet is the same as not changing them.
+  const { data: teams, error: teamsError } = await supabase.rpc("my_core_teams");
+  const visibility =
+    teamsError || (teams?.length ?? 0) > 0
+      ? {}
+      : {
+          is_profile_public: formData.get("is_profile_public") === "on",
+          is_contact_public: formData.get("is_contact_public") === "on",
+          show_on_core: formData.get("show_on_core") === "on",
+        };
 
-  // "Remove the current image": the photo leaves the profile, and any file of
-  // theirs leaves storage so the old address stops working.
-  const removeAvatar = !avatarUrl && formData.get("avatar__remove") === "on";
-  if (removeAvatar) {
-    const { data: files } = await supabase.storage.from("avatars").list(user.id);
-    if (files?.length) await supabase.storage.from("avatars").remove(files.map((f) => `${user.id}/${f.name}`));
-  }
-
-  const { error } = await supabase
+  // The words first, so that a photo that fails can't cost anyone what they wrote.
+  const { data: saved, error } = await supabase
     .from("profiles")
     .update({
       full_name,
       department: department || null,
       year: year || null,
       bio: bio || null,
-      skills: skills ? skills.split(",").map((s) => s.trim()).filter(Boolean) : [],
-      interests: interests ? interests.split(",").map((s) => s.trim()).filter(Boolean) : [],
+      skills: tagList(skills),
+      interests: tagList(interests),
       portfolio_url: portfolio_url || null,
       github_url: github_url || null,
       linkedin_url: linkedin_url || null,
-      is_profile_public: is_profile_public === "on",
-      is_contact_public: is_contact_public === "on",
-      show_on_core: show_on_core === "on",
-      ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
-      ...(removeAvatar ? { avatar_url: null } : {}),
+      ...visibility,
     })
-    .eq("id", user.id);
+    .eq("id", user.id)
+    .select("id");
 
-  if (error) {
-    return { status: "error", message: "Could not save your profile. Please try again." };
+  if (error) return { status: "error", message: "Couldn't save your profile. Please try again." };
+  if (!saved || saved.length === 0) return { status: "error", message: "Your profile wasn't saved: no changes reached it. Reload the page and try again." };
+
+  const problem = await savePhoto(supabase, user.id, formData);
+  touched();
+  if (problem) return { status: "partial", message: `Your profile was saved, but the photo couldn't be uploaded: ${problem} Choose the file again.` };
+  return { status: "success", message: `Profile saved at ${savedAt()}` };
+}
+
+/** Optional. The path starts with the user's own id, which the storage policy checks. Returns what went wrong. */
+async function savePhoto(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, formData: FormData): Promise<string | null> {
+  const file = formData.get("avatar");
+  if (file instanceof File && file.size > 0) {
+    if (file.size > MAX_IMAGE_BYTES) return "Photo is larger than 2 MB.";
+    // The browser's word for the type and the file's name are not trusted: what
+    // is stored, and how it is served, follows the file's first bytes.
+    const kind = imageKind(new Uint8Array(await file.slice(0, 12).arrayBuffer()));
+    if (!kind) return "This file isn't an image.";
+    const path = `${userId}/avatar.${kind.ext}`;
+    const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, { contentType: kind.type, upsert: true });
+    if (uploadError) return "Couldn't upload the photo, please try again.";
+    // Cache-bust so the new photo shows immediately instead of a stale copy at the same URL.
+    const url = `${supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl}?t=${Date.now()}`;
+    const { error } = await supabase.from("profiles").update({ avatar_url: url }).eq("id", userId);
+    return error ? "Couldn't upload the photo, please try again." : null;
   }
 
-  revalidatePath("/profile");
-  revalidatePath("/", "layout");
-  return { status: "success", message: "Profile updated." };
+  // "Remove the current image": the photo leaves the profile, and any file of
+  // theirs leaves storage so the old address stops working.
+  if (formData.get("avatar__remove") === "on") {
+    const { data: files } = await supabase.storage.from("avatars").list(userId);
+    if (files?.length) await supabase.storage.from("avatars").remove(files.map((f) => `${userId}/${f.name}`));
+    const { error } = await supabase.from("profiles").update({ avatar_url: null }).eq("id", userId);
+    return error ? "Couldn't remove the photo, please try again." : null;
+  }
+  return null;
 }

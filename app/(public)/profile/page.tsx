@@ -53,12 +53,9 @@ export default async function ProfilePage() {
               ? `Your card on the Core page is missing ${missing.join(", ")}. Add them below so it shows well.`
               : "Your profile is complete. Changes you save here show on the Core page straight away."}
           </p>
-          {profile && !profile.is_contact_public && (profile.linkedin_url || profile.github_url || profile.portfolio_url) && (
-            <p className="mt-2 text-sm text-ink/70">Your links stay off your card until you turn on &ldquo;Show my contact links&rdquo; below.</p>
-          )}
         </section>
       )}
-      {profile && <ProfileForm profile={profile} email={user.email ?? ""} />}
+      {profile && <ProfileForm profile={profile} email={user.email ?? ""} isCoreMember={teams.length > 0} />}
     </Section>
   );
 }

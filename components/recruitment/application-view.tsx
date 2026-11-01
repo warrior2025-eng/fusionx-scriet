@@ -15,6 +15,7 @@ import {
 } from "@/lib/recruitment/data";
 import type { createClient } from "@/lib/supabase/server";
 import { RUBRIC, rubricAverage, type RubricScores } from "@/lib/interview/shared";
+import { linkHref } from "@/lib/validation/link";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -75,7 +76,10 @@ export async function ApplicationView({
     ),
   );
   const resumeUrl = await signed(application.resume_path);
-  const links = Object.entries(application.links).filter(([, url]) => /^https?:\/\//i.test(url));
+  const links = Object.entries(application.links).flatMap(([key, url]) => {
+    const href = linkHref(url);
+    return href ? ([[key, href]] as [string, string][]) : [];
+  });
 
   const row = (label: React.ReactNode, value: React.ReactNode) => (
     <div className="grid gap-1 py-3 sm:grid-cols-3 sm:gap-4">

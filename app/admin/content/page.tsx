@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { resetContent, saveContent } from "@/actions/admin-content";
 import { ActionButton } from "@/components/admin/action-button";
-import { AdminForm, CheckboxField, TextField, TextareaField } from "@/components/admin/admin-form";
+import { AdminForm, CheckboxField, LinkField, TextField, TextareaField } from "@/components/admin/admin-form";
 import { RowsEditor } from "@/components/admin/rows-editor";
 import { AdminPage, Panel } from "@/components/admin/ui";
 import { requireCapability } from "@/lib/admin/guard";
@@ -73,9 +73,9 @@ export default async function ContentPage() {
             />
             <div className="grid gap-5 sm:grid-cols-2">
               <TextField name="primaryCta.label" label="Main button label" defaultValue={hero.primaryCta.label} />
-              <TextField name="primaryCta.href" label="Main button link" defaultValue={hero.primaryCta.href} />
+              <LinkField allowPath name="primaryCta.href" label="Main button link" defaultValue={hero.primaryCta.href} />
               <TextField name="secondaryCta.label" label="Second button label" defaultValue={hero.secondaryCta.label} />
-              <TextField name="secondaryCta.href" label="Second button link" defaultValue={hero.secondaryCta.href} />
+              <LinkField allowPath name="secondaryCta.href" label="Second button link" defaultValue={hero.secondaryCta.href} />
             </div>
           </AdminForm>
         </Panel>

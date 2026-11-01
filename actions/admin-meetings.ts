@@ -61,7 +61,7 @@ export async function saveMeeting(id: string | null, input: MeetingInput): Promi
   if (!ctx) return FORBIDDEN;
   if (id && !uuid.safeParse(id).success) return fail("That meeting no longer exists.");
   const parsed = saveSchema.safeParse(input);
-  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Please check the form.");
+  if (!parsed.success) return fail([...new Set(parsed.error.issues.map((issue) => issue.message))].join(" ") || "Please check the form.");
   const { data, error } = await ctx.supabase.rpc("meeting_save", { p_id: id, p: parsed.data });
   if (error) return fail(friendlyDbError(error.message, "Could not save the meeting."));
   const saved = data as { id: string; invited: number; moved?: boolean };
@@ -78,7 +78,7 @@ export async function startInstantMeeting(input: z.input<typeof instantSchema>):
   const ctx = await authorize("meetings");
   if (!ctx) return FORBIDDEN;
   const parsed = instantSchema.safeParse(input);
-  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Please check the form.");
+  if (!parsed.success) return fail([...new Set(parsed.error.issues.map((issue) => issue.message))].join(" ") || "Please check the form.");
   const { data, error } = await ctx.supabase.rpc("meeting_start_instant", { p: parsed.data });
   if (error) return fail(friendlyDbError(error.message, "Could not start the meeting."));
   const started = data as { id: string; invited: number };
