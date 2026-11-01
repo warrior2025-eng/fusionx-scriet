@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 
 const initialState: AuthActionState = { status: "idle" };
 
-export function SignUpForm({ next = "/" }: { next?: string }) {
+export function SignUpForm({ next = "/", email = "" }: { next?: string; email?: string }) {
   const [state, formAction, pending] = useActionState(signUpAction, initialState);
 
   return (
@@ -29,7 +29,7 @@ export function SignUpForm({ next = "/" }: { next?: string }) {
         </div>
         <div>
           <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" autoComplete="email" required />
+          <Input id="email" name="email" type="email" autoComplete="email" defaultValue={email} required />
           <FieldError>{state.fieldErrors?.email}</FieldError>
         </div>
         <div>

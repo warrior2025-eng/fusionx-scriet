@@ -34,7 +34,9 @@ export type FieldDef = {
     | "tags"
     /** One per line in the form, text[] in the database. */
     | "lines"
-    | "image";
+    | "image"
+    /** One website account, picked by name or email. Stored as its id. */
+    | "user";
   required?: boolean;
   max?: number;
   rows?: number;
@@ -84,7 +86,7 @@ export type EntityDef = {
   ownerColumn?: string;
   defaultSort: { column: string; ascending: boolean };
   /** Extra columns in the list, beside the title and status. */
-  listColumns: { label: string; value: (row: Row) => string }[];
+  listColumns: { label: string; value: (row: Row) => string; pill?: (row: Row) => "good" | "neutral" }[];
   fields: FieldDef[];
   publicPaths: string[];
   viewHref: (row: Row) => string;
@@ -132,7 +134,10 @@ export const ENTITIES = {
     orderable: true,
     group: { column: "category", labels: PERSON_CATEGORY_LABELS },
     defaultSort: { column: "display_order", ascending: true },
-    listColumns: [{ label: "Role", value: (r) => String(r.role_title ?? "") }],
+    listColumns: [
+      { label: "Role", value: (r) => String(r.role_title ?? "") },
+      { label: "Website account", value: (r) => (r.linked_profile_id ? "Linked" : "Not linked"), pill: (r) => (r.linked_profile_id ? "good" : "neutral") },
+    ],
     fields: [
       {
         name: "photo",
@@ -160,6 +165,13 @@ export const ENTITIES = {
       },
       { name: "about", label: "About", type: "textarea", max: 1200, rows: 6, counter: true },
       { name: "email", label: "Email (shown publicly if filled)", type: "email", half: true },
+      {
+        name: "linked_profile_id",
+        label: "Linked website account",
+        type: "user",
+        half: true,
+        hint: "Used for meeting passes. Without a link, their email is matched to an account.",
+      },
       { name: "linkedin_url", label: "LinkedIn", type: "url", half: true },
       { name: "github_url", label: "GitHub", type: "url", half: true },
       { name: "portfolio_url", label: "Portfolio", type: "url", half: true },
@@ -488,7 +500,10 @@ export const ENTITIES = {
     orderable: true,
     ownerColumn: "created_by",
     defaultSort: { column: "display_order", ascending: true },
-    listColumns: [{ label: "Role", value: (r) => String(r.role_title ?? "") }],
+    listColumns: [
+      { label: "Role", value: (r) => String(r.role_title ?? "") },
+      { label: "Website account", value: (r) => (r.linked_profile_id ? "Linked" : "Not linked"), pill: (r) => (r.linked_profile_id ? "good" : "neutral") },
+    ],
     fields: [
       { name: "name", label: "Name", type: "text", required: true, max: 120, half: true },
       { name: "role_title", label: "Role or title", type: "text", required: true, max: 160, half: true },
@@ -589,6 +604,8 @@ function fieldSchema(f: FieldDef): z.ZodType {
         .max(30, "Keep this to 30 items");
     case "image":
       return z.any();
+    case "user":
+      return z.string().refine((v) => v === "" || z.uuid().safeParse(v).success, "Choose someone from the list");
   }
 }
 

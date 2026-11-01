@@ -21,10 +21,14 @@ const audience = z
       z.object({ kind: z.literal("role"), id: z.enum(["admins", "reviewers"]) }),
       z.object({ kind: z.literal("team"), id: uuid }),
       z.object({ kind: z.literal("person"), id: uuid }),
+      z.object({ kind: z.literal("org_category"), id: z.enum(["founder", "faculty_guide", "senior_mentor", "core_team", "advisor"]) }),
     ]),
   )
-  .min(1, "Choose who the meeting is for")
-  .max(200, "That is too many entries");
+  .max(1000, "That is too many entries");
+
+const emails = z.array(z.string().trim().toLowerCase().pipe(z.email("Check the email addresses"))).max(200, "At most 200 email invites per meeting");
+const someone = (v: { audience: unknown[]; emails: unknown[] }) => v.audience.length + v.emails.length > 0;
+const SOMEONE = { message: "Choose who the meeting is for" };
 
 const saveSchema = z.object({
   title: z.string().trim().min(3, "Give the meeting a title").max(160, "Keep the title under 160 characters"),
@@ -32,6 +36,7 @@ const saveSchema = z.object({
   starts_at: z.string().datetime({ offset: true, message: "Choose the date and start time" }),
   duration_min: z.number().int().min(15, "The shortest meeting is 15 minutes").max(180, "The longest meeting is 180 minutes"),
   audience,
+  emails,
   cohosts: z.array(uuid).max(50),
   agenda: z.array(z.object({ title: z.string().trim().min(1, "Each agenda item needs a title").max(200), minutes: z.number().int().min(1).max(180).nullable() })).max(40),
   lobby_on: z.boolean(),
@@ -40,7 +45,7 @@ const saveSchema = z.object({
   screen_share_all: z.boolean(),
   chat_on: z.boolean(),
   repeat_weeks: z.number().int().min(1).max(26),
-});
+}).refine(someone, SOMEONE);
 
 export type MeetingInput = z.input<typeof saveSchema>;
 
@@ -61,10 +66,12 @@ export async function saveMeeting(id: string | null, input: MeetingInput): Promi
   if (error) return fail(friendlyDbError(error.message, "Could not save the meeting."));
   const saved = data as { id: string; invited: number; moved?: boolean };
   touched(saved.id);
-  return ok(id ? (saved.moved ? "Rescheduled. Everyone has been told." : "Meeting saved.") : `Meeting created. ${saved.invited} people have their pass.`, { redirectTo: "/admin/meetings" });
+  const { count } = await ctx.supabase.from("meeting_email_invites").select("id", { count: "exact", head: true }).eq("meeting_id", saved.id).is("accepted_user_id", null);
+  const byEmail = count ? `, and ${count} invited by email` : "";
+  return ok(id ? (saved.moved ? "Rescheduled. Everyone has been told." : "Meeting saved.") : `Meeting created. ${saved.invited} people have their pass${byEmail}.`, { redirectTo: "/admin/meetings" });
 }
 
-const instantSchema = z.object({ title: z.string().trim().min(3, "Give the meeting a title").max(160), audience });
+const instantSchema = z.object({ title: z.string().trim().min(3, "Give the meeting a title").max(160), audience, emails }).refine(someone, SOMEONE);
 
 /** Starts now: invitees get a ring. */
 export async function startInstantMeeting(input: z.input<typeof instantSchema>): Promise<ActionState> {
@@ -98,4 +105,37 @@ export async function searchMeetingPeople(q: string): Promise<{ results: Meeting
   const { data, error } = await ctx.supabase.rpc("admin_search_core_users", { p_group: "00000000-0000-0000-0000-000000000000", p_q: q.slice(0, 100) });
   if (error) return { results: [], error: "The search did not work. Please try again." };
   return { results: (data ?? []) as MeetingPerson[] };
+}
+
+/** Which addresses already have a confirmed account, as the admin types them. */
+export async function checkMeetingEmails(input: string[]): Promise<{ users: { email: string; user: { id: string; name: string } }[]; error?: string }> {
+  const ctx = await authorize("meetings");
+  if (!ctx) return { users: [], error: FORBIDDEN.message };
+  const parsed = emails.safeParse(input);
+  if (!parsed.success) return { users: [], error: parsed.error.issues[0]?.message };
+  const { data, error } = await ctx.supabase.rpc("meeting_resolve_emails", { p_emails: parsed.data });
+  if (error) return { users: [], error: "Could not check those addresses. They will still be checked when you save." };
+  return { users: ((data ?? []) as { email: string; id: string; name: string }[]).map((u) => ({ email: u.email, user: { id: u.id, name: u.name } })) };
+}
+
+export async function resendMeetingEmail(id: string): Promise<ActionState> {
+  const ctx = await authorize("meetings");
+  if (!ctx) return FORBIDDEN;
+  if (!uuid.safeParse(id).success) return fail("That invite no longer exists.");
+  const { error } = await ctx.supabase.rpc("meeting_email_resend", { p_id: id });
+  if (error) return fail(friendlyDbError(error.message, "Could not resend it."));
+  touched();
+  revalidatePath("/admin/meetings/[id]", "page");
+  return ok("Sent again.");
+}
+
+export async function removeMeetingEmail(id: string): Promise<ActionState> {
+  const ctx = await authorize("meetings");
+  if (!ctx) return FORBIDDEN;
+  if (!uuid.safeParse(id).success) return fail("That invite no longer exists.");
+  const { error } = await ctx.supabase.rpc("meeting_email_remove", { p_id: id });
+  if (error) return fail(friendlyDbError(error.message, "Could not remove it."));
+  touched();
+  revalidatePath("/admin/meetings/[id]", "page");
+  return ok("Removed.");
 }

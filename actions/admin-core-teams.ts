@@ -142,6 +142,14 @@ export async function searchCoreUsers(groupId: string, q: string): Promise<{ res
   return { results: (data ?? []) as CoreUserHit[] };
 }
 
+/** The name of a linked account, for the person form in Website sections. */
+export async function coreUserName(id: string): Promise<string | null> {
+  const ctx = await authorize("team");
+  if (!ctx || !uuid.safeParse(id).success) return null;
+  const { data } = await ctx.supabase.from("profiles").select("full_name").eq("id", id).maybeSingle();
+  return (data?.full_name as string | undefined) ?? null;
+}
+
 export type CoreCandidate = {
   user_id: string;
   full_name: string;

@@ -3,13 +3,13 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp, Plus, Trash2, X, Zap } from "lucide-react";
-import { saveMeeting, searchMeetingPeople, startInstantMeeting, type MeetingInput, type MeetingPerson } from "@/actions/admin-meetings";
+import { saveMeeting, startInstantMeeting } from "@/actions/admin-meetings";
 import { Button } from "@/components/ui/button";
-import { FieldHint, Input, Label, Select, Textarea } from "@/components/ui/field";
+import { Input, Label, Select, Textarea } from "@/components/ui/field";
+import { AudiencePicker, PersonSearch, chip, type Audience, type Choices, type EmailEntry, type Person } from "./meeting-audience";
 import { toastResult } from "./toast";
 
-type Audience = MeetingInput["audience"][number];
-export type Choices = { groups: { id: string; name: string; kind: string }[]; teams: { id: string; name: string }[] };
+export type { Choices } from "./meeting-audience";
 export type MeetingDraft = {
   id: string;
   title: string;
@@ -24,138 +24,8 @@ export type MeetingDraft = {
   audience: { kind: Audience["kind"]; id: string; label: string | null }[];
   cohosts: { id: string; name: string }[];
   agenda: { title: string; minutes: number | null }[];
+  emails: { id: string; email: string; source: "manual" | "group"; can_resend: boolean; user_id: string | null; name: string | null; status: "waiting" | "pass" | "joined" }[];
 };
-
-type Person = { id: string; name: string };
-
-/** Name or email, as you type; the admin never types anything about the person. */
-function PersonSearch({ placeholder, onPick, exclude }: { placeholder: string; onPick: (p: Person) => void; exclude: string[] }) {
-  const [q, setQ] = useState("");
-  const [results, setResults] = useState<MeetingPerson[] | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latest = useRef(0);
-  const change = (next: string) => {
-    setQ(next);
-    if (timer.current) clearTimeout(timer.current);
-    const ask = ++latest.current;
-    if (next.trim().length < 2) return setResults(null);
-    timer.current = setTimeout(async () => {
-      const found = await searchMeetingPeople(next.trim());
-      if (ask === latest.current) setResults(found.results);
-    }, 300);
-  };
-  const shown = results?.filter((r) => !exclude.includes(r.id)) ?? null;
-  return (
-    <div className="relative">
-      <Input type="search" value={q} onChange={(e) => change(e.target.value)} placeholder={placeholder} aria-label={placeholder} autoComplete="off" />
-      {shown && (
-        <ul className="absolute inset-x-0 top-full z-20 max-h-56 overflow-y-auto border border-line bg-paper shadow-lg">
-          {shown.length === 0 && <li className="px-3 py-2 text-sm text-ink/70">Not found. Ask them to sign up at fxscriet.com first.</li>}
-          {shown.map((r) => (
-            <li key={r.id}>
-              <button
-                type="button"
-                className="block w-full px-3 py-2 text-left text-sm hover:bg-ink/5"
-                onClick={() => {
-                  onPick({ id: r.id, name: r.full_name });
-                  setQ("");
-                  setResults(null);
-                }}
-              >
-                <span className="font-medium text-ink">{r.full_name}</span>
-                <span className="block text-xs text-ink/65">{r.email}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-const chip = "inline-flex items-center gap-1.5 border border-line bg-paper px-2 py-1 text-sm text-ink";
-
-function AudiencePicker({ value, onChange, choices, people, setPeople }: { value: Audience[]; onChange: (next: Audience[]) => void; choices: Choices; people: Person[]; setPeople: (next: Person[]) => void }) {
-  const has = (kind: Audience["kind"], id: string) => value.some((a) => a.kind === kind && a.id === id);
-  const toggle = (item: Audience) => onChange(has(item.kind, item.id) ? value.filter((a) => !(a.kind === item.kind && a.id === item.id)) : [...value, item]);
-  const check = (item: Audience, label: string) => (
-    <label key={`${item.kind}-${item.id}`} className="flex items-center gap-2 text-sm text-ink">
-      <input type="checkbox" checked={has(item.kind, item.id)} onChange={() => toggle(item)} className="h-4 w-4 accent-accent" />
-      {label}
-    </label>
-  );
-  const teams = value.filter((a) => a.kind === "team");
-  return (
-    <fieldset className="space-y-3">
-      <legend className="text-sm font-medium text-ink">Who is it for</legend>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {choices.groups.map((g) => check({ kind: "core_group", id: g.id }, g.name))}
-        {check({ kind: "role", id: "admins" }, "All admins")}
-        {check({ kind: "role", id: "reviewers" }, "All reviewers")}
-      </div>
-      {choices.teams.length > 0 && (
-        <div>
-          <Label htmlFor="meeting-team">A FusionX Teams team</Label>
-          <Select
-            id="meeting-team"
-            value=""
-            onChange={(e) => {
-              if (e.target.value) toggle({ kind: "team", id: e.target.value });
-            }}
-          >
-            <option value="">Add a team…</option>
-            {choices.teams
-              .filter((t) => !has("team", t.id))
-              .map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-          </Select>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {teams.map((t) => (
-              <span key={t.id} className={chip}>
-                {choices.teams.find((c) => c.id === t.id)?.name ?? "Team"}
-                <button type="button" aria-label="Remove this team" onClick={() => toggle(t)}>
-                  <X size={13} aria-hidden />
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-      <div>
-        <p className="mb-1.5 text-sm font-medium text-ink">Specific people</p>
-        <PersonSearch
-          placeholder="Search people by name or email"
-          exclude={people.map((p) => p.id)}
-          onPick={(p) => {
-            setPeople([...people, p]);
-            onChange([...value, { kind: "person", id: p.id }]);
-          }}
-        />
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {people.map((p) => (
-            <span key={p.id} className={chip}>
-              {p.name}
-              <button
-                type="button"
-                aria-label={`Remove ${p.name}`}
-                onClick={() => {
-                  setPeople(people.filter((x) => x.id !== p.id));
-                  onChange(value.filter((a) => !(a.kind === "person" && a.id === p.id)));
-                }}
-              >
-                <X size={13} aria-hidden />
-              </button>
-            </span>
-          ))}
-        </div>
-      </div>
-      <FieldHint>Every admin always gets a pass too. Leads of a chosen team become co-hosts by themselves.</FieldHint>
-    </fieldset>
-  );
-}
 
 const istDate = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 const istClock = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" });
@@ -171,7 +41,13 @@ export function MeetingForm({ meeting, choices, preselectTeam }: { meeting?: Mee
   const [audience, setAudience] = useState<Audience[]>(
     meeting ? meeting.audience.map((a) => ({ kind: a.kind, id: a.id }) as Audience) : preselectTeam ? [{ kind: "core_group", id: preselectTeam }] : [],
   );
-  const [people, setPeople] = useState<Person[]>(meeting?.audience.filter((a) => a.kind === "person").map((a) => ({ id: a.id, name: a.label ?? "Person" })) ?? []);
+  const [people, setPeople] = useState<Person[]>(() => {
+    // Someone ticked inside a group shows there; only the others are listed by name.
+    const inGroups = new Set(choices.groups.flatMap((g) => g.members.map((m) => m.user_id)));
+    return meeting?.audience.filter((a) => a.kind === "person" && !inGroups.has(a.id)).map((a) => ({ id: a.id, name: a.label ?? "Person" })) ?? [];
+  });
+  const [emails, setEmails] = useState<EmailEntry[]>(meeting?.emails?.filter((e) => e.source === "manual" && !e.user_id).map((e) => ({ email: e.email })) ?? []);
+  const accepted = meeting?.emails?.flatMap((e) => (e.user_id ? [{ id: e.user_id, name: e.name ?? e.email }] : [])) ?? [];
   const [cohosts, setCohosts] = useState<Person[]>(meeting?.cohosts ?? []);
   const [agenda, setAgenda] = useState(meeting?.agenda.map((a) => ({ title: a.title, minutes: a.minutes ? String(a.minutes) : "" })) ?? []);
   const [lobby, setLobby] = useState(meeting?.lobby_on ?? false);
@@ -202,6 +78,7 @@ export function MeetingForm({ meeting, choices, preselectTeam }: { meeting?: Mee
         starts_at: `${date}T${time}:00+05:30`,
         duration_min: Number(duration),
         audience,
+        emails: emails.map((e) => e.email),
         cohosts: cohosts.map((c) => c.id),
         agenda: agenda.filter((a) => a.title.trim()).map((a) => ({ title: a.title, minutes: a.minutes ? Number(a.minutes) : null })),
         lobby_on: lobby,
@@ -249,7 +126,7 @@ export function MeetingForm({ meeting, choices, preselectTeam }: { meeting?: Mee
         </div>
       </div>
 
-      <AudiencePicker value={audience} onChange={setAudience} choices={choices} people={people} setPeople={setPeople} />
+      <AudiencePicker value={audience} onChange={setAudience} emails={emails} setEmails={setEmails} choices={choices} people={people} setPeople={setPeople} alsoInvited={[...cohosts, ...accepted]} />
 
       <div>
         <p className="mb-1.5 text-sm font-medium text-ink">Co-hosts (optional)</p>
@@ -353,12 +230,13 @@ export function InstantMeetingButton({ choices }: { choices: Choices }) {
   const [title, setTitle] = useState("");
   const [audience, setAudience] = useState<Audience[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
+  const [emails, setEmails] = useState<EmailEntry[]>([]);
   const [problem, setProblem] = useState("");
   const [pending, startTransition] = useTransition();
   const start = () => {
     setProblem("");
     startTransition(async () => {
-      const result = await startInstantMeeting({ title, audience });
+      const result = await startInstantMeeting({ title, audience, emails: emails.map((e) => e.email) });
       toastResult(result);
       if (result.status !== "success") return setProblem(result.message ?? "Please check the form.");
       dialogRef.current?.close();
@@ -378,7 +256,7 @@ export function InstantMeetingButton({ choices }: { choices: Choices }) {
             <Label htmlFor="instant-title">Title</Label>
             <Input id="instant-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={160} autoComplete="off" />
           </div>
-          <AudiencePicker value={audience} onChange={setAudience} choices={choices} people={people} setPeople={setPeople} />
+          <AudiencePicker value={audience} onChange={setAudience} emails={emails} setEmails={setEmails} choices={choices} people={people} setPeople={setPeople} />
           {problem && (
             <p role="alert" className="text-sm text-red-600">
               {problem}

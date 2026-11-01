@@ -25,6 +25,8 @@ type Row = {
   invitees: number;
   attendees: number;
   inside: number;
+  emails: number;
+  emails_waiting: number;
   chips: string[];
 };
 
@@ -125,7 +127,14 @@ export default async function MeetingsAdminPage({ searchParams }: { searchParams
                   </div>
                 </Td>
                 <Td>{m.host ?? ""}</Td>
-                <Td className="tabular-nums">{m.invitees}</Td>
+                <Td className="tabular-nums">
+                  {m.invitees}
+                  {m.emails > 0 && (
+                    <Link href={`/admin/meetings/${m.id}`} className="block whitespace-nowrap text-xs text-ink/65 underline underline-offset-2 hover:text-ink">
+                      {m.emails_waiting > 0 ? `+${m.emails_waiting} by email` : "Email invites"}
+                    </Link>
+                  )}
+                </Td>
                 <Td className="tabular-nums">{m.attendees}</Td>
                 <Td className="whitespace-nowrap text-right">
                   <div className="flex flex-wrap justify-end gap-2">
