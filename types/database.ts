@@ -57,6 +57,8 @@ export interface OrganizationSettings {
   instagram_url: string | null;
   linkedin_url: string | null;
   github_url: string | null;
+  /** Added by migration 0036. */
+  whatsapp_url: string | null;
   announcement_banner: string | null;
   announcement_banner_active: boolean;
   // Added by migration 0008. Until it has run these come from the fallback

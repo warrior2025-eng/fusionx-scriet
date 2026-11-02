@@ -66,6 +66,7 @@ const identitySchema = z.object({
   instagram_url: linkField("Instagram", "instagram"),
   linkedin_url: linkField("LinkedIn", "linkedin"),
   github_url: linkField("GitHub", "github"),
+  whatsapp_url: linkField("WhatsApp community link", "whatsapp_group", { siteOnly: true }),
   institutional_approval: z.enum(["faculty_guide_confirmed", "director_review_pending", "officially_approved"]),
 });
 
@@ -91,6 +92,7 @@ export async function saveIdentity(_prev: ActionState, formData: FormData): Prom
     instagram_url: nullable(parsed.data.instagram_url),
     linkedin_url: nullable(parsed.data.linkedin_url),
     github_url: nullable(parsed.data.github_url),
+    whatsapp_url: nullable(parsed.data.whatsapp_url),
   };
 
   const uploaded: string[] = [];

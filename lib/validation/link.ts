@@ -194,8 +194,8 @@ export function normalizeLink(input: string | null | undefined, kind: LinkKind =
   return { ok: true, value, hint: other ? `This looks like a ${other} link. Is that right?` : `This doesn't look like a ${expected} link. Is that right?` };
 }
 
-/** A Zod string that comes out as the fixed link. Reports only real problems. */
-export function linkField(label: string, kind: LinkKind = "any", options: { required?: boolean; allowPath?: boolean; allowMailto?: boolean; max?: number } = {}) {
+/** A Zod string that comes out as the fixed link. Reports only real problems, and, with siteOnly, a link from another site. */
+export function linkField(label: string, kind: LinkKind = "any", options: { required?: boolean; allowPath?: boolean; allowMailto?: boolean; max?: number; siteOnly?: boolean } = {}) {
   const max = options.max ?? 500;
   return z.string().transform((value, ctx) => {
     const result = normalizeLink(value, kind, { label, allowPath: options.allowPath, allowMailto: options.allowMailto });
@@ -209,6 +209,10 @@ export function linkField(label: string, kind: LinkKind = "any", options: { requ
     }
     if (result.value.length > max) {
       ctx.addIssue({ code: "custom", message: `${label} is too long (max ${max} characters).` });
+      return z.NEVER;
+    }
+    if (options.siteOnly && result.value && result.hint) {
+      ctx.addIssue({ code: "custom", message: `${label} must be a ${SITE_NAMES[kind]} link. Example: ${EXAMPLES[kind]}` });
       return z.NEVER;
     }
     return result.value;

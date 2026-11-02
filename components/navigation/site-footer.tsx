@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { OrganizationSettings } from "@/types/database";
 import { Mail } from "lucide-react";
-import { InstagramIcon, LinkedInIcon } from "@/components/ui/brand-icons";
+import { InstagramIcon, LinkedInIcon, WhatsAppIcon } from "@/components/ui/brand-icons";
 import { institution, socialLinks } from "@/lib/site-config";
 
 type FooterColumn = { heading: string; links: { href: string; label: string }[] };
@@ -15,6 +15,7 @@ export function SiteFooter({ settings, columns }: { settings: OrganizationSettin
   const connect = [
     { href: linkHref(settings.instagram_url, "instagram") || socialLinks.instagram, label: `${name} on Instagram`, icon: <InstagramIcon />, external: true },
     { href: linkHref(settings.linkedin_url, "linkedin") || socialLinks.linkedin, label: `${name} on LinkedIn`, icon: <LinkedInIcon />, external: true },
+    { href: linkHref(settings.whatsapp_url, "whatsapp_group") || socialLinks.whatsapp, label: `Join ${settings.org_name} on WhatsApp`, icon: <WhatsAppIcon />, external: true },
     { href: `mailto:${email}`, label: `Email ${name}`, icon: <Mail size={20} aria-hidden />, external: false },
   ];
 
