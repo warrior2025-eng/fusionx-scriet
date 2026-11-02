@@ -20,6 +20,7 @@ const FALLBACK_SETTINGS: OrganizationSettings = {
   instagram_url: null,
   linkedin_url: null,
   github_url: null,
+  whatsapp_url: null,
   announcement_banner: null,
   announcement_banner_active: false,
   subtitle: "Student Innovation & Research Network",

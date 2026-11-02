@@ -21,6 +21,7 @@ export const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://fxscriet.co
 export const socialLinks = {
   instagram: "https://www.instagram.com/fx.scriet/",
   linkedin: "https://www.linkedin.com/company/fxscriet",
+  whatsapp: "https://chat.whatsapp.com/K1O56mt1uzV2whuK3MhI8O",
   email: "network@fxscriet.com",
 } as const;
 

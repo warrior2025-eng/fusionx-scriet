@@ -10,6 +10,7 @@ import { AdminPage, Panel } from "@/components/admin/ui";
 import { requireCapability } from "@/lib/admin/guard";
 import { getOrganizationSettings } from "@/lib/data/organization";
 import { emailStatus } from "@/lib/email/outbox";
+import { socialLinks } from "@/lib/site-config";
 
 export const metadata: Metadata = { title: "Admin: Settings" };
 
@@ -86,6 +87,13 @@ export default async function SettingsPage() {
               />
               <LinkField kind="instagram" name="instagram_url" label="Instagram (optional)" defaultValue={settings.instagram_url ?? ""} />
               <LinkField kind="linkedin" name="linkedin_url" label="LinkedIn (optional)" defaultValue={settings.linkedin_url ?? ""} />
+              <LinkField
+                kind="whatsapp_group"
+                name="whatsapp_url"
+                label="WhatsApp community link (optional)"
+                hint={`Empty uses ${socialLinks.whatsapp}`}
+                defaultValue={settings.whatsapp_url ?? ""}
+              />
               <LinkField kind="github" name="github_url" label="GitHub (optional)" defaultValue={settings.github_url ?? ""} />
             </div>
           </AdminForm>
