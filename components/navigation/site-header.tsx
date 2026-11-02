@@ -285,20 +285,6 @@ export function SiteHeader({
       <div className="container-fx flex h-16 max-w-[90rem]! items-center gap-4">
         {/* Logos & Brand */}
         <div className="mr-4 flex shrink-0 items-center gap-2.5 sm:gap-3">
-          {/* College Official Logo */}
-          <Link href="/" className="flex items-center shrink-0" aria-label="CCSU Meerut">
-            <Image
-              src="/ccsu-logo.webp"
-              alt="Chaudhary Charan Singh University, Meerut"
-              width={34}
-              height={34}
-              className="h-8 w-auto object-contain shrink-0"
-            />
-          </Link>
-
-          {/* Elegant Divider */}
-          <span className="h-6 w-px bg-ink/20" aria-hidden />
-
           {/* FusionX Official Logo & Name */}
           <Link href="/" className="flex items-center gap-2.5 group" onClick={() => setOpen(false)}>
             <Image
