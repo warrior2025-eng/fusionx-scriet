@@ -728,7 +728,11 @@ select[aria-invalid="true"] {
 .ai-tile {
   clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
 }
-.ai-launcher { color: var(--color-accent); filter: drop-shadow(0 0 10px color-mix(in srgb, #004df6 45%, transparent)); }
+.ai-launcher { color: #3b7bff; filter: drop-shadow(0 0 6px color-mix(in srgb, #3b7bff 80%, transparent)) drop-shadow(0 0 18px color-mix(in srgb, #004df6 70%, transparent)); }
+/* A soft blue light behind the tile that breathes, so the launcher is easy to notice. */
+.ai-halo { position: absolute; inset: -8px; border-radius: 9999px; pointer-events: none; background: radial-gradient(circle, color-mix(in srgb, #3b7bff 65%, transparent) 0%, color-mix(in srgb, #004df6 30%, transparent) 45%, transparent 70%); animation: ai-breathe 2.4s ease-in-out infinite; }
+.ai-launcher:hover .ai-halo { animation-duration: 1.2s; }
+@keyframes ai-breathe { 0%, 100% { opacity: 0.55; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.18); } }
 .ai-launcher:focus-visible .ai-tile { outline: 2px solid var(--color-accent); outline-offset: 3px; }
 .ai-launcher:focus-visible { filter: drop-shadow(0 0 0 transparent); }
 .ai-launcher:focus-visible::after { content: ""; position: absolute; inset: -4px; border: 2px solid var(--color-accent); border-radius: 9999px; }
@@ -744,5 +748,6 @@ select[aria-invalid="true"] {
 .ai-typing span:nth-child(3) { animation-delay: 0.3s; }
 @keyframes ai-dot { 0%, 80%, 100% { opacity: 0.25; transform: none; } 40% { opacity: 0.9; transform: translateY(-3px); } }
 @media (prefers-reduced-motion: reduce) {
-  .ai-ring, .ai-tag, .ai-typing span { animation: none; }
+  .ai-ring, .ai-tag, .ai-typing span, .ai-halo { animation: none; }
+  .ai-halo { opacity: 0.85; }
 }
