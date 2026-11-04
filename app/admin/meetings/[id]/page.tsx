@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { removeMeetingEmail, resendMeetingEmail } from "@/actions/admin-meetings";
+import { endMeeting, removeMeetingEmail, resendMeetingEmail } from "@/actions/admin-meetings";
 import { ActionButton } from "@/components/admin/action-button";
 import { MeetingForm, type MeetingDraft } from "@/components/admin/meeting-form";
 import { AdminPage, Panel, Pill } from "@/components/admin/ui";
@@ -65,15 +65,33 @@ export default async function EditMeetingPage({ params }: { params: Promise<{ id
   const meeting = data as MeetingDraft & { phase: string; invitees: number; started_at: string | null };
   const over = meeting.phase === "ended" || meeting.phase === "cancelled";
   const editable = !meeting.started_at && !over;
+  const live = meeting.phase === "live" || meeting.phase === "doors";
   const emails = meeting.emails ?? [];
-  // A meeting that has started can't be edited, but its email invites can still be seen.
-  if (!editable && emails.length === 0) redirect("/admin/meetings");
+  // A meeting that has started can't be edited, but it can be ended and its email invites can still be seen.
+  if (!editable && !live && emails.length === 0) redirect("/admin/meetings");
+  const m = { id, title: meeting.title };
   return (
     <AdminPage
       title={meeting.title}
       description={editable ? `${meeting.invitees} people have a pass. Changing the time tells everyone, and their passes update.` : `${meeting.invitees} people have a pass.`}
       crumbs={[{ label: "Meetings", href: "/admin/meetings" }, { label: editable ? "Edit" : "Email invites" }]}
     >
+      {live && (
+        <div className="mb-6">
+          <Panel>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-ink">{meeting.phase === "live" ? "This meeting is live." : "Doors are open for this meeting."} You can end it for everyone without entering the room.</p>
+              <ActionButton
+                danger
+                action={endMeeting.bind(null, m.id)}
+                confirm={{ title: `End '${m.title}' for everyone?`, body: "Everyone in the room leaves now and every pass shows it as ended. The minutes stay available.", confirmLabel: "End meeting" }}
+              >
+                End meeting
+              </ActionButton>
+            </div>
+          </Panel>
+        </div>
+      )}
       {editable && (
         <Panel>
           <MeetingForm meeting={meeting} choices={choices} />

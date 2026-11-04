@@ -16,6 +16,8 @@ export type RoomApi = {
   meetingId: string;
   state: RoomState;
   live: LiveInfo;
+  /** Who reacted in the last few seconds, by identity: shown next to their name. */
+  reactions: Record<string, string>;
   host: (action: string, args?: Record<string, unknown>) => Promise<string | null>;
   /** A host action, with the reason shown if it is refused. */
   act: (action: string, args?: Record<string, unknown>) => void;
@@ -105,6 +107,11 @@ function PersonRow({ person, api, handOrder }: { person: RoomPerson; api: RoomAp
         <p className="flex flex-wrap items-center gap-1.5 font-medium text-ink">
           <span className="truncate">{person.name}</span>
           {self && <span className="text-xs font-normal text-ink/60">(you)</span>}
+          {api.reactions[person.id] && (
+            <span className="text-base leading-none" data-person-reaction={api.reactions[person.id]} aria-hidden>
+              {api.reactions[person.id]}
+            </span>
+          )}
           {badge && <Badge tone="accent">{badge}</Badge>}
           {person.seat.lead && <Badge>Lead</Badge>}
         </p>
