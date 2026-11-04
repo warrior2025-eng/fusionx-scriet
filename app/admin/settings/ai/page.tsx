@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { refreshAiKnowledge, saveAiSettings } from "@/actions/admin-ai";
+import { refreshAiKnowledge, saveAiSettings, testAiConnection } from "@/actions/admin-ai";
 import { ActionButton } from "@/components/admin/action-button";
 import { AdminForm, CheckboxField, TextField, TextareaField } from "@/components/admin/admin-form";
 import { AdminPage, Panel, Pill } from "@/components/admin/ui";
 import { requireCapability } from "@/lib/admin/guard";
 import { buildKnowledge } from "@/lib/ai/knowledge";
-import { AI_MODEL, aiConfigured, type AiSettings } from "@/lib/ai/settings";
+import { GEMINI_MODELS, aiConfigured, type AiSettings } from "@/lib/ai/settings";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Admin: FusionX AI" };
@@ -56,12 +56,17 @@ export default async function AiSettingsPage({ searchParams }: { searchParams: P
               Groq fallback: {process.env.GROQ_API_KEY ? <Pill tone="good">Set</Pill> : <Pill>Not set (optional)</Pill>}
             </li>
             <li>
-              Model: <code className="text-xs">{AI_MODEL}</code>
+              Models, tried in turn: <code className="text-xs">{GEMINI_MODELS.join(", ")}</code>
             </li>
             <li>
               On public pages: {settings.enabled && configured ? <Pill tone="good">Showing</Pill> : <Pill>Hidden</Pill>}
             </li>
           </ul>
+          <div className="mt-4">
+            <ActionButton action={testAiConnection} disabled={!configured}>
+              Test the connection
+            </ActionButton>
+          </div>
         </Panel>
 
         <Panel title="Settings">

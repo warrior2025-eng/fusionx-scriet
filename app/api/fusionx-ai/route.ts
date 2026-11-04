@@ -70,7 +70,7 @@ export async function POST(request: Request) {
   const fallback = (outcome: Outcome) => {
     const faq = faqAnswer(message, pack.sections);
     log(faq ? "fallback" : "resting");
-    return textResponse(faq ? `${faq}\n\n_${RESTING}_` : RESTING, faq ? "fallback" : outcome);
+    return textResponse(faq ? `${faq}\n\n${RESTING}` : RESTING, faq ? "fallback" : outcome);
   };
   if (!allowed) return fallback("resting");
 
