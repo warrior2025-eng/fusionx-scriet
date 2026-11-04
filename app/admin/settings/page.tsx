@@ -35,9 +35,14 @@ export default async function SettingsPage() {
       description="Site identity, the announcement banner and registration. Changes go live as soon as they are saved."
       crumbs={[{ label: "Settings" }]}
       actions={
-        <Link href="/admin/settings/site" className="text-sm font-medium text-ink underline underline-offset-2">
-          Footer and SEO
-        </Link>
+        <span className="flex flex-wrap gap-4">
+          <Link href="/admin/settings/ai" className="text-sm font-medium text-ink underline underline-offset-2">
+            FusionX AI
+          </Link>
+          <Link href="/admin/settings/site" className="text-sm font-medium text-ink underline underline-offset-2">
+            Footer and SEO
+          </Link>
+        </span>
       }
     >
       <div className="space-y-6">
