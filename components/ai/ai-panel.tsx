@@ -162,6 +162,7 @@ export default function AiPanel({ welcome, suggestions, allowed, onClose }: AiLa
             <h2 id="fx-ai-title" className="flex items-center gap-1.5 font-semibold leading-tight text-ink">
               FusionX AI <SlashMark className="text-[0.8em]" />
             </h2>
+            <p className="text-xs text-ink/65">Your guide to everything FusionX</p>
           </div>
           <button type="button" onClick={close} aria-label="Close FusionX AI" className="rounded-sm p-1.5 text-ink/70 hover:bg-ink/5 hover:text-ink">
             <X size={18} aria-hidden />
