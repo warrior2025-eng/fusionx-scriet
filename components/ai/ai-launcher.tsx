@@ -78,16 +78,22 @@ export function AiLauncher(props: AiLauncherProps) {
             }}
             aria-label="Ask FusionX AI"
             aria-haspopup="dialog"
-            className="ai-launcher group relative grid h-14 w-14 place-items-center focus-visible:outline-none"
+            className="ai-launcher group relative grid h-[4.5rem] w-[4.5rem] place-items-center focus-visible:outline-none"
           >
             <span className="ai-halo" aria-hidden />
             <svg className="ai-ring pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 56 56" aria-hidden>
-              <circle cx="28" cy="28" r="26.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 5" />
+              <circle cx="28" cy="28" r="26.5" fill="none" stroke="currentColor" strokeWidth="1.2" strokeDasharray="3 5" />
               <circle cx="28" cy="1.5" r="1.6" fill="currentColor" />
             </svg>
-            <span className="ai-tile relative grid h-10 w-10 place-items-center bg-[#00030D] text-white">
-              {/* eslint-disable-next-line @next/next/no-img-element -- the small logo mark, already cached by the header */}
-              <img src="/logo-mark.png" alt="" width={24} height={24} className="h-6 w-6" />
+            {/* A light runs around the tile's cut-corner edge. */}
+            <span className="ai-edge relative grid h-[3.25rem] w-[3.25rem] place-items-center">
+              <span className="ai-tile grid h-12 w-12 place-items-center bg-[#00030D] text-white">
+                {/* eslint-disable-next-line @next/next/no-img-element -- the small logo mark, already cached by the header */}
+                <img src="/logo-mark.png" alt="" width={32} height={32} className="h-8 w-8" />
+              </span>
+            </span>
+            <span className="ai-badge" aria-hidden>
+              AI
             </span>
           </button>
         </div>
