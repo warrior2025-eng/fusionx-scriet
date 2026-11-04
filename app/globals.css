@@ -733,6 +733,23 @@ select[aria-invalid="true"] {
 .ai-halo { position: absolute; inset: -8px; border-radius: 9999px; pointer-events: none; background: radial-gradient(circle, color-mix(in srgb, #3b7bff 65%, transparent) 0%, color-mix(in srgb, #004df6 30%, transparent) 45%, transparent 70%); animation: ai-breathe 2.4s ease-in-out infinite; }
 .ai-launcher:hover .ai-halo { animation-duration: 1.2s; }
 @keyframes ai-breathe { 0%, 100% { opacity: 0.55; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.18); } }
+/* The tile's edge: a comet of light that runs around the cut corners. */
+@property --ai-a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.ai-edge {
+  clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 11px 100%, 0 calc(100% - 11px));
+  background: conic-gradient(from var(--ai-a), #0a2a8a 0deg, #004df6 160deg, #3b7bff 250deg, #7dd3fc 310deg, #ffffff 340deg, #0a2a8a 360deg);
+  animation: ai-edge-run 2.8s linear infinite;
+}
+.ai-edge .ai-tile { clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
+.ai-launcher:hover .ai-edge { animation-duration: 1.4s; }
+@keyframes ai-edge-run { to { --ai-a: 360deg; } }
+/* A small "AI" mark on the corner. */
+.ai-badge {
+  position: absolute; top: 1px; right: -2px; padding: 3px 5px; font-size: 10px; font-weight: 700; line-height: 1; letter-spacing: 0.05em;
+  color: #fff; background: #004df6; border: 1px solid #7dd3fc;
+  clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px));
+  filter: drop-shadow(0 0 4px #3b7bff);
+}
 .ai-launcher:focus-visible .ai-tile { outline: 2px solid var(--color-accent); outline-offset: 3px; }
 .ai-launcher:focus-visible { filter: drop-shadow(0 0 0 transparent); }
 .ai-launcher:focus-visible::after { content: ""; position: absolute; inset: -4px; border: 2px solid var(--color-accent); border-radius: 9999px; }
@@ -748,6 +765,6 @@ select[aria-invalid="true"] {
 .ai-typing span:nth-child(3) { animation-delay: 0.3s; }
 @keyframes ai-dot { 0%, 80%, 100% { opacity: 0.25; transform: none; } 40% { opacity: 0.9; transform: translateY(-3px); } }
 @media (prefers-reduced-motion: reduce) {
-  .ai-ring, .ai-tag, .ai-typing span, .ai-halo { animation: none; }
+  .ai-ring, .ai-tag, .ai-typing span, .ai-halo, .ai-edge { animation: none; }
   .ai-halo { opacity: 0.85; }
 }
