@@ -5,6 +5,8 @@ import { z } from "zod";
 import { fail, ok, type ActionState } from "@/lib/admin/action-state";
 import { authorize, FORBIDDEN } from "@/lib/admin/guard";
 import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
+import { roomConfigured } from "@/lib/interview/livekit";
+import { endRoom } from "@/lib/meetings/livekit";
 import { friendlyDbError } from "@/lib/recruitment/shared";
 
 /**
@@ -94,6 +96,25 @@ export async function cancelMeeting(id: string): Promise<ActionState> {
   if (error) return fail(friendlyDbError(error.message, "Could not cancel the meeting."));
   touched(id);
   return ok("Meeting cancelled. Everyone has been told.", { redirectTo: "/admin/meetings" });
+}
+
+/**
+ * Ends a live meeting (or one with its doors open) for everyone without entering the room:
+ * the same path as "End meeting for all" there. The database checks the host right, ends it
+ * and writes the audit entry; then everyone is taken out of the call.
+ */
+export async function endMeeting(id: string): Promise<ActionState> {
+  const ctx = await authorize("meetings");
+  if (!ctx) return FORBIDDEN;
+  if (!uuid.safeParse(id).success) return fail("That meeting no longer exists.");
+  const { data: detail } = await ctx.supabase.rpc("admin_meeting_detail", { p_meeting: id });
+  const phase = (detail as { phase?: string } | null)?.phase;
+  if (phase !== "live" && phase !== "doors") return fail("This meeting is not live.");
+  const { error } = await ctx.supabase.rpc("meeting_host_action", { p_meeting: id, p_action: "end", p: {} });
+  if (error) return fail(/FORBIDDEN/.test(error.message) ? "Only a host can end this meeting." : friendlyDbError(error.message, "Could not end the meeting."));
+  if (roomConfigured()) await endRoom(id);
+  touched(id);
+  return ok("Meeting ended. Everyone has left the room.");
 }
 
 export type MeetingPerson = { id: string; full_name: string; email: string; department: string | null; year: string | null };

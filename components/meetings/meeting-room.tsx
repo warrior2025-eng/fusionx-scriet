@@ -53,6 +53,14 @@ import { Avatar, Badge, PersonMenu, RoomSidebar, type LiveInfo, type RoomApi, ty
 import { useRoomState } from "./use-room-state";
 
 const REACTIONS = ["👍", "👏", "😂", "❤️", "🎉"];
+// Floating reactions take the first free lane, so several at once never overlap.
+const LANES = [8, 22, 36, 50, 64, 78];
+const FLOAT_MS = 3000;
+type Float = { id: number; emoji: string; ids: string[]; names: string[]; lane: number; first: number };
+
+/** "Riya", "Riya, Aman", "Riya, Aman +3". */
+const reactors = (names: string[]) => (names.length <= 2 ? names.join(", ") : `${names.slice(0, 2).join(", ")} +${names.length - 2}`);
+const quietMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const PAGE_SIZE = 9;
 let nextId = 0;
 const AUDIO: AudioCaptureOptions = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
@@ -104,7 +112,7 @@ function tone(notes: number[]) {
   } catch {}
 }
 
-function Tile({ trackRef, person, api, pinned, onPin, small, fit }: { trackRef: TrackReferenceOrPlaceholder; person?: RoomPerson; api: RoomApi | null; pinned: boolean; onPin: () => void; small?: boolean; fit?: boolean }) {
+function Tile({ trackRef, person, api, pinned, onPin, small, fit, reaction }: { trackRef: TrackReferenceOrPlaceholder; person?: RoomPerson; api: RoomApi | null; pinned: boolean; onPin: () => void; small?: boolean; fit?: boolean; reaction?: string }) {
   const p = trackRef.participant;
   const speaking = useIsSpeaking(p);
   const muted = useIsMuted(trackRef);
@@ -139,10 +147,19 @@ function Tile({ trackRef, person, api, pinned, onPin, small, fit }: { trackRef: 
         </div>
         {badge && !isShare && <span className="shrink-0 rounded-sm bg-accent px-1.5 py-0.5 text-[10px] font-semibold">{badge}</span>}
       </div>
-      {person?.hand && !isShare && (
-        <span className="absolute left-1.5 top-1.5 rounded-sm bg-amber-400 p-1 text-black" title="Hand raised">
-          <Hand size={13} aria-label="Hand raised" />
-        </span>
+      {!isShare && (person?.hand || reaction) && (
+        <div className="absolute left-1.5 top-1.5 flex items-center gap-1">
+          {person?.hand && (
+            <span className="rounded-sm bg-amber-400 p-1 text-black" title="Hand raised">
+              <Hand size={13} aria-label="Hand raised" />
+            </span>
+          )}
+          {reaction && (
+            <span className="rounded-full bg-black/70 px-1.5 py-0.5 text-base leading-none" data-tile-reaction={reaction} aria-hidden>
+              {reaction}
+            </span>
+          )}
+        </div>
       )}
       <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100">
         <button type="button" onClick={onPin} aria-label={pinned ? `Unpin ${name}` : `Pin ${name}`} className="rounded bg-black/60 p-1 text-white">
@@ -159,7 +176,7 @@ function Tile({ trackRef, person, api, pinned, onPin, small, fit }: { trackRef: 
   );
 }
 
-function Stage({ state, api, view, phone }: { state: RoomState | null; api: RoomApi | null; view: "gallery" | "speaker"; phone: boolean }) {
+function Stage({ state, api, view, phone, reactions }: { state: RoomState | null; api: RoomApi | null; view: "gallery" | "speaker"; phone: boolean; reactions: Record<string, string> }) {
   const all = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
@@ -179,7 +196,16 @@ function Stage({ state, api, view, phone }: { state: RoomState | null; api: Room
   const cams = all.filter((t) => t.source === Track.Source.Camera);
   const shares = all.filter((t) => t.source === Track.Source.ScreenShare);
   const tile = (t: TrackReferenceOrPlaceholder, opts: { small?: boolean; fit?: boolean } = {}) => (
-    <Tile key={key(t)} trackRef={t} person={people.get(t.participant.identity)} api={api} pinned={pinned === key(t)} onPin={() => setPinned((v) => (v === key(t) ? null : key(t)))} {...opts} />
+    <Tile
+      key={key(t)}
+      trackRef={t}
+      person={people.get(t.participant.identity)}
+      api={api}
+      pinned={pinned === key(t)}
+      onPin={() => setPinned((v) => (v === key(t) ? null : key(t)))}
+      reaction={t.source === Track.Source.Camera ? reactions[t.participant.identity] : undefined}
+      {...opts}
+    />
   );
 
   const pinnedTrack = pinned ? all.find((t) => key(t) === pinned) : undefined;
@@ -269,19 +295,22 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
   const [sheet, setSheet] = useState(false);
   const [tab, setTab] = useState<Tab>("people");
   const [width, setWidth] = useState(360);
-  const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
-  const [floats, setFloats] = useState<{ id: number; emoji: string; left: number }[]>([]);
+  const [toasts, setToasts] = useState<{ id: number; text: string; quiet?: boolean }[]>([]);
+  const [floats, setFloats] = useState<Float[]>([]);
+  const [reactions, setReactions] = useState<Record<string, string>>({});
+  const [announce, setAnnounce] = useState("");
   const [reacting, setReacting] = useState(false);
   const [hostMenu, setHostMenu] = useState(false);
   const [moving, setMoving] = useState(false);
   const [chime, setChime] = useState(true);
   const [ask, setAsk] = useState<{ title: string; body: string; label: string; run: () => void } | null>(null);
   const askDialog = useRef<HTMLDialogElement>(null);
+  const leaveDialog = useRef<HTMLDialogElement>(null);
   const moveDialog = useRef<HTMLDialogElement>(null);
 
-  const toast = useCallback((text: string) => {
+  const toast = useCallback((text: string, quiet?: boolean) => {
     const id = ++nextId;
-    setToasts((all) => [...all.slice(-3), { id, text }]);
+    setToasts((all) => [...all.slice(-3), { id, text, quiet }]);
     window.setTimeout(() => setToasts((all) => all.filter((t) => t.id !== id)), 4500);
   }, []);
 
@@ -295,33 +324,85 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
     void refresh();
     publish({ t: "sync" });
   }, [refresh, publish]);
-  const float = useCallback((emoji: string) => {
-    const id = ++nextId;
-    setFloats((all) => [...all, { id, emoji, left: 10 + Math.random() * 70 }]);
-    window.setTimeout(() => setFloats((all) => all.filter((f) => f.id !== id)), 2700);
-  }, []);
-
-  // Notes from others: read the state now; a reaction floats. Nothing here grants anything.
+  // Arrivals, batched when many come at once; a small chime for hosts.
+  const stateRef = useRef(state);
   useEffect(() => {
-    const onData = (payload: Uint8Array, _p?: Participant, _k?: unknown, topic?: string) => {
+    stateRef.current = state;
+  }, [state]);
+
+  // A reaction: the name comes from who LiveKit says sent it (the room's people list, or the
+  // name in their server-signed token), never from the message, so nobody can send as someone else.
+  const lastReaction = useRef(new Map<string, number>());
+  const heard = useRef<string[]>([]);
+  const heardTimer = useRef<number | null>(null);
+  const showReaction = useCallback(
+    (identity: string, emoji: string, sender?: Participant) => {
+      const now = Date.now();
+      // One per person per second; a flood from one sender is dropped.
+      if (now - (lastReaction.current.get(identity) ?? 0) < 900) return;
+      lastReaction.current.set(identity, now);
+      const mine = identity === localParticipant.identity;
+      const full = stateRef.current?.people.find((p) => p.id === identity)?.name || sender?.name || "Someone";
+      const name = mine ? "You" : full.trim().split(/\s+/)[0] || "Someone";
+
+      // On their tile and in People for 4 seconds; a newer reaction from them starts it again.
+      setReactions((all) => ({ ...all, [identity]: emoji }));
+      window.setTimeout(() => {
+        if (Date.now() - (lastReaction.current.get(identity) ?? 0) < 3900) return;
+        setReactions((all) => Object.fromEntries(Object.entries(all).filter(([k]) => k !== identity)));
+      }, 4000);
+
+      heard.current.push(`${mine ? "You" : full} reacted ${emoji}`);
+      if (heardTimer.current === null) {
+        heardTimer.current = window.setTimeout(() => {
+          setAnnounce(heard.current.join(". "));
+          heard.current = [];
+          heardTimer.current = null;
+        }, 1500);
+      }
+
+      if (quietMotion()) {
+        toast(`${name} reacted ${emoji}`, true);
+        return;
+      }
+      const id = ++nextId;
+      setFloats((all) => {
+        const group = all.find((f) => f.emoji === emoji && now - f.first < FLOAT_MS);
+        if (group) {
+          if (group.ids.includes(identity)) return all;
+          // Many at once with the same emoji: one pill, "Riya, Aman +3", floating up again.
+          return all.map((f) => (f === group ? { ...f, id, ids: [...f.ids, identity], names: [...f.names, name] } : f));
+        }
+        const used = new Set(all.map((f) => f.lane));
+        const lane = LANES.findIndex((_, i) => !used.has(i));
+        return [...all, { id, emoji, ids: [identity], names: [name], lane: lane < 0 ? all.length % LANES.length : lane, first: now }];
+      });
+      window.setTimeout(() => setFloats((all) => all.filter((f) => f.id !== id)), FLOAT_MS);
+    },
+    [localParticipant, toast],
+  );
+  useEffect(
+    () => () => {
+      if (heardTimer.current !== null) window.clearTimeout(heardTimer.current);
+    },
+    [],
+  );
+
+  // Notes from others: read the state now; a reaction floats with its sender. Nothing here grants anything.
+  useEffect(() => {
+    const onData = (payload: Uint8Array, sender?: Participant, _k?: unknown, topic?: string) => {
       if (topic !== "meeting") return;
       try {
         const message = JSON.parse(new TextDecoder().decode(payload)) as { t?: string; e?: string };
         if (message.t === "sync") void refresh();
-        if (message.t === "react" && message.e && REACTIONS.includes(message.e)) float(message.e);
+        if (message.t === "react" && sender && message.e && REACTIONS.includes(message.e)) showReaction(sender.identity, message.e, sender);
       } catch {}
     };
     room.on(RoomEvent.DataReceived, onData);
     return () => {
       room.off(RoomEvent.DataReceived, onData);
     };
-  }, [room, refresh, float]);
-
-  // Arrivals, batched when many come at once; a small chime for hosts.
-  const stateRef = useRef(state);
-  useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
+  }, [room, refresh, showReaction]);
   const chimeRef = useRef(chime);
   useEffect(() => {
     chimeRef.current = chime;
@@ -386,7 +467,16 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
     };
   }, [room, toast]);
 
+  // The last host leaving while others are still in chooses: the meeting goes on, or it ends.
   const leave = useCallback(() => {
+    const s = stateRef.current;
+    if (s?.me.is_host) {
+      const others = s.people.filter((p) => p.in_room && p.id !== s.me.id);
+      if (others.length > 0 && !others.some((p) => p.host_kind)) {
+        leaveDialog.current?.showModal();
+        return;
+      }
+    }
     onLeaveWhy("left");
   }, [onLeaveWhy]);
 
@@ -418,7 +508,7 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
     return out;
   }, [participants]);
 
-  const api: RoomApi | null = useMemo(() => (state ? { meetingId, state, live, host, act, confirm, toast, nudge } : null), [meetingId, state, live, host, act, confirm, toast, nudge]);
+  const api: RoomApi | null = useMemo(() => (state ? { meetingId, state, live, reactions, host, act, confirm, toast, nudge } : null), [meetingId, state, live, reactions, host, act, confirm, toast, nudge]);
 
   const toggleMic = async () => {
     clicked.current = Date.now();
@@ -473,11 +563,19 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
     await createClient().rpc("meeting_raise_hand", { p_meeting: meetingId, p_up: up });
     nudge();
   };
-  const react = (emoji: string) => {
-    float(emoji);
-    publish({ t: "react", e: emoji });
-    setReacting(false);
-  };
+  // At most one reaction a second from here.
+  const sentAt = useRef(0);
+  const react = useCallback(
+    (emoji: string) => {
+      setReacting(false);
+      const now = Date.now();
+      if (now - sentAt.current < 1000) return;
+      sentAt.current = now;
+      showReaction(localParticipant.identity, emoji);
+      publish({ t: "react", e: emoji });
+    },
+    [localParticipant, showReaction, publish],
+  );
   const openPanel = (next: Tab) => {
     setTab(next);
     if (phone) setSheet(true);
@@ -501,7 +599,7 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
     <div className="flex h-full min-h-0 flex-col" onPointerMove={onDrag} onPointerUp={() => (dragging.current = false)}>
       <div className="flex min-h-0 flex-1">
         <div className="relative min-h-0 min-w-0 flex-1 bg-[#00030D]">
-          <Stage state={state} api={api} view={view} phone={phone} />
+          <Stage state={state} api={api} view={view} phone={phone} reactions={reactions} />
           {(connection === ConnectionState.Reconnecting || connection === ConnectionState.SignalReconnecting) && (
             <p role="status" className="absolute inset-x-0 top-0 z-20 bg-amber-500 px-3 py-1.5 text-center text-sm font-medium text-black">
               Reconnecting…
@@ -557,14 +655,20 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
           )}
           <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden" aria-hidden>
             {floats.map((f) => (
-              <span key={f.id} className="meeting-reaction absolute bottom-6 text-3xl" style={{ left: `${f.left}%` }}>
-                {f.emoji}
+              <span key={f.id} className="meeting-reaction absolute bottom-6 flex flex-col items-center" style={{ left: `${LANES[f.lane]}%` }} data-float={f.emoji}>
+                <span className="text-3xl leading-none">{f.emoji}</span>
+                <span className="mt-1 whitespace-nowrap rounded-full bg-black/75 px-2 py-0.5 text-xs font-medium text-white" data-float-names>
+                  {reactors(f.names)}
+                </span>
               </span>
             ))}
           </div>
+          <p className="sr-only" aria-live="polite" data-reaction-announce>
+            {announce}
+          </p>
           <div className="pointer-events-none absolute bottom-3 left-3 z-30 space-y-1.5" role="status" aria-live="polite">
             {toasts.map((t) => (
-              <p key={t.id} className="w-fit max-w-xs rounded-sm bg-black/80 px-3 py-1.5 text-sm text-white">
+              <p key={t.id} className="w-fit max-w-xs rounded-sm bg-black/80 px-3 py-1.5 text-sm text-white" aria-hidden={t.quiet || undefined}>
                 {t.text}
               </p>
             ))}
@@ -707,6 +811,40 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
         <div className="mt-4 text-center">
           <Button type="button" variant="ghost" size="sm" onClick={() => moveDialog.current?.close()}>
             Close
+          </Button>
+        </div>
+      </dialog>
+
+      <dialog ref={leaveDialog} aria-labelledby="meeting-leave" className="m-auto w-[min(92vw,30rem)] border border-line bg-surface p-6 text-ink backdrop:bg-black/60" data-leave-choice>
+        <h2 id="meeting-leave" className="font-serif text-xl">
+          You are the last host in the room
+        </h2>
+        <p className="mt-2 text-sm text-ink/75">The others can carry on without a host, or you can end the meeting for everyone.</p>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <Button type="button" variant="ghost" size="sm" onClick={() => leaveDialog.current?.close()}>
+            Stay
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              leaveDialog.current?.close();
+              onLeaveWhy("left");
+            }}
+          >
+            Leave (meeting continues)
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            className="bg-red-600 hover:bg-red-600/90"
+            onClick={() => {
+              leaveDialog.current?.close();
+              void host("end").then((problem) => (problem ? toast(problem) : onLeaveWhy("ended")));
+            }}
+          >
+            End for all
           </Button>
         </div>
       </dialog>

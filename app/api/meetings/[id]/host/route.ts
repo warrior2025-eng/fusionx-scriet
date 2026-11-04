@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { deliverEmailsAfterResponse } from "@/lib/email/outbox";
 import { roomConfigured } from "@/lib/interview/livekit";
-import { closeRoom, muteTracks, nudgeRoom, removeFromRoom, updatePermissions } from "@/lib/meetings/livekit";
+import { endRoom, muteTracks, nudgeRoom, removeFromRoom, updatePermissions } from "@/lib/meetings/livekit";
 import { friendlyDbError } from "@/lib/recruitment/shared";
 import { createClient } from "@/lib/supabase/server";
 
@@ -65,8 +65,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     } else if (answer.live === "remove" && answer.user) {
       await removeFromRoom(id, answer.user);
     } else if (answer.live === "end") {
-      await nudgeRoom(id);
-      await closeRoom(id);
+      await endRoom(id);
     }
     if (answer.live !== "end" && action !== "set_notes") await nudgeRoom(id);
   }

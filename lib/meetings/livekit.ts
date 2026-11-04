@@ -93,6 +93,21 @@ export async function closeRoom(meetingId: string): Promise<void> {
   await roomService("DeleteRoom", meetingRoomName(meetingId), {}).catch(() => null);
 }
 
+/** Ending for everyone, from the room or the admin panel: browsers read the end, then the call closes. */
+export async function endRoom(meetingId: string): Promise<void> {
+  await nudgeRoom(meetingId);
+  await closeRoom(meetingId);
+}
+
+/** Whether anyone is connected to the call. When LiveKit can't be asked, assume so: nothing is ended on a guess. */
+export async function roomHasPeople(meetingId: string): Promise<boolean> {
+  try {
+    return (await participants(meetingId)).length > 0;
+  } catch {
+    return true;
+  }
+}
+
 /** Tells every browser in the room to read the state now rather than at its next check. */
 export async function nudgeRoom(meetingId: string): Promise<void> {
   await roomService("SendData", meetingRoomName(meetingId), {

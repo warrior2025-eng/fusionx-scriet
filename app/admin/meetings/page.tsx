@@ -4,7 +4,7 @@ import { Plus } from "lucide-react";
 import { ActionButton } from "@/components/admin/action-button";
 import { InstantMeetingButton } from "@/components/admin/meeting-form";
 import { AdminPage, EmptyRow, Pill, Table, Td, Th, formatDate, param, type ListParams } from "@/components/admin/ui";
-import { cancelMeeting } from "@/actions/admin-meetings";
+import { cancelMeeting, endMeeting } from "@/actions/admin-meetings";
 import { LinkButton } from "@/components/ui/button";
 import { requireCapability } from "@/lib/admin/guard";
 import { meetingChoices } from "@/lib/meetings/admin";
@@ -139,9 +139,18 @@ export default async function MeetingsAdminPage({ searchParams }: { searchParams
                 <Td className="whitespace-nowrap text-right">
                   <div className="flex flex-wrap justify-end gap-2">
                     {(m.phase === "doors" || m.phase === "live") && (
-                      <LinkButton href={`/meetings/${m.id}?enter=1`} size="sm">
-                        Enter
-                      </LinkButton>
+                      <>
+                        <LinkButton href={`/meetings/${m.id}?enter=1`} size="sm">
+                          Enter
+                        </LinkButton>
+                        <ActionButton
+                          danger
+                          action={endMeeting.bind(null, m.id)}
+                          confirm={{ title: `End '${m.title}' for everyone?`, body: "Everyone in the room leaves now and every pass shows it as ended. The minutes stay available.", confirmLabel: "End meeting" }}
+                        >
+                          End meeting
+                        </ActionButton>
+                      </>
                     )}
                     {m.phase === "ended" && (
                       <LinkButton href={`/meetings/${m.id}/minutes`} variant="secondary" size="sm">

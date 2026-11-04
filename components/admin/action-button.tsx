@@ -102,7 +102,7 @@ export function ActionButton({
         ref={dialogRef}
         aria-labelledby={titleId}
         onClose={() => setTyped("")}
-        className="m-auto w-[min(92vw,26rem)] border border-line bg-surface p-6 text-ink backdrop:bg-black/60"
+        className="m-auto w-[min(92vw,26rem)] whitespace-normal border border-line bg-surface p-6 text-left text-ink backdrop:bg-black/60"
       >
         <h2 id={titleId} className="font-serif text-xl">
           {confirm.title}
