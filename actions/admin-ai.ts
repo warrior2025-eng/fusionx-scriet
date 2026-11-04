@@ -5,6 +5,8 @@ import { z } from "zod";
 import { fail, ok, zodFieldErrors, type ActionState } from "@/lib/admin/action-state";
 import { logAudit } from "@/lib/admin/audit";
 import { authorize, FORBIDDEN } from "@/lib/admin/guard";
+import { checkModels } from "@/lib/ai/model";
+import { aiConfigured } from "@/lib/ai/settings";
 
 /** FusionX AI's settings (migration 0038). Everything here can be shown to anyone. */
 
@@ -59,4 +61,14 @@ export async function refreshAiKnowledge(): Promise<ActionState> {
   await logAudit(ctx, { action: "refreshed_ai_knowledge", table: "ai_settings", id: "1" });
   touched();
   return ok("The assistant will use the latest public information from its next answer.");
+}
+
+/** Asks each model for a one-word reply and says which answer. Reads only; nothing is saved. */
+export async function testAiConnection(): Promise<ActionState> {
+  const ctx = await authorize("settings");
+  if (!ctx) return FORBIDDEN;
+  if (!aiConfigured()) return fail("GEMINI_API_KEY is not set on the server.");
+  const lines = await checkModels();
+  const works = lines.some((l) => l.endsWith("works"));
+  return works ? ok(lines.join(" · ")) : fail(`No model answered: ${lines.join(" · ")}. 403 means the key is wrong or blocked, 404 a retired model.`);
 }

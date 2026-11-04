@@ -6,9 +6,14 @@ import { createClient } from "@/lib/supabase/server";
  * only to the AI provider; they never go to the browser or into a log.
  */
 
-/** A free-tier Gemini model. Change it with AI_MODEL, without a code change. */
-export const AI_MODEL = process.env.AI_MODEL || "gemini-2.5-flash-lite";
-/** The Groq fallback (free tier), used when Gemini says 429 or 5xx and GROQ_API_KEY is set. */
+/**
+ * A free-tier Gemini model. Change it with AI_MODEL, without a code change. The default
+ * is Google's alias for its newest Flash-Lite, so a retired model never breaks the
+ * assistant; the other names are tried in turn when one is unavailable.
+ */
+export const AI_MODEL = process.env.AI_MODEL || "gemini-flash-lite-latest";
+export const GEMINI_MODELS = [...new Set([AI_MODEL, "gemini-flash-lite-latest", "gemini-flash-latest"])];
+/** The Groq fallback (free tier), used when no Gemini model answers and GROQ_API_KEY is set. */
 export const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.1-8b-instant";
 
 /** Without a Gemini key the launcher is hidden and the route answers 404. */
