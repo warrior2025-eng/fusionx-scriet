@@ -721,3 +721,28 @@ textarea[aria-invalid="true"],
 select[aria-invalid="true"] {
   border-color: #dc2626 !important;
 }
+
+/* =========================================================================
+   FusionX AI (components/ai): the launcher's tile, its blueprint ring and the panel.
+   ========================================================================= */
+.ai-tile {
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+}
+.ai-launcher { color: var(--color-accent); filter: drop-shadow(0 0 10px color-mix(in srgb, #004df6 45%, transparent)); }
+.ai-launcher:focus-visible .ai-tile { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+.ai-launcher:focus-visible { filter: drop-shadow(0 0 0 transparent); }
+.ai-launcher:focus-visible::after { content: ""; position: absolute; inset: -4px; border: 2px solid var(--color-accent); border-radius: 9999px; }
+.ai-ring { animation: ai-turn 18s linear infinite; transform-origin: 50% 50%; }
+.ai-launcher:hover .ai-ring, .ai-launcher:focus-visible .ai-ring { animation-duration: 7s; }
+@keyframes ai-turn { to { transform: rotate(360deg); } }
+.ai-tag { --cut: 8px; animation: ai-tag-in 0.5s ease-out both; }
+@keyframes ai-tag-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+.ai-panel { --cut: 20px; --card-bg: var(--color-surface); }
+@media (max-width: 639px) { .ai-panel { --cut: 0px; } }
+.ai-typing span { width: 6px; height: 6px; border-radius: 9999px; background: currentColor; opacity: 0.4; animation: ai-dot 1.2s ease-in-out infinite; }
+.ai-typing span:nth-child(2) { animation-delay: 0.15s; }
+.ai-typing span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes ai-dot { 0%, 80%, 100% { opacity: 0.25; transform: none; } 40% { opacity: 0.9; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) {
+  .ai-ring, .ai-tag, .ai-typing span { animation: none; }
+}

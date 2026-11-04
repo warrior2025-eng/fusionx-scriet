@@ -13,16 +13,21 @@ import { createClient } from "@/lib/supabase/server";
 import { CandidateEntryBar } from "@/components/recruitment/candidate-entry";
 import { getCandidateEntry, getLiveInterviewDay } from "@/lib/recruitment/my-entry";
 import { getMeetingSignal } from "@/lib/meetings/data";
+import { AiLauncher } from "@/components/ai/ai-launcher";
+import { aiConfigured, getAiSettings } from "@/lib/ai/settings";
+import { socialLinks } from "@/lib/site-config";
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
   // Two rounds of queries instead of one after another: everything that does not need the user, with the
   // user; then what does (roles, profile, reviewer link), together.
-  const [settings, user, navLinks, cycle, storedColumns] = await Promise.all([
+  const [settings, user, navLinks, cycle, storedColumns, ai] = await Promise.all([
     getOrganizationSettings(),
     getCurrentUser(),
     getContent("nav.links"),
     getCurrentCycle(),
     getContent("footer.columns"),
+    // FusionX AI: only with a key on the server and switched on in Settings (migration 0038).
+    aiConfigured() ? getAiSettings() : Promise.resolve(null),
   ]);
   const supabase = user ? await createClient() : null;
   const [roles, profileRow, reviewerCount, candidate, liveDay, meetings] = user && supabase
@@ -80,6 +85,17 @@ export default async function PublicLayout({ children }: { children: React.React
     return { ...column, links: add ? [...links, { href: "/recruitment", label: "Recruitment" }] : links };
   });
   const bannerClass = "block bg-accent text-white text-center text-sm px-4 py-2";
+  // The only places an answer may link to, besides this site.
+  const aiLinks = {
+    site: process.env.NEXT_PUBLIC_SITE_URL || "https://fxscriet.com",
+    external: [
+      `mailto:${settings.official_email || socialLinks.email}`,
+      `mailto:${socialLinks.email}`,
+      linkHref(settings.instagram_url, "instagram") || socialLinks.instagram,
+      linkHref(settings.linkedin_url, "linkedin") || socialLinks.linkedin,
+      linkHref(settings.whatsapp_url, "whatsapp_group") || socialLinks.whatsapp,
+    ],
+  };
 
   return (
     <>
@@ -110,6 +126,7 @@ export default async function PublicLayout({ children }: { children: React.React
       <main className={candidate ? "flex-1 pb-24 lg:pb-0" : "flex-1"}>{children}</main>
       {candidate && <CandidateEntryBar entry={candidate} />}
       <SiteFooter settings={settings} columns={footerColumns} />
+      {ai?.enabled && <AiLauncher welcome={ai.welcome} suggestions={ai.suggestions} allowed={aiLinks} />}
     </>
   );
 }
