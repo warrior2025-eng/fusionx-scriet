@@ -20,10 +20,9 @@ import {
 import type { TrackReferenceOrPlaceholder } from "@livekit/components-react";
 import { ConnectionQuality, ConnectionState, DisconnectReason, RoomEvent, Track, type AudioCaptureOptions, type Participant, type RoomOptions, type VideoCaptureOptions } from "livekit-client";
 import {
+  AudioLines,
   Bell,
   BellOff,
-  ChevronLeft,
-  ChevronRight,
   Hand,
   LayoutGrid,
   LogOut,
@@ -61,7 +60,6 @@ type Float = { id: number; emoji: string; ids: string[]; names: string[]; lane: 
 /** "Riya", "Riya, Aman", "Riya, Aman +3". */
 const reactors = (names: string[]) => (names.length <= 2 ? names.join(", ") : `${names.slice(0, 2).join(", ")} +${names.length - 2}`);
 const quietMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-const PAGE_SIZE = 9;
 let nextId = 0;
 const AUDIO: AudioCaptureOptions = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
 // Small and off-screen tiles get low quality (adaptive stream, simulcast), and layers nobody watches are not sent.
@@ -112,9 +110,61 @@ function tone(notes: number[]) {
   } catch {}
 }
 
+/**
+ * Speaking, held on for half a second after they stop, so the highlight does not
+ * flicker between words.
+ */
+function useSpeakingHeld(p: Participant): boolean {
+  const speaking = useIsSpeaking(p);
+  const [was, setWas] = useState(speaking);
+  const [stops, setStops] = useState(0);
+  const [quiet, setQuiet] = useState(0);
+  if (was !== speaking) {
+    setWas(speaking);
+    if (!speaking) setStops(stops + 1);
+  }
+  useEffect(() => {
+    if (stops === quiet) return;
+    const timer = window.setTimeout(() => setQuiet(stops), 500);
+    return () => window.clearTimeout(timer);
+  }, [stops, quiet]);
+  return speaking || stops !== quiet;
+}
+
+/** The size of an element, kept up to date as it changes. */
+function useBox<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => setBox({ w: entry.contentRect.width, h: entry.contentRect.height }));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return [ref, box] as const;
+}
+
+/**
+ * Everyone on one screen: the column count that gives the biggest 16:9 picture for n
+ * people in w×h (2 side by side, 4 as 2×2, 9 as 3×3, 25 as 5×5 on a wide screen). Each
+ * tile then fills its cell.
+ */
+function fitGallery(n: number, w: number, h: number, gap = 4) {
+  let best = { cols: 1, rows: 1, cellW: w, cellH: h, score: -1 };
+  for (let cols = 1; cols <= Math.max(1, n); cols++) {
+    const rows = Math.ceil(n / cols);
+    const cellW = (w - gap * (cols - 1)) / cols;
+    const cellH = (h - gap * (rows - 1)) / rows;
+    const score = Math.min(cellW, (cellH * 16) / 9);
+    if (score > best.score) best = { cols, rows, cellW, cellH, score };
+  }
+  return best;
+}
+
 function Tile({ trackRef, person, api, pinned, onPin, small, fit, reaction }: { trackRef: TrackReferenceOrPlaceholder; person?: RoomPerson; api: RoomApi | null; pinned: boolean; onPin: () => void; small?: boolean; fit?: boolean; reaction?: string }) {
   const p = trackRef.participant;
-  const speaking = useIsSpeaking(p);
+  const speakingNow = useSpeakingHeld(p);
   const muted = useIsMuted(trackRef);
   const micMuted = useIsMuted({ participant: p, source: Track.Source.Microphone });
   const [menu, setMenu] = useState(false);
@@ -123,10 +173,12 @@ function Tile({ trackRef, person, api, pinned, onPin, small, fit, reaction }: { 
   const name = person?.name ?? p.name ?? "Member";
   const badge = person ? hostBadge(person.host_kind) : null;
   const canManage = api?.state.me.is_host && person && !p.isLocal;
+  const speaking = speakingNow && !isShare;
   return (
     <div
-      className={cn("meeting-tile-in group relative h-full w-full overflow-hidden rounded bg-[#0a1230]", speaking && !isShare ? "ring-2 ring-accent" : "ring-1 ring-white/10")}
+      className={cn("meeting-tile-in group relative h-full w-full overflow-hidden rounded bg-[#0a1230]", speaking ? "meeting-speaking" : "ring-1 ring-white/10")}
       data-tile={name}
+      data-speaking={speaking ? "" : undefined}
       data-source={trackRef.source}
       data-video={showVideo ? "on" : "off"}
     >
@@ -134,13 +186,14 @@ function Tile({ trackRef, person, api, pinned, onPin, small, fit, reaction }: { 
         <VideoTrack trackRef={trackRef} className={cn("h-full w-full", fit || isShare ? "object-contain" : "object-cover", p.isLocal && !isShare && "-scale-x-100")} />
       ) : (
         <div className="flex h-full w-full items-center justify-center">
-          <Avatar person={{ name, avatar_url: person?.avatar_url ?? null }} className={small ? "h-10 w-10 text-xs" : "h-20 w-20 text-xl"} />
+          <Avatar person={{ name, avatar_url: person?.avatar_url ?? null }} className={cn(small ? "h-10 w-10 text-xs" : "h-20 w-20 text-xl", speaking && "meeting-speaking-avatar")} />
         </div>
       )}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end gap-1 bg-gradient-to-t from-black/75 to-transparent p-1.5 pt-6 text-white">
         <div className="min-w-0 flex-1 text-xs leading-tight">
-          <p className="flex items-center gap-1 truncate font-semibold">
+          <p className={cn("flex max-w-full items-center gap-1 truncate font-semibold", speaking && "meeting-speaking-name")}>
             {micMuted && !isShare && <MicOff size={12} aria-label="Muted" className="shrink-0" />}
+            {speaking && <AudioLines size={12} aria-label="Speaking" className="shrink-0" />}
             <span className="truncate">{isShare ? `${name}'s screen` : p.isLocal ? `${name} (you)` : name}</span>
           </p>
           {!small && !isShare && person && <p className="truncate text-white/80" title={person.seat.label}>{person.seat.short}</p>}
@@ -186,14 +239,22 @@ function Stage({ state, api, view, phone, reactions }: { state: RoomState | null
   );
   const speaking = useSpeakingParticipants();
   const [pinned, setPinned] = useState<string | null>(null);
-  const [page, setPage] = useState(0);
   const [lastSpeaker, setLastSpeaker] = useState<string | null>(null);
+  const [galleryRef, box] = useBox<HTMLDivElement>();
+  // Tiles keep their place: everyone stays in the order they first appeared.
+  const [seen, setSeen] = useState<string[]>([]);
   const loudest = speaking.find((p) => !p.isLocal)?.identity ?? null;
   if (loudest && loudest !== lastSpeaker) setLastSpeaker(loudest);
 
   const people = useMemo(() => new Map((state?.people ?? []).map((p) => [p.id, p])), [state?.people]);
   const key = (t: TrackReferenceOrPlaceholder) => `${t.participant.identity}:${t.source}`;
-  const cams = all.filter((t) => t.source === Track.Source.Camera);
+  const unseen = all.filter((t) => t.source === Track.Source.Camera && !seen.includes(t.participant.identity)).map((t) => t.participant.identity);
+  if (unseen.length > 0) setSeen([...seen, ...unseen]);
+  const place = (t: TrackReferenceOrPlaceholder) => {
+    const at = seen.indexOf(t.participant.identity);
+    return at < 0 ? seen.length : at;
+  };
+  const cams = all.filter((t) => t.source === Track.Source.Camera).sort((a, b) => place(a) - place(b));
   const shares = all.filter((t) => t.source === Track.Source.ScreenShare);
   const tile = (t: TrackReferenceOrPlaceholder, opts: { small?: boolean; fit?: boolean } = {}) => (
     <Tile
@@ -209,7 +270,7 @@ function Stage({ state, api, view, phone, reactions }: { state: RoomState | null
   );
 
   const pinnedTrack = pinned ? all.find((t) => key(t) === pinned) : undefined;
-  const speakerMode = view === "speaker" || phone;
+  const speakerMode = view === "speaker" && !phone;
   const main =
     pinnedTrack ??
     shares[0] ??
@@ -237,27 +298,33 @@ function Stage({ state, api, view, phone, reactions }: { state: RoomState | null
     );
   }
 
-  const pages = Math.max(1, Math.ceil(cams.length / PAGE_SIZE));
-  const at = Math.min(page, pages - 1);
-  const shown = cams.slice(at * PAGE_SIZE, (at + 1) * PAGE_SIZE);
-  const cols = shown.length <= 1 ? 1 : shown.length <= 4 ? 2 : 3;
-  const rows = Math.max(1, Math.ceil(shown.length / cols));
-  return (
-    <div className="relative h-full p-1" data-layout="gallery">
-      <div className="grid h-full gap-1" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` }}>
-        {shown.map((t) => tile(t))}
-      </div>
-      {pages > 1 && (
-        <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded bg-black/70 px-2 py-1 text-xs text-white">
-          <button type="button" aria-label="Previous page" disabled={at === 0} onClick={() => setPage(at - 1)} className="disabled:opacity-40">
-            <ChevronLeft size={16} aria-hidden />
-          </button>
-          Page {at + 1} of {pages}
-          <button type="button" aria-label="Next page" disabled={at >= pages - 1} onClick={() => setPage(at + 1)} className="disabled:opacity-40">
-            <ChevronRight size={16} aria-hidden />
-          </button>
+  if (phone) {
+    // A compact grid of everyone, scrolling inside the video area when it has to.
+    const cols = cams.length <= 4 ? 2 : cams.length <= 12 ? 3 : 4;
+    return (
+      <div className="h-full overflow-y-auto p-1" data-layout="gallery" data-cols={cols}>
+        <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+          {cams.map((t) => (
+            <div key={key(t)} className="aspect-[3/4]">
+              {tile(t, { small: cols > 2 })}
+            </div>
+          ))}
         </div>
-      )}
+      </div>
+    );
+  }
+
+  const grid = fitGallery(cams.length, Math.max(0, box.w - 8), Math.max(0, box.h - 8));
+  return (
+    <div ref={galleryRef} className="h-full overflow-hidden p-1" data-layout="gallery" data-cols={grid.cols}>
+      <div className="flex h-full flex-wrap content-center justify-center gap-1">
+        {box.w > 0 &&
+          cams.map((t) => (
+            <div key={key(t)} style={{ width: grid.cellW, height: grid.cellH }}>
+              {tile(t, { small: grid.cellW < 220 })}
+            </div>
+          ))}
+      </div>
     </div>
   );
 }
@@ -876,8 +943,9 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
 }
 
 /**
- * The meeting room: full viewport, the page behind it does not scroll. Up to 3×3 in the
- * gallery with pages after 9, or the speaker large; a screen share takes the main area.
+ * The meeting room: full viewport, the page behind it does not scroll. Everyone on one
+ * screen in the gallery (a scrolling grid on a phone), or the speaker large; a screen
+ * share takes the main area with everyone else in a strip.
  * No recording and no integrity tracking.
  */
 export function MeetingRoom({ meetingId, entered, muted, cameraOff, onLeave }: { meetingId: string; entered: Entered; muted: boolean; cameraOff: boolean; onLeave: (why: LeaveReason) => void }) {

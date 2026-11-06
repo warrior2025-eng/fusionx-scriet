@@ -9,7 +9,7 @@ export default function Page({ searchParams }: { searchParams: Promise<ListParam
     <EntityListPage
       entity="mentors"
       searchParams={searchParams}
-      description="The mentor directory."
+      description="The one place for mentors: /mentors and the Core page both show this list. Add a website account and their photo, name and bio come from their own profile."
     />
   );
 }

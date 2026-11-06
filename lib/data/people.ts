@@ -1,13 +1,13 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getOrganizationSettings } from "@/lib/data/organization";
-import { additionalFacultyGuides, founders, seniorMentor } from "@/lib/site-config";
+import { additionalFacultyGuides, founders } from "@/lib/site-config";
 import type { OrgPerson, OrgPersonCategory } from "@/types/database";
 
+// Senior mentors are kept in the mentors table (Admin → Mentors, migration 0039).
 export const PERSON_CATEGORIES: { value: OrgPersonCategory; label: string; plural: string }[] = [
   { value: "founder", label: "Founder", plural: "Founding team" },
   { value: "faculty_guide", label: "Faculty guide", plural: "Faculty guides" },
-  { value: "senior_mentor", label: "Senior mentor", plural: "Senior mentors" },
   { value: "core_team", label: "Core team", plural: "Core team" },
   { value: "advisor", label: "Advisor", plural: "Advisors" },
 ];
@@ -45,7 +45,6 @@ async function fallbackPeople(): Promise<OrgPerson[]> {
     ...founders.map((f, i) => person("founder", i + 1, f.name, f.role, f.responsibilities)),
     person("faculty_guide", 1, settings.faculty_guide_name, settings.faculty_guide_title),
     ...additionalFacultyGuides.map((f, i) => person("faculty_guide", i + 2, f.name, f.title)),
-    person("senior_mentor", 1, seniorMentor.name, seniorMentor.role),
   ];
 }
 

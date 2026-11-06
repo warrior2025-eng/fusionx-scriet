@@ -210,11 +210,13 @@ export async function setCoreMemberTitle(memberId: string, title: string): Promi
   if (!parsed.success) return fail([...new Set(parsed.error.issues.map((issue) => issue.message))].join(" ") || "Please check the title.");
   const member = await memberOf(ctx, memberId);
   if (!member) return fail("This member is no longer in the team.");
+  if (member.title === parsed.data) return ok("Nothing changed.");
+  // The database tells them (migration 0039): one message, and one email a minute later.
   const { error } = await ctx.supabase.from("core_group_members").update({ title: parsed.data }).eq("id", memberId);
   if (error) return fail("Could not save the title.");
   await logAudit(ctx, { action: "changed_core_title", table: "core_group_members", id: memberId, before: { title: member.title }, after: { title: parsed.data }, note: member.name });
   touched();
-  return ok("Title saved.");
+  return ok("Title saved. They have been told.");
 }
 
 export async function setCoreMemberLead(memberId: string, lead: boolean): Promise<ActionState> {
@@ -222,11 +224,13 @@ export async function setCoreMemberLead(memberId: string, lead: boolean): Promis
   if (!ctx) return FORBIDDEN;
   const member = await memberOf(ctx, memberId);
   if (!member) return fail("This member is no longer in the team.");
+  if (member.is_lead === lead) return ok("Nothing changed.");
+  // Told by the database, as with a title; both within a minute make one message.
   const { error } = await ctx.supabase.from("core_group_members").update({ is_lead: lead }).eq("id", memberId);
   if (error) return fail("Could not change this.");
   await logAudit(ctx, { action: lead ? "set_core_lead" : "unset_core_lead", table: "core_group_members", id: memberId, note: member.name });
   touched();
-  return ok(lead ? `${member.name} is now a lead.` : `${member.name} is no longer a lead.`);
+  return ok(lead ? `${member.name} is now a lead. They have been told.` : `${member.name} is no longer a lead. They have been told.`);
 }
 
 export async function setCoreMemberVisible(memberId: string, visible: boolean): Promise<ActionState> {

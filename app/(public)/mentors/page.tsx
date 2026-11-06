@@ -2,10 +2,9 @@ import type { Metadata } from "next";
 import { Section } from "@/components/ui/section";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { EmptyState } from "@/components/ui/empty-state";
-import { createClient } from "@/lib/supabase/server";
+import { CoreMemberCard } from "@/components/ui/core-member-card";
+import { getMentors } from "@/lib/data/mentors";
 import { Eyebrow } from "@/components/ui/eyebrow";
-import { ArrowRight } from "lucide-react";
-import { linkHref } from "@/lib/validation/link";
 
 export const metadata: Metadata = {
   title: "Mentors",
@@ -13,12 +12,8 @@ export const metadata: Metadata = {
 };
 
 export default async function MentorsPage() {
-  const supabase = await createClient();
-  const { data: mentors } = await supabase
-    .from("mentors")
-    .select("id, name, role_title, expertise, experience, linkedin_url, availability, bio")
-    .eq("is_published", true)
-    .order("created_at", { ascending: false });
+  // Admin → Mentors; the same list, in the same order, as on the Core page.
+  const mentors = await getMentors();
 
   return (
     <>
@@ -35,32 +30,11 @@ export default async function MentorsPage() {
       </section>
 
       <Section>
-        {mentors && mentors.length > 0 ? (
-          <div className="grid md:grid-cols-2 gap-6">
+        {mentors.length > 0 ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" data-mentors>
             {mentors.map((m, i) => (
-              <ScrollReveal key={m.id} delay={i * 80}>
-                <div className="card-elevated rounded-sm p-7 h-full flex flex-col justify-between group">
-                  <div>
-                    <p className="font-serif text-xl font-medium text-ink group-hover:text-accent transition-colors">{m.name}</p>
-                    <p className="text-xs uppercase tracking-wider text-accent font-medium mt-1">{m.role_title}</p>
-                    {m.bio && <p className="mt-3 text-sm text-ink/55 leading-relaxed">{m.bio}</p>}
-                    <div className="mt-4 flex flex-wrap gap-1.5">
-                      {m.expertise?.map((e: string) => (
-                        <span key={e} className="text-xs text-ink/50 bg-ink/5 border border-ink/10 rounded-full px-2.5 py-0.5 font-medium">
-                          {e}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="mt-6 pt-5 border-t border-ink/8 flex items-center justify-between text-xs text-ink/45">
-                    {m.availability ? <span>{m.availability}</span> : <span />}
-                    {linkHref(m.linkedin_url, "linkedin") && (
-                      <a href={linkHref(m.linkedin_url, "linkedin") ?? undefined} target="_blank" rel="noopener noreferrer" className="group inline-flex items-center gap-1.5 text-accent font-medium hover:underline">
-                        LinkedIn <ArrowRight size={14} className="arrow-nudge" aria-hidden />
-                      </a>
-                    )}
-                  </div>
-                </div>
+              <ScrollReveal key={m.id} delay={i * 80} className="h-full">
+                <CoreMemberCard member={m} tags={m.expertise} note={m.availability} />
               </ScrollReveal>
             ))}
           </div>

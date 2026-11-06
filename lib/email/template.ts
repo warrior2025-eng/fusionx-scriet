@@ -32,7 +32,15 @@ export function notificationEmail(input: {
   const title = input.title.replace(/\s+/g, " ").trim().slice(0, 150);
   const body = (input.body ?? "").trim();
   const pass = input.link?.match(MEETING_PASS);
-  const label = input.label ?? (pass ? "Open your pass" : input.link && MEETING_MINUTES.test(input.link) ? "Open the minutes" : `Open on ${input.siteName}`);
+  const label =
+    input.label ??
+    (pass
+      ? "Open your pass"
+      : input.link && MEETING_MINUTES.test(input.link)
+        ? "Open the minutes"
+        : input.link === "/profile"
+          ? "Complete your profile"
+          : `Open on ${input.siteName}`);
   // Resend's batch sending takes no attachments, so the .ics is one click away (and opens only for its owner).
   const calendar = pass && !/^Cancelled/.test(title) ? `${site}/meetings/${pass[1]}/calendar.ics` : null;
   const footer = input.footer ?? `You are receiving this because you have an account on ${input.siteName}. All your notifications: ${site}/notifications`;

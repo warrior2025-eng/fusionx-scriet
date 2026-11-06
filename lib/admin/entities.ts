@@ -89,6 +89,8 @@ export type EntityDef = {
   group?: { column: string; labels: Record<string, string> };
   /** Column set to the acting user's id on create. */
   ownerColumn?: string;
+  /** The words on the button that adds one, e.g. "Add mentor". Default "New <singular>". */
+  addLabel?: string;
   defaultSort: { column: string; ascending: boolean };
   /** Extra columns in the list, beside the title and status. */
   listColumns: { label: string; value: (row: Row) => string; pill?: (row: Row) => "good" | "neutral" }[];
@@ -163,7 +165,7 @@ export const ENTITIES = {
         options: [
           { value: "founder", label: "Founder" },
           { value: "faculty_guide", label: "Faculty guide" },
-          { value: "senior_mentor", label: "Senior mentor" },
+          // Senior mentors are kept in Admin → Mentors (migration 0039).
           { value: "core_team", label: "Core team" },
           { value: "advisor", label: "Advisor" },
         ],
@@ -505,22 +507,52 @@ export const ENTITIES = {
     publish: PUBLISHED,
     orderable: true,
     ownerColumn: "created_by",
+    addLabel: "Add mentor",
     defaultSort: { column: "display_order", ascending: true },
     listColumns: [
-      { label: "Role", value: (r) => String(r.role_title ?? "") },
-      { label: "Website account", value: (r) => (r.linked_profile_id ? "Linked" : "Not linked"), pill: (r) => (r.linked_profile_id ? "good" : "neutral") },
+      { label: "Title", value: (r) => String(r.role_title ?? "") },
+      { label: "Website account", value: (r) => (r.user_id ? "Linked" : "Not linked"), pill: (r) => (r.user_id ? "good" : "neutral") },
+      { label: "Core page", value: (r) => (r.show_on_core ? "Shown" : "Not shown") },
     ],
+    // The one place for mentors: /mentors and the Core page both show this list (migration 0039).
     fields: [
-      { name: "name", label: "Name", type: "text", required: true, max: 120, half: true },
-      { name: "role_title", label: "Role or title", type: "text", required: true, max: 160, half: true },
-      { name: "expertise", label: "Expertise", type: "tags", hint: "Separate with commas." },
-      { name: "experience", label: "Experience", type: "text", max: 300 },
-      { name: "availability", label: "Availability", type: "text", max: 200, half: true },
-      { name: "linkedin_url", label: "LinkedIn", type: "url", linkKind: "linkedin", half: true },
-      { name: "bio", label: "Bio", type: "textarea", max: 1000, rows: 4, counter: true },
-      PUBLISH_FIELD,
+      {
+        name: "user_id",
+        label: "Website account",
+        type: "user",
+        hint: "Search by name or email. Their photo, name, department, year, bio and links come from their own profile. Not on the website yet? Ask them to sign up at fxscriet.com first.",
+      },
+      { name: "role_title", label: "Title", type: "text", required: true, max: 160, initial: "Student Mentor", half: true },
+      { name: "expertise", label: "Expertise (optional)", type: "tags", hint: "Separate with commas.", half: true },
+      { name: "availability", label: "Availability (optional)", type: "text", max: 200, half: true },
+      { name: "show_on_core", label: "Show on Core page", type: "checkbox", initial: true, half: true },
+      { ...PUBLISH_FIELD, initial: true },
+      { name: "name", label: "Name (only without a website account)", type: "text", max: 120, half: true },
+      {
+        name: "photo",
+        column: "photo_path",
+        label: "Photo (only without a website account)",
+        type: "image",
+        bucket: "team-photos",
+        square: true,
+        hint: "Used until a website account is linked, and when that account has no photo.",
+      },
+      { name: "linkedin_url", label: "LinkedIn (only without a website account)", type: "url", linkKind: "linkedin", half: true },
+      { name: "bio", label: "Bio (only without a website account)", type: "textarea", max: 1000, rows: 4, counter: true },
     ],
-    publicPaths: ["/mentors"],
+    // A linked mentor is listed under the name on their profile; one account is one mentor.
+    validate: async (values, existing, supabase): Promise<Record<string, string> | null> => {
+      if (!values.user_id) return values.name ? null : { name: "Pick a website account, or give a name." };
+      const [{ data: person }, { data: taken }] = await Promise.all([
+        supabase.from("profiles").select("full_name").eq("id", String(values.user_id)).maybeSingle(),
+        supabase.from("mentors").select("id").eq("user_id", String(values.user_id)).neq("id", String(existing?.id ?? "00000000-0000-0000-0000-000000000000")).limit(1),
+      ]);
+      if (!person) return { user_id: "That account no longer exists." };
+      if (taken?.length) return { user_id: "This person is already a mentor." };
+      values.name = person.full_name;
+      return null;
+    },
+    publicPaths: ["/mentors", "/core"],
     viewHref: () => "/mentors",
   },
 } satisfies Record<string, EntityDef>;
