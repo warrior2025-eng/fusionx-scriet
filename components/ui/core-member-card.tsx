@@ -11,9 +11,10 @@ import { linkHref } from "@/lib/validation/link";
 /**
  * A team member, from their own profile, in the same card as PersonCard.
  * The photo is a plain <img>: it can be a Google or GitHub picture, which
- * next/image would refuse. `compact` is the short form for the home page.
+ * next/image would refuse. `compact` is the short form for the home page; `tags` and
+ * `note` (a mentor's expertise and availability) show below the bio.
  */
-export function CoreMemberCard({ member, compact }: { member: CoreMember; compact?: boolean }) {
+export function CoreMemberCard({ member, compact, tags, note }: { member: CoreMember; compact?: boolean; tags?: string[]; note?: string | null }) {
   const links = [
     { href: linkHref(member.linkedin_url, "linkedin"), label: "LinkedIn", icon: <LinkedInIcon /> },
     { href: linkHref(member.github_url, "github"), label: "GitHub", icon: <GitHubIcon /> },
@@ -81,6 +82,16 @@ export function CoreMemberCard({ member, compact }: { member: CoreMember; compac
         </div>
       </div>
       {bio}
+      {tags && tags.length > 0 && (
+        <ul className="mt-4 flex flex-wrap gap-1.5">
+          {tags.map((tag) => (
+            <li key={tag} className="border border-line bg-paper px-2.5 py-0.5 text-xs font-medium text-ink/70">
+              {tag}
+            </li>
+          ))}
+        </ul>
+      )}
+      {note && <p className="mt-3 text-xs text-ink/60">{note}</p>}
       {linkList}
     </CutCard>
   );

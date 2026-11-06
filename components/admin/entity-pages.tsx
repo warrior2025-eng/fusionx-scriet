@@ -114,7 +114,7 @@ export async function EntityListPage({
         <>
           {extraActions}
           <LinkButton href={`${def.adminPath}/new`} size="sm">
-            <Plus size={15} /> New {def.singular.toLowerCase()}
+            <Plus size={15} /> {def.addLabel ?? `New ${def.singular.toLowerCase()}`}
           </LinkButton>
         </>
       }
@@ -282,7 +282,7 @@ export async function EntityFormPage({
     row = data as Row;
   }
 
-  const title = row ? String(row[def.titleColumn] ?? def.singular) : `New ${def.singular.toLowerCase()}`;
+  const title = row ? String(row[def.titleColumn] ?? def.singular) : (def.addLabel ?? `New ${def.singular.toLowerCase()}`);
 
   return (
     <AdminPage
@@ -299,7 +299,7 @@ export async function EntityFormPage({
       <Panel>
         <AdminForm
           action={saveEntity.bind(null, def.key, id ?? null)}
-          submitLabel={row ? "Save changes" : `Create ${def.singular.toLowerCase()}`}
+          submitLabel={row ? "Save changes" : (def.addLabel ?? `Create ${def.singular.toLowerCase()}`)}
           secondary={
             <Link href={def.adminPath} className="text-sm text-ink/70 underline underline-offset-2 hover:text-ink">
               Cancel
