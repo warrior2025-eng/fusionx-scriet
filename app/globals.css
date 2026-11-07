@@ -802,3 +802,25 @@ select[aria-invalid="true"] {
   .ai-ring, .ai-tag, .ai-typing span, .ai-halo, .ai-edge { animation: none; }
   .ai-halo { opacity: 0.85; }
 }
+
+/* ── Role badge in the account menu (components/navigation/site-header.tsx) ──
+   Text contrast: white on #004df6 6.4:1, on #0e7490 5.4:1; the editor's blue 5.7:1 on white, #9db8ff 10:1 on navy. */
+.role-badge {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 9999px;
+  font-size: 11px; font-weight: 600; line-height: 16px; white-space: nowrap;
+}
+.role-super { position: relative; overflow: hidden; color: #fff; background: linear-gradient(90deg, #004df6, #0e7490); }
+.role-admin { color: #fff; background: #004df6; }
+.role-editor { color: #9db8ff; border: 1px solid #4d82ff; }
+:root[data-theme="light"] .role-editor { color: #004df6; border-color: #004df6; }
+.role-faculty { color: color-mix(in srgb, var(--color-ink) 85%, transparent); border: 1px solid color-mix(in srgb, var(--color-ink) 35%, transparent); }
+/* A thin gradient ring around the super admin's avatar. */
+.role-ring { display: inline-flex; padding: 2px; border-radius: 9999px; background: linear-gradient(135deg, #004df6, #22d3ee); }
+@media (prefers-reduced-motion: no-preference) {
+  .role-super::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(110deg, transparent 35%, rgb(255 255 255 / 0.3) 50%, transparent 65%);
+    transform: translateX(-100%); animation: role-shine 3.2s ease-in-out infinite;
+  }
+}
+@keyframes role-shine { 0% { transform: translateX(-100%); } 45%, 100% { transform: translateX(100%); } }

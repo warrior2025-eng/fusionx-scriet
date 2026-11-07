@@ -30,7 +30,7 @@ export default async function PublicLayout({ children }: { children: React.React
     aiConfigured() ? getAiSettings() : Promise.resolve(null),
   ]);
   const supabase = user ? await createClient() : null;
-  const [roles, profileRow, reviewerCount, candidate, liveDay, meetings] = user && supabase
+  const [roles, profileRow, reviewerCount, candidate, liveDay, meetings, coreTitles, mentorRow] = user && supabase
     ? await Promise.all([
         getCurrentRoles(),
         supabase.from("profiles").select("full_name, avatar_url").eq("id", user.id).single().then((r) => r.data),
@@ -40,8 +40,11 @@ export default async function PublicLayout({ children }: { children: React.React
         getLiveInterviewDay(),
         // Passes and calls (migration 0032; null before it).
         getMeetingSignal(),
+        // The plain line under the role badge in the account menu: their Core title, else their mentor title.
+        supabase.rpc("my_core_teams").then((r) => (r.data ?? []) as { title: string | null; on_page: boolean }[]),
+        supabase.from("mentors").select("role_title").eq("user_id", user.id).eq("is_published", true).limit(1).maybeSingle().then((r) => r.data),
       ])
-    : [[], null, 0, null, null, null];
+    : [[], null, 0, null, null, null, [], null];
   // Only reviewers get "Reviewer panel · Live" (admins keep their admin links).
   const reviewerLive = reviewerCount ? liveDay : null;
 
@@ -57,6 +60,11 @@ export default async function PublicLayout({ children }: { children: React.React
     ...(capabilitiesFor(roles).includes("admin.access") ? [{ href: "/admin", label: "Admin panel" }] : []),
     ...(roles.includes("faculty") ? [{ href: "/faculty", label: "Faculty dashboard" }] : []),
   ];
+
+  // Display only, for the badge in the account menu. Every panel checks the real role again.
+  const badgeRole = (["super_admin", "admin", "editor", "faculty"] as const).find((r) => roles.includes(r)) ?? null;
+  const coreTitle = (coreTitles.find((t) => t.on_page && t.title?.trim()) ?? coreTitles.find((t) => t.title?.trim()))?.title?.trim();
+  const roleTitle = coreTitle || mentorRow?.role_title?.trim() || null;
 
   const profile: { full_name: string; avatar_url: string | null } | null = user
     ? profileRow
@@ -119,7 +127,7 @@ export default async function PublicLayout({ children }: { children: React.React
         recruitment={showRecruitment ? recruitmentLink : null}
         user={
           user
-            ? { email: user.email ?? "", fullName: profile?.full_name ?? "Member", avatarUrl: profile?.avatar_url ?? null, panels, candidate, reviewerLive, meetings }
+            ? { email: user.email ?? "", fullName: profile?.full_name ?? "Member", avatarUrl: profile?.avatar_url ?? null, role: badgeRole, title: roleTitle, panels, candidate, reviewerLive, meetings }
             : null
         }
       />

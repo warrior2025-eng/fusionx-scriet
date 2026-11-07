@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { Menu, X, Search, Bell, LayoutGrid, ChevronDown, ArrowRight } from "lucide-react";
+import { Menu, X, Search, Bell, LayoutGrid, ChevronDown, ArrowRight, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LinkButton } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -43,6 +43,10 @@ type SiteUser = {
   email: string;
   fullName: string;
   avatarUrl: string | null;
+  /** Shown as a badge in the account menu (display only). Members have none. */
+  role?: "super_admin" | "admin" | "editor" | "faculty" | null;
+  /** Their Core title, else their mentor title: a plain line under the badge. */
+  title?: string | null;
   /** Staff and faculty panels this person may open. Empty for members. */
   panels: { href: string; label: string }[];
   /** A candidate with an interview booking: "My Interview" / "My Application" / "My Result". */
@@ -58,6 +62,48 @@ function initials(name: string) {
   if (parts.length === 0) return "?";
   if (parts.length === 1) return parts[0][0].toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+const ROLE_BADGE = {
+  super_admin: { label: "Super admin", className: "role-super" },
+  admin: { label: "Admin", className: "role-admin" },
+  editor: { label: "Editor", className: "role-editor" },
+  faculty: { label: "Faculty", className: "role-faculty" },
+} as const;
+
+/** The role badge and the Core or mentor title, under the name and email. Nothing for a plain member. */
+function RoleLine({ user }: { user: SiteUser }) {
+  const badge = user.role ? ROLE_BADGE[user.role] : null;
+  if (!badge && !user.title) return null;
+  return (
+    <div className="mt-1.5 flex flex-col items-start gap-1" data-role-line>
+      {badge && (
+        <span className={cn("role-badge", badge.className)} data-role-badge={user.role}>
+          {user.role === "super_admin" && <Crown size={11} aria-hidden />}
+          {badge.label}
+        </span>
+      )}
+      {user.title && <span className="max-w-full truncate text-xs text-ink/65" data-role-title>{user.title}</span>}
+    </div>
+  );
+}
+
+/** The avatar, with a thin gradient ring for the super admin. */
+function Avatar({ user, size }: { user: SiteUser; size: "h-7 w-7" | "h-8 w-8" }) {
+  const face = user.avatarUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={user.avatarUrl} alt={user.fullName} className={cn(size, "rounded-full object-cover")} />
+  ) : (
+    <span className={cn(size, "flex items-center justify-center rounded-full bg-accent text-xs font-semibold text-white")}>
+      {initials(user.fullName)}
+    </span>
+  );
+  if (user.role !== "super_admin") return face;
+  return (
+    <span className="role-ring shrink-0" data-role-ring>
+      <span className="rounded-full bg-paper p-px">{face}</span>
+    </span>
+  );
 }
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
@@ -177,14 +223,7 @@ function ProfileMenu({ user }: { user: SiteUser }) {
         aria-expanded={open}
         aria-label="Account menu"
       >
-        {user.avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={user.avatarUrl} alt={user.fullName} className="h-7 w-7 rounded-full object-cover" />
-        ) : (
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-white">
-            {initials(user.fullName)}
-          </span>
-        )}
+        <Avatar user={user} size="h-7 w-7" />
         <ChevronDown size={14} className={cn("text-ink/50 transition-transform", open && "rotate-180")} />
       </button>
 
@@ -193,6 +232,7 @@ function ProfileMenu({ user }: { user: SiteUser }) {
           <div className="px-3.5 py-2 border-b border-ink/10">
             <p className="text-sm font-medium text-ink truncate">{user.fullName}</p>
             <p className="text-xs text-ink/45 truncate">{user.email}</p>
+            <RoleLine user={user} />
           </div>
           {user.candidate && <CandidateEntryButton entry={user.candidate} place="menu" onNavigate={() => setOpen(false)} />}
           {user.panels.map((panel) => (
@@ -394,17 +434,11 @@ export function SiteHeader({
           </div>
           {user && (
             <div className="flex items-center gap-2.5 pb-3 mb-2 border-b border-ink/10">
-              {user.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-              <img src={user.avatarUrl} alt={user.fullName} className="h-8 w-8 rounded-full object-cover" />
-              ) : (
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-xs font-semibold text-white">
-                  {initials(user.fullName)}
-                </span>
-              )}
+              <Avatar user={user} size="h-8 w-8" />
               <div className="min-w-0">
                 <p className="text-sm font-medium text-ink truncate">{user.fullName}</p>
                 <p className="text-xs text-ink/45 truncate">{user.email}</p>
+                <RoleLine user={user} />
               </div>
             </div>
           )}
