@@ -726,7 +726,22 @@ a:hover > .arrow-nudge {
 .meeting-speaking-name { align-self: flex-start; border-radius: 2px; padding: 1px 6px; background: linear-gradient(90deg, #004df6, #06b6d4); color: #fff; }
 .meeting-speaking-avatar { box-shadow: 0 0 0 3px #0a1230, 0 0 0 6px #06b6d4, 0 0 18px 4px rgb(6 182 212 / 0.55); }
 
+/* A chat message floating in while the chat is closed, and the message it opens. */
+@keyframes meeting-chat-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@keyframes meeting-chat-fade { from { opacity: 0; } to { opacity: 1; } }
+.meeting-chat-card { animation: meeting-chat-in 0.25s ease-out; transition: opacity 0.25s ease-in, transform 0.25s ease-in; }
+.meeting-chat-card-out { opacity: 0; transform: translateX(24px); }
+@media (max-width: 767px) {
+  .meeting-chat-card { animation-name: meeting-chat-fade; }
+  .meeting-chat-card-out { transform: translateY(-12px); }
+}
+@keyframes meeting-chat-focus { from { background: rgb(0 77 246 / 0.18); } to { background: transparent; } }
+.meeting-chat-focus { animation: meeting-chat-focus 2.4s ease-out; }
+
 @media (prefers-reduced-motion: reduce) {
+  .meeting-chat-card { animation: meeting-chat-fade 0.2s ease-out; transition: opacity 0.15s linear; }
+  .meeting-chat-card-out { transform: none; }
+  .meeting-chat-focus { animation: none; background: rgb(0 77 246 / 0.12); }
   .meeting-reaction { animation: fade-in 0.01ms; opacity: 1; }
   .meeting-tile-in { animation: none; }
   .meeting-speaking { box-shadow: none; }

@@ -18,7 +18,7 @@ import {
   useTracks,
 } from "@livekit/components-react";
 import type { TrackReferenceOrPlaceholder } from "@livekit/components-react";
-import { ConnectionQuality, ConnectionState, DisconnectReason, RoomEvent, Track, type AudioCaptureOptions, type Participant, type RoomOptions, type VideoCaptureOptions } from "livekit-client";
+import { ConnectionQuality, ConnectionState, DisconnectReason, Room, RoomEvent, Track, type AudioCaptureOptions, type Participant, type RoomOptions, type VideoCaptureOptions } from "livekit-client";
 import {
   AudioLines,
   Bell,
@@ -26,6 +26,7 @@ import {
   Hand,
   LayoutGrid,
   LogOut,
+  MessageSquare,
   Mic,
   MicOff,
   MonitorUp,
@@ -35,11 +36,14 @@ import {
   PinOff,
   RefreshCw,
   Rows3,
+  Settings2,
   ShieldCheck,
   Smartphone,
   Smile,
+  UserPlus,
   Video,
   VideoOff,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DEVICE_KEYS } from "@/lib/interview/device";
@@ -47,8 +51,10 @@ import { createClient } from "@/lib/supabase/client";
 import { hostBadge, type Entered, type RoomPerson, type RoomState } from "@/lib/meetings/shared";
 import { cn } from "@/lib/utils";
 import type { LeaveReason } from "./enter-flow";
+import { InviteDialog } from "./invite-dialog";
+import { Popup, PopupProvider, usePopup } from "./popup";
 import { QrPanel } from "./qr-panel";
-import { Avatar, Badge, PersonMenu, RoomSidebar, type LiveInfo, type RoomApi, type Tab } from "./room-sidebar";
+import { Avatar, Badge, mentionsMe, PersonMenu, RoomSidebar, type LiveInfo, type RoomApi, type Tab } from "./room-sidebar";
 import { useRoomState } from "./use-room-state";
 
 const REACTIONS = ["👍", "👏", "😂", "❤️", "🎉"];
@@ -167,7 +173,7 @@ function Tile({ trackRef, person, api, pinned, onPin, small, fit, reaction }: { 
   const speakingNow = useSpeakingHeld(p);
   const muted = useIsMuted(trackRef);
   const micMuted = useIsMuted({ participant: p, source: Track.Source.Microphone });
-  const [menu, setMenu] = useState(false);
+  const menu = usePopup(`tile:${p.identity}:${trackRef.source}`);
   const isShare = trackRef.source === Track.Source.ScreenShare;
   const showVideo = isTrackReference(trackRef) && !muted;
   const name = person?.name ?? p.name ?? "Member";
@@ -214,17 +220,21 @@ function Tile({ trackRef, person, api, pinned, onPin, small, fit, reaction }: { 
           )}
         </div>
       )}
-      <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100">
+      <div className={cn("absolute right-1.5 top-1.5 flex gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100", menu.open && "opacity-100")}>
         <button type="button" onClick={onPin} aria-label={pinned ? `Unpin ${name}` : `Pin ${name}`} className="rounded bg-black/60 p-1 text-white">
           {pinned ? <PinOff size={13} aria-hidden /> : <Pin size={13} aria-hidden />}
         </button>
         {canManage && (
-          <button type="button" onClick={() => setMenu((v) => !v)} aria-label={`More for ${name}`} aria-expanded={menu} className="rounded bg-black/60 p-1 text-white">
+          <button type="button" {...menu.trigger} onClick={menu.toggle} aria-label={`More for ${name}`} className="rounded bg-black/60 p-1 text-white">
             <MoreHorizontal size={13} aria-hidden />
           </button>
         )}
       </div>
-      {menu && canManage && api && person && <PersonMenu person={person} api={api} onDone={() => setMenu(false)} className="absolute right-1.5 top-9 z-20" />}
+      {canManage && api && person && (
+        <Popup popup={menu} label={`Host actions for ${name}`}>
+          <PersonMenu person={person} api={api} />
+        </Popup>
+      )}
     </div>
   );
 }
@@ -329,23 +339,142 @@ function Stage({ state, api, view, phone, reactions }: { state: RoomState | null
   );
 }
 
-function Ctrl({ label, on, danger, onClick, children, disabled, pressed }: { label: string; on?: boolean; danger?: boolean; onClick?: () => void; children: React.ReactNode; disabled?: boolean; pressed?: boolean }) {
+function Ctrl({
+  label,
+  on,
+  danger,
+  onClick,
+  children,
+  disabled,
+  pressed,
+  popup,
+  count,
+}: {
+  label: string;
+  on?: boolean;
+  danger?: boolean;
+  onClick?: () => void;
+  children: React.ReactNode;
+  disabled?: boolean;
+  pressed?: boolean;
+  popup?: ReturnType<typeof usePopup>;
+  count?: number;
+}) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      {...popup?.trigger}
+      onClick={popup ? popup.toggle : onClick}
       disabled={disabled}
       aria-label={label}
       aria-pressed={pressed}
       title={label}
       className={cn(
-        "flex h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-sm text-[10px] font-medium disabled:opacity-40 md:h-12 md:min-w-14 md:flex-none md:shrink-0 md:px-2",
-        danger ? "bg-red-600 text-white hover:bg-red-700" : on === false ? "bg-ink/10 text-ink hover:bg-ink/15" : on ? "bg-accent text-white hover:bg-accent/90" : "text-ink hover:bg-ink/5",
+        "relative flex h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-sm text-[10px] font-medium disabled:opacity-40 md:h-12 md:min-w-14 md:flex-none md:shrink-0 md:px-2",
+        danger ? "bg-red-600 text-white hover:bg-red-700" : on === false ? "bg-ink/10 text-ink hover:bg-ink/15" : on || popup?.open ? "bg-accent text-white hover:bg-accent/90" : "text-ink hover:bg-ink/5",
       )}
     >
       {children}
+      {Boolean(count) && (
+        <span className="absolute right-1 top-0.5 min-w-4 rounded-full bg-red-600 px-1 text-center text-[10px] font-bold leading-4 text-white md:right-2" data-unread={count}>
+          {count! > 99 ? "99+" : count}
+          <span className="sr-only"> unread</span>
+        </span>
+      )}
       <span className="hidden md:block">{label}</span>
     </button>
+  );
+}
+
+const DEVICE_KINDS = [
+  { kind: "audioinput", label: "Microphone", key: DEVICE_KEYS.microphone },
+  { kind: "videoinput", label: "Camera", key: DEVICE_KEYS.camera },
+] as const;
+
+/** The microphone and camera in use, switched without leaving the room. */
+function DeviceMenu() {
+  const room = useRoomContext();
+  const [devices, setDevices] = useState<Record<string, MediaDeviceInfo[]>>({});
+  const [, setPicked] = useState(0);
+  useEffect(() => {
+    let gone = false;
+    void Promise.all(DEVICE_KINDS.map((d) => Room.getLocalDevices(d.kind).catch(() => [] as MediaDeviceInfo[]))).then((lists) => {
+      if (!gone) setDevices(Object.fromEntries(DEVICE_KINDS.map((d, i) => [d.kind, lists[i]])));
+    });
+    return () => {
+      gone = true;
+    };
+  }, []);
+  const pick = (kind: MediaDeviceKind, key: string, id: string) => {
+    void room.switchActiveDevice(kind, id).then(() => setPicked((n) => n + 1)).catch(() => {});
+    try {
+      sessionStorage.setItem(key, id);
+    } catch {}
+  };
+  return (
+    <div className="w-72 py-1 text-sm">
+      {DEVICE_KINDS.map((d) => {
+        const active = room.getActiveDevice(d.kind) ?? saved(d.key) ?? "default";
+        const list = devices[d.kind] ?? [];
+        return (
+          <div key={d.kind} role="group" aria-label={d.label}>
+            <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink/55">{d.label}</p>
+            {list.length === 0 && <p className="px-3 py-1.5 text-ink/60">None found</p>}
+            {list.map((device, i) => (
+              <button
+                key={device.deviceId || i}
+                type="button"
+                role="menuitemradio"
+                aria-checked={device.deviceId === active}
+                onClick={() => pick(d.kind, d.key, device.deviceId)}
+                className={cn("flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-ink/5", device.deviceId === active && "font-semibold text-accent-text")}
+              >
+                <span className="min-w-0 flex-1 truncate">{device.label || `${d.label} ${i + 1}`}</span>
+              </button>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+type ChatCard = { id: string; name: string; avatar_url: string | null; body: string; mention: boolean; leaving?: boolean };
+
+/** A new chat message, for a few seconds while the chat is closed. Hovering keeps it. */
+function FloatingMessage({ card, onGone, onOpen }: { card: ChatCard; onGone: (id: string) => void; onOpen: (id: string) => void }) {
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    if (held || card.leaving) return;
+    const timer = window.setTimeout(() => onGone(card.id), card.mention ? 10000 : 6000);
+    return () => window.clearTimeout(timer);
+  }, [held, card, onGone]);
+  return (
+    <div
+      className={cn(
+        "meeting-chat-card pointer-events-auto relative flex w-full gap-2.5 border bg-surface p-2.5 pr-8 text-ink shadow-xl",
+        card.mention ? "border-accent" : "border-line",
+        card.leaving && "meeting-chat-card-out",
+      )}
+      onMouseEnter={() => setHeld(true)}
+      onMouseLeave={() => setHeld(false)}
+      data-chat-card={card.id}
+      data-mention={card.mention ? "" : undefined}
+    >
+      <button type="button" onClick={() => onOpen(card.id)} className="flex min-w-0 flex-1 gap-2.5 text-left" aria-label={`Message from ${card.name}: ${card.body}. Open the chat`}>
+        <Avatar person={{ name: card.name, avatar_url: card.avatar_url }} />
+        <span className="min-w-0 flex-1 text-sm">
+          <span className="flex items-center gap-1.5 text-xs font-semibold">
+            <span className="truncate">{card.name}</span>
+            {card.mention && <span className="shrink-0 rounded-sm bg-accent px-1 py-px text-[10px] text-white">Mentioned you</span>}
+          </span>
+          <span className="line-clamp-2 break-words text-ink/85">{card.body}</span>
+        </span>
+      </button>
+      <button type="button" aria-label="Dismiss" onClick={() => onGone(card.id)} className="absolute right-1.5 top-1.5 p-1 text-ink/55 hover:text-ink">
+        <X size={14} aria-hidden />
+      </button>
+    </div>
   );
 }
 
@@ -366,9 +495,15 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
   const [floats, setFloats] = useState<Float[]>([]);
   const [reactions, setReactions] = useState<Record<string, string>>({});
   const [announce, setAnnounce] = useState("");
-  const [reacting, setReacting] = useState(false);
-  const [hostMenu, setHostMenu] = useState(false);
+  const reactMenu = usePopup("react");
+  const hostMenu = usePopup("host");
+  const deviceMenu = usePopup("devices");
   const [moving, setMoving] = useState(false);
+  const [cards, setCards] = useState<ChatCard[]>([]);
+  const [unread, setUnread] = useState(0);
+  const [chatSound, setChatSound] = useState(false);
+  const [chatFocus, setChatFocus] = useState<{ id: string; at: number } | null>(null);
+  const [inviting, setInviting] = useState(false);
   const [chime, setChime] = useState(true);
   const [ask, setAsk] = useState<{ title: string; body: string; label: string; run: () => void } | null>(null);
   const askDialog = useRef<HTMLDialogElement>(null);
@@ -575,7 +710,66 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
     return out;
   }, [participants]);
 
-  const api: RoomApi | null = useMemo(() => (state ? { meetingId, state, live, reactions, host, act, confirm, toast, nudge } : null), [meetingId, state, live, reactions, host, act, confirm, toast, nudge]);
+  const invite = useCallback(() => setInviting(true), []);
+  const api: RoomApi | null = useMemo(
+    () => (state ? { meetingId, state, live, reactions, host, act, confirm, toast, nudge, invite } : null),
+    [meetingId, state, live, reactions, host, act, confirm, toast, nudge, invite],
+  );
+
+  // New chat messages from others float in while the chat is closed, at most three at a time.
+  const chatOpen = tab === "chat" && (phone ? sheet : panel);
+  const chatOpenRef = useRef(chatOpen);
+  const chatSoundRef = useRef(chatSound);
+  useEffect(() => {
+    chatOpenRef.current = chatOpen;
+    chatSoundRef.current = chatSound;
+  }, [chatOpen, chatSound]);
+  if (chatOpen && (unread > 0 || cards.length > 0)) {
+    setUnread(0);
+    setCards([]);
+  }
+  const seenChat = useRef<Set<string> | null>(null);
+  const heardChat = useCallback((s: RoomState) => {
+    const seen = seenChat.current;
+    // What was written before I came in is not news.
+    if (!seen) {
+      seenChat.current = new Set(s.chat.map((m) => m.id));
+      return;
+    }
+    const removed = new Set(s.chat.filter((m) => m.deleted).map((m) => m.id));
+    if (removed.size) setCards((all) => (all.some((c) => removed.has(c.id)) ? all.filter((c) => !removed.has(c.id)) : all));
+    const fresh = s.chat.filter((m) => !seen.has(m.id));
+    fresh.forEach((m) => seen.add(m.id));
+    const others = fresh.filter((m) => !m.deleted && m.user_id !== s.me.id);
+    if (others.length === 0) return;
+    if (chatSoundRef.current) tone([740]);
+    if (chatOpenRef.current) return;
+    const me = s.people.find((p) => p.id === s.me.id)?.name;
+    setUnread((n) => n + others.length);
+    setCards((all) => [
+      ...all,
+      ...others.map((m) => ({
+        id: m.id,
+        name: m.name ?? "Someone",
+        avatar_url: s.people.find((p) => p.id === m.user_id)?.avatar_url ?? null,
+        body: m.body ?? "",
+        mention: mentionsMe(m.body, me),
+      })),
+    ].slice(-3));
+  }, []);
+  useEffect(() => {
+    if (!state) return;
+    const timer = window.setTimeout(() => heardChat(state), 0);
+    return () => window.clearTimeout(timer);
+  }, [state, heardChat]);
+  const cardGone = useCallback((id: string) => {
+    setCards((all) => all.map((c) => (c.id === id ? { ...c, leaving: true } : c)));
+    window.setTimeout(() => setCards((all) => all.filter((c) => c.id !== id)), quietMotion() ? 150 : 260);
+  }, []);
+  const openChatAt = (id: string) => {
+    setChatFocus((was) => ({ id, at: (was?.at ?? 0) + 1 }));
+    openPanel("chat");
+  };
 
   const toggleMic = async () => {
     clicked.current = Date.now();
@@ -634,7 +828,6 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
   const sentAt = useRef(0);
   const react = useCallback(
     (emoji: string) => {
-      setReacting(false);
       const now = Date.now();
       if (now - sentAt.current < 1000) return;
       sentAt.current = now;
@@ -666,7 +859,9 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
     <div className="flex h-full min-h-0 flex-col" onPointerMove={onDrag} onPointerUp={() => (dragging.current = false)}>
       <div className="flex min-h-0 flex-1">
         <div className="relative min-h-0 min-w-0 flex-1 bg-[#00030D]">
-          <Stage state={state} api={api} view={view} phone={phone} reactions={reactions} />
+          <div className="h-full" data-popup-calm>
+            <Stage state={state} api={api} view={view} phone={phone} reactions={reactions} />
+          </div>
           {(connection === ConnectionState.Reconnecting || connection === ConnectionState.SignalReconnecting) && (
             <p role="status" className="absolute inset-x-0 top-0 z-20 bg-amber-500 px-3 py-1.5 text-center text-sm font-medium text-black">
               Reconnecting…
@@ -740,6 +935,13 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
               </p>
             ))}
           </div>
+          {cards.length > 0 && (
+            <div className={cn("pointer-events-none absolute z-30 space-y-2", phone ? "inset-x-2 top-2" : "bottom-3 right-3 w-80")} aria-live="polite" data-chat-cards>
+              {cards.map((c) => (
+                <FloatingMessage key={c.id} card={c} onGone={cardGone} onOpen={openChatAt} />
+              ))}
+            </div>
+          )}
           <StartAudio label="Tap to enable sound" className="absolute! left-1/2 top-1/2 z-30 -translate-x-1/2 -translate-y-1/2 rounded! bg-[#004df6]! px-6! py-4! text-base! font-semibold! text-white! shadow-xl" />
         </div>
 
@@ -756,7 +958,7 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
               className="w-1.5 shrink-0 cursor-col-resize touch-none bg-line hover:bg-accent"
             />
             <aside className="h-full min-h-0 shrink-0" style={{ width }} aria-label="Meeting panel">
-              <RoomSidebar api={api} tab={tab} onTab={setTab} onClose={() => setPanel(false)} />
+              <RoomSidebar api={api} tab={tab} onTab={setTab} onClose={() => setPanel(false)} chat={{ focus: chatFocus, sound: chatSound, onSound: setChatSound }} />
             </aside>
           </>
         )}
@@ -765,7 +967,7 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
       {phone && sheet && api && (
         <div className="fixed inset-0 z-40 flex flex-col justify-end bg-black/50" onClick={(e) => e.target === e.currentTarget && setSheet(false)}>
           <div className="h-[72dvh] min-h-0">
-            <RoomSidebar api={api} tab={tab} onTab={setTab} onClose={() => setSheet(false)} />
+            <RoomSidebar api={api} tab={tab} onTab={setTab} onClose={() => setSheet(false)} chat={{ focus: chatFocus, sound: chatSound, onSound: setChatSound }} />
           </div>
         </div>
       )}
@@ -789,11 +991,14 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
         <Ctrl label={handUp ? "Lower hand" : "Raise hand"} on={handUp ? true : undefined} pressed={handUp} onClick={() => void raise(!handUp)}>
           <Hand size={18} aria-hidden />
         </Ctrl>
-        <Ctrl label="React" pressed={reacting} onClick={() => setReacting((v) => !v)}>
+        <Ctrl label="React" popup={reactMenu}>
           <Smile size={18} aria-hidden />
         </Ctrl>
         <Ctrl label="People" onClick={() => openPanel("people")}>
           <PanelRight size={18} aria-hidden />
+        </Ctrl>
+        <Ctrl label="Chat" count={unread} onClick={() => openPanel("chat")}>
+          <MessageSquare size={18} aria-hidden />
         </Ctrl>
         {!phone && (
           <Ctrl label={view === "gallery" ? "Speaker view" : "Gallery view"} onClick={() => setView((v) => (v === "gallery" ? "speaker" : "gallery"))}>
@@ -811,11 +1016,14 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
             <Smartphone size={18} aria-hidden />
           </Ctrl>
         )}
+        <Ctrl label="Devices" popup={deviceMenu}>
+          <Settings2 size={18} aria-hidden />
+        </Ctrl>
         <Ctrl label="Fix audio/video" onClick={() => void fix()}>
           <RefreshCw size={18} aria-hidden />
         </Ctrl>
         {isHost && (
-          <Ctrl label="Host" pressed={hostMenu} onClick={() => setHostMenu((v) => !v)}>
+          <Ctrl label="Host" popup={hostMenu}>
             <ShieldCheck size={18} aria-hidden />
           </Ctrl>
         )}
@@ -824,18 +1032,25 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
         </Ctrl>
       </nav>
 
-      {reacting && (
-        <div className="fixed bottom-16 left-1/2 z-50 flex -translate-x-1/2 gap-1 border border-line bg-surface p-1.5 shadow-xl" role="group" aria-label="Reactions">
+      <Popup popup={reactMenu} label="Reactions" role="group" align="center">
+        <div className="flex gap-1 p-1.5">
           {REACTIONS.map((emoji) => (
-            <button key={emoji} type="button" onClick={() => react(emoji)} aria-label={`React ${emoji}`} className="rounded-sm p-1.5 text-2xl hover:bg-ink/5">
+            <button key={emoji} type="button" data-popup-close onClick={() => react(emoji)} aria-label={`React ${emoji}`} className="rounded-sm p-1.5 text-2xl hover:bg-ink/5">
               {emoji}
             </button>
           ))}
         </div>
-      )}
+      </Popup>
 
-      {hostMenu && isHost && (
-        <div className="fixed bottom-16 right-2 z-50 w-60 border border-line bg-surface py-1 text-sm text-ink shadow-xl" role="menu" aria-label="Host controls">
+      <Popup popup={deviceMenu} label="Devices" align="center">
+        <DeviceMenu />
+      </Popup>
+
+      {isHost && (
+        <Popup popup={hostMenu} label="Host controls" className="w-60 py-1 text-sm">
+          <button type="button" role="menuitem" className="flex w-full items-center gap-2 px-3 py-2 text-left font-medium hover:bg-ink/5" onClick={invite}>
+            <UserPlus size={14} aria-hidden /> Invite people
+          </button>
           {[
             ["Mute all", () => act("mute_all")],
             ["Ask all to turn cameras off", () => act("cameras_off")],
@@ -847,10 +1062,7 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
               type="button"
               role="menuitem"
               className="block w-full px-3 py-2 text-left hover:bg-ink/5"
-              onClick={() => {
-                (run as () => void)();
-                setHostMenu(false);
-              }}
+              onClick={() => (run as () => void)()}
             >
               {label as string}
             </button>
@@ -863,16 +1075,21 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
             role="menuitem"
             className="block w-full border-t border-line px-3 py-2 text-left font-medium text-red-600 hover:bg-red-500/10"
             onClick={() => {
-              setHostMenu(false);
               confirm("End the meeting for everyone?", "Everyone will leave the room. The minutes stay available.", "End for all", () => act("end"));
             }}
           >
             End meeting for all
           </button>
-        </div>
+        </Popup>
       )}
 
-      <dialog ref={moveDialog} aria-label="Move to another device" onClose={() => setMoving(false)} className="m-auto w-[min(92vw,24rem)] border border-line bg-surface p-6 text-ink backdrop:bg-black/60">
+      <InviteDialog meetingId={meetingId} open={inviting} onClose={() => setInviting(false)} onSent={toast} />
+
+      <dialog
+        ref={moveDialog}
+        aria-label="Move to another device"
+        onClose={() => setMoving(false)}
+        onClick={(e) => e.target === e.currentTarget && moveDialog.current?.close()} className="m-auto w-[min(92vw,24rem)] border border-line bg-surface p-6 text-ink backdrop:bg-black/60">
         <h2 className="text-center font-serif text-xl">Move to another device</h2>
         <div className="mt-3">{moving && <QrPanel meetingId={meetingId} purpose="move" />}</div>
         <div className="mt-4 text-center">
@@ -945,7 +1162,8 @@ function RoomInner({ meetingId, entered, onLeaveWhy }: { meetingId: string; ente
 /**
  * The meeting room: full viewport, the page behind it does not scroll. Everyone on one
  * screen in the gallery (a scrolling grid on a phone), or the speaker large; a screen
- * share takes the main area with everyone else in a strip.
+ * share takes the main area with everyone else in a strip. Menus open in a layer above
+ * the tiles, one at a time; new chat messages float in while the chat is closed.
  * No recording and no integrity tracking.
  */
 export function MeetingRoom({ meetingId, entered, muted, cameraOff, onLeave }: { meetingId: string; entered: Entered; muted: boolean; cameraOff: boolean; onLeave: (why: LeaveReason) => void }) {
@@ -1007,7 +1225,9 @@ export function MeetingRoom({ meetingId, entered, muted, cameraOff, onLeave }: {
     <div className="fixed inset-0 z-[70] bg-surface" style={{ height: phone ? "100dvh" : undefined }}>
       <LiveKitRoom serverUrl={entered.serverUrl} token={entered.token} connect video={video} audio={audio} options={options} onDisconnected={onDisconnected} onError={onError} style={{ height: "100%" }}>
         <RoomAudioRenderer />
-        <RoomInner meetingId={meetingId} entered={entered} onLeaveWhy={finish} />
+        <PopupProvider>
+          <RoomInner meetingId={meetingId} entered={entered} onLeaveWhy={finish} />
+        </PopupProvider>
       </LiveKitRoom>
     </div>
   );

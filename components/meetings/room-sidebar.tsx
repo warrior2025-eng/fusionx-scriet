@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Hand, Mic, MicOff, MoreHorizontal, PhoneCall, Trash2, Video, VideoOff, X } from "lucide-react";
+import { Bell, BellOff, Hand, Mic, MicOff, MoreHorizontal, PhoneCall, Trash2, UserPlus, Video, VideoOff, X } from "lucide-react";
 import { countdownText, useServerClock } from "@/components/interview/use-server-clock";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea } from "@/components/ui/field";
@@ -9,6 +9,7 @@ import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { createClient } from "@/lib/supabase/client";
 import { HOST_REMOVABLE, hostBadge, linkParts, type RoomPerson, type RoomState } from "@/lib/meetings/shared";
 import { cn } from "@/lib/utils";
+import { Popup, usePopup } from "./popup";
 
 export type LiveInfo = Record<string, { mic: boolean; camera: boolean; quality: "good" | "poor" | "lost" | "unknown" }>;
 export type Tab = "people" | "chat" | "agenda" | "notes";
@@ -24,6 +25,8 @@ export type RoomApi = {
   confirm: (title: string, body: string, confirmLabel: string, run: () => void) => void;
   toast: (message: string) => void;
   nudge: () => void;
+  /** Opens "Invite people" (hosts). */
+  invite: () => void;
 };
 
 const TABS: { key: Tab; label: string }[] = [
@@ -45,7 +48,15 @@ export function Badge({ children, tone = "plain" }: { children: React.ReactNode;
   return <span className={cn("rounded-sm px-1.5 py-0.5 text-[11px] font-semibold", tone === "accent" ? "bg-accent text-white" : "border border-ink/25 text-ink/80")}>{children}</span>;
 }
 
-/** What a host can do to one person: the same menu in People and on a tile. */
+/** Whether a chat message names me: "@Riya" or "@Riya Sharma". */
+export function mentionsMe(body: string | null, name: string | undefined): boolean {
+  const full = (name ?? "").trim();
+  if (!body || !full) return false;
+  const esc = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^\\w@])@(${esc(full)}|${esc(full.split(/\s+/)[0])})(?!\\w)`, "i").test(body);
+}
+
+/** What a host can do to one person: the same menu in People and on a tile, shown in a popup. */
 export function PersonMenu({ person, api, onDone, className }: { person: RoomPerson; api: RoomApi; onDone?: () => void; className?: string }) {
   const kind = person.host_kind;
   const item = "block w-full px-3 py-2 text-left text-sm text-ink hover:bg-ink/5";
@@ -54,7 +65,7 @@ export function PersonMenu({ person, api, onDone, className }: { person: RoomPer
     onDone?.();
   };
   return (
-    <div className={cn("min-w-44 border border-line bg-paper py-1 shadow-lg", className)} role="menu" aria-label={`Host actions for ${person.name}`}>
+    <div className={cn("min-w-44 py-1", className)}>
       {!kind && (
         <button type="button" role="menuitem" className={item} onClick={() => run(() => api.act("make_cohost", { user: person.id }))}>
           Make co-host
@@ -94,7 +105,7 @@ export function PersonMenu({ person, api, onDone, className }: { person: RoomPer
 }
 
 function PersonRow({ person, api, handOrder }: { person: RoomPerson; api: RoomApi; handOrder?: number }) {
-  const [open, setOpen] = useState(false);
+  const menu = usePopup(`person:${person.id}`);
   const live = api.live[person.id];
   const isHost = api.state.me.is_host;
   const self = person.id === api.state.me.id;
@@ -147,12 +158,14 @@ function PersonRow({ person, api, handOrder }: { person: RoomPerson; api: RoomAp
         </Button>
       )}
       {isHost && !self && (
-        <div className="relative">
-          <button type="button" aria-label={`More for ${person.name}`} aria-expanded={open} onClick={() => setOpen((v) => !v)} className="rounded-sm p-1 text-ink/65 hover:bg-ink/5 hover:text-ink">
+        <>
+          <button type="button" {...menu.trigger} aria-label={`More for ${person.name}`} onClick={menu.toggle} className="rounded-sm p-1 text-ink/65 hover:bg-ink/5 hover:text-ink">
             <MoreHorizontal size={16} aria-hidden />
           </button>
-          {open && <PersonMenu person={person} api={api} onDone={() => setOpen(false)} className="absolute right-0 top-full z-20" />}
-        </div>
+          <Popup popup={menu} label={`Host actions for ${person.name}`}>
+            <PersonMenu person={person} api={api} />
+          </Popup>
+        </>
       )}
     </li>
   );
@@ -189,6 +202,9 @@ function PeopleTab({ api }: { api: RoomApi }) {
     <div className="space-y-4">
       {state.me.is_host && (
         <div className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" onClick={api.invite} data-invite-open>
+            <UserPlus size={13} aria-hidden /> Invite people
+          </Button>
           <Button type="button" variant="secondary" size="sm" disabled={notJoined === 0} onClick={() => api.act("ring")}>
             <PhoneCall size={13} aria-hidden /> Ring all not joined
           </Button>
@@ -215,7 +231,7 @@ function PeopleTab({ api }: { api: RoomApi }) {
         <section key={g.name} aria-label={g.name}>
           <h3 className="text-sm font-semibold text-ink">{g.name}</h3>
           {part(g.people.filter((p) => p.in_room), "In the room", g.name)}
-          {part(g.people.filter((p) => !p.in_room && !p.cant), "Not joined yet", g.name)}
+          {part(g.people.filter((p) => !p.in_room && !p.cant), "Invited · not joined yet", g.name)}
           {part(g.people.filter((p) => !p.in_room && p.cant), "Can’t make it", g.name)}
         </section>
       ))}
@@ -223,15 +239,26 @@ function PeopleTab({ api }: { api: RoomApi }) {
   );
 }
 
-function ChatTab({ api }: { api: RoomApi }) {
+export type ChatView = { focus: { id: string; at: number } | null; sound: boolean; onSound: (on: boolean) => void };
+
+function ChatTab({ api, view }: { api: RoomApi; view?: ChatView }) {
   const { state } = api;
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const end = useRef<HTMLLIElement>(null);
+  const list = useRef<HTMLUListElement>(null);
   const count = state.chat.length;
+  const myName = state.people.find((p) => p.id === state.me.id)?.name;
+  const focus = view?.focus;
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
   }, [count]);
+  // Opened from a floating message: that message, in view and marked for a moment.
+  useEffect(() => {
+    if (!focus) return;
+    const item = list.current?.querySelector<HTMLElement>(`[data-chat-id="${focus.id}"]`);
+    item?.scrollIntoView({ block: "center" });
+  }, [focus]);
   const send = async () => {
     const body = text.trim();
     if (!body || sending) return;
@@ -245,10 +272,26 @@ function ChatTab({ api }: { api: RoomApi }) {
   if (!state.meeting.chat_on) return <p className="text-sm text-ink/70">Chat is off for this meeting.</p>;
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <ul className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+      {view && (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={view.sound}
+          onClick={() => view.onSound(!view.sound)}
+          className="mb-2 flex items-center gap-1.5 self-end text-xs text-ink/65 hover:text-ink"
+          data-chat-sound
+        >
+          {view.sound ? <Bell size={12} aria-hidden /> : <BellOff size={12} aria-hidden />} Sound for new messages: {view.sound ? "on" : "off"}
+        </button>
+      )}
+      <ul ref={list} className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
         {count === 0 && <li className="text-sm text-ink/60">No messages yet.</li>}
         {state.chat.map((m) => (
-          <li key={m.id} className="group text-sm">
+          <li
+            key={m.id}
+            className={cn("group text-sm", focus?.id === m.id && "meeting-chat-focus", !m.deleted && m.user_id !== state.me.id && mentionsMe(m.body, myName) && "border-l-2 border-accent pl-2")}
+            data-chat-id={m.id}
+          >
             <p className="text-xs text-ink/60">
               <span className="font-semibold text-ink/85">{m.name ?? "Someone"}</span> · {new Date(m.at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })}
               {state.me.is_host && !m.deleted && (
@@ -499,7 +542,7 @@ function NotesTab({ api }: { api: RoomApi }) {
 }
 
 /** People · Chat · Agenda · Notes, with its own scroll. */
-export function RoomSidebar({ api, tab, onTab, onClose }: { api: RoomApi; tab: Tab; onTab: (tab: Tab) => void; onClose: () => void }) {
+export function RoomSidebar({ api, tab, onTab, onClose, chat }: { api: RoomApi; tab: Tab; onTab: (tab: Tab) => void; onClose: () => void; chat?: ChatView }) {
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface text-ink">
       <div className="flex shrink-0 items-center border-b border-line" role="tablist" aria-label="Meeting panel">
@@ -522,7 +565,7 @@ export function RoomSidebar({ api, tab, onTab, onClose }: { api: RoomApi; tab: T
       </div>
       <div className={cn("min-h-0 flex-1 p-3.5", tab === "chat" ? "flex flex-col overflow-hidden" : "overflow-y-auto")} role="tabpanel">
         {tab === "people" && <PeopleTab api={api} />}
-        {tab === "chat" && <ChatTab api={api} />}
+        {tab === "chat" && <ChatTab api={api} view={chat} />}
         {tab === "agenda" && <AgendaTab api={api} />}
         {/* Kept mounted so unsaved typing survives a look at another tab. */}
         <div className={tab === "notes" ? "" : "hidden"}>
