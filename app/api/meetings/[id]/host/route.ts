@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 const ACTIONS = [
   "set_notes", "action_add", "action_delete", "send_minutes", "make_cohost", "remove_cohost", "admit", "admit_all", "deny", "knock_let_in", "knock_not_now",
   "ring", "lower_hand", "lower_hands", "lock", "agenda", "chat_delete", "mute_all", "cameras_off", "mute_person", "remove_person", "end",
+  "invite_search", "invite",
 ] as const;
 
 const bodySchema = z.object({
@@ -21,6 +22,10 @@ const bodySchema = z.object({
       decisions: z.array(z.string().max(500)).max(100).optional(),
       task: z.string().max(300).optional(),
       due_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")).optional(),
+      q: z.string().max(100).optional(),
+      users: z.array(z.string().uuid()).max(50).optional(),
+      emails: z.array(z.string().trim().toLowerCase().pipe(z.email())).max(50).optional(),
+      ring: z.boolean().optional(),
     })
     .default({}),
 });
@@ -45,6 +50,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "That request was not understood." }, { status: 400 });
   const { action, args } = parsed.data;
+
+  // Inviting from the room: the database checks the host right, the hourly limit and the
+  // email rules, and writes the passes, notifications, rings and the audit entry.
+  if (action === "invite_search" || action === "invite") {
+    const { data, error } =
+      action === "invite_search"
+        ? await supabase.rpc("meeting_invite_search", { p_meeting: id, p_q: args.q ?? "" })
+        : await supabase.rpc("meeting_invite_live", { p_meeting: id, p_users: args.users ?? [], p_emails: args.emails ?? [], p_ring: args.ring ?? true });
+    if (error) {
+      const forbidden = /FORBIDDEN/.test(error.message);
+      return Response.json({ error: forbidden ? "Only a host can do this." : friendlyDbError(error.message, "That could not be done.") }, { status: forbidden ? 403 : 400 });
+    }
+    if (action === "invite") {
+      if (roomConfigured()) await nudgeRoom(id);
+      deliverEmailsAfterResponse();
+    }
+    return Response.json(action === "invite_search" ? { results: data ?? [] } : data, { headers: { "Cache-Control": "no-store" } });
+  }
 
   const { data, error } = await supabase.rpc("meeting_host_action", { p_meeting: id, p_action: action, p: args });
   if (error) {
