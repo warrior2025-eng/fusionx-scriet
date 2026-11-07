@@ -152,6 +152,8 @@ export function ImageField({
   photo,
   accept = "image/jpeg,image/png,image/webp",
   removeLabel = "Remove the current image",
+  onCropped,
+  onRemove,
   className,
 }: {
   name: string;
@@ -162,6 +164,10 @@ export function ImageField({
   photo?: boolean;
   accept?: string;
   removeLabel?: string;
+  /** Called with the finished crop, e.g. to save it at once. */
+  onCropped?: (file: File) => void;
+  /** With this, "remove" is a button that acts at once instead of a box sent with the form. */
+  onRemove?: () => void;
   className?: string;
 }) {
   const square = squareProp || photo;
@@ -258,6 +264,7 @@ export function ImageField({
       setApplied(fixed);
       setPreview(URL.createObjectURL(file));
       dialogRef.current?.close();
+      onCropped?.(file);
     } catch (error) {
       setLocalError(error instanceof Error && error.message === TOO_LARGE ? TOO_LARGE : "This picture could not be cropped. Try another one.");
       dialogRef.current?.close();
@@ -327,7 +334,12 @@ export function ImageField({
             onChange={onChange}
             className="block w-full text-sm text-ink/80 file:mr-3 file:cursor-pointer file:border file:border-ink/30 file:bg-transparent file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink"
           />
-          {currentUrl && !preview && (
+          {currentUrl && !preview && onRemove && (
+            <button type="button" onClick={onRemove} className="text-sm font-medium text-ink/80 underline underline-offset-2 hover:text-ink">
+              {removeLabel}
+            </button>
+          )}
+          {currentUrl && !preview && !onRemove && (
             <label className="flex cursor-pointer items-center gap-2 text-sm text-ink/80">
               <input
                 type="checkbox"

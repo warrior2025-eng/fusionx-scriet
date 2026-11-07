@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { updateProfile, type ProfileActionState } from "@/actions/profile";
+import { useRouter } from "next/navigation";
+import { updatePhoto, updateProfile, type ProfileActionState } from "@/actions/profile";
 import { ImageField } from "@/components/admin/image-field";
 import { photoSource } from "@/lib/photo-source";
 import { useFormSubmit } from "@/components/ui/form-errors";
@@ -24,6 +25,29 @@ function fill(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
 
 export function ProfileForm({ profile, email, isCoreMember, cardHasTeamPhoto = false }: { profile: Profile; email: string; isCoreMember: boolean; cardHasTeamPhoto?: boolean }) {
   const source = photoSource(profile.avatar_url);
+  const router = useRouter();
+  const [photoState, setPhotoState] = useState<{ busy: boolean; ok?: boolean; message?: string }>({ busy: false });
+  // The photo is saved on its own as soon as it is cropped or removed.
+  const savePhotoNow = async (data: FormData) => {
+    setPhotoState({ busy: true, message: "Saving your photo…" });
+    try {
+      const result = await updatePhoto(data);
+      setPhotoState({ busy: false, ok: result.ok, message: result.message });
+      if (result.ok) router.refresh();
+    } catch {
+      setPhotoState({ busy: false, ok: false, message: "The photo couldn't be sent. Check your connection and try again." });
+    }
+  };
+  const onCropped = (file: File) => {
+    const data = new FormData();
+    data.set("avatar", file);
+    void savePhotoNow(data);
+  };
+  const onRemovePhoto = () => {
+    const data = new FormData();
+    data.set("avatar__remove", "on");
+    void savePhotoNow(data);
+  };
   const [bio, setBio] = useState(profile.bio ?? "");
   // Remounts the fields after a save, so they show what was saved.
   const [version, setVersion] = useState(0);
@@ -104,7 +128,15 @@ export function ProfileForm({ profile, email, isCoreMember, cardHasTeamPhoto = f
         hint="JPG, PNG, WEBP, GIF, BMP, HEIC or AVIF, up to 15 MB. You choose the square crop, and it is shrunk for you."
         currentUrl={profile.avatar_url}
         photo
+        removeLabel="Remove photo"
+        onCropped={onCropped}
+        onRemove={onRemovePhoto}
       />
+      {photoState.message && (
+        <p role={photoState.ok === false ? "alert" : "status"} className={photoState.ok === false ? "-mt-3 text-sm text-red-600" : "-mt-3 text-sm text-accent"} data-photo-status>
+          {photoState.message}
+        </p>
+      )}
       {(source !== "none" || cardHasTeamPhoto) && (
         <div className="-mt-3 space-y-1 text-sm text-ink/70" data-photo-source={source}>
           {source === "own" && <p>Your photo.</p>}

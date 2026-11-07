@@ -104,6 +104,23 @@ async function setPhoto(supabase: Awaited<ReturnType<typeof createClient>>, user
   return (await supabase.from("profiles").update({ avatar_url: url }).eq("id", userId)).error;
 }
 
+/**
+ * The photo alone, saved as soon as it is cropped (or removed), so it never waits for
+ * the rest of the profile form to be valid and saved.
+ */
+export async function updatePhoto(formData: FormData): Promise<{ ok: boolean; message: string; signedOut?: boolean }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "You were signed out. Sign in again, then choose the photo again.", signedOut: true };
+  const removing = formData.get("avatar__remove") === "on";
+  const problem = await savePhoto(supabase, user.id, formData);
+  touched();
+  if (problem) return { ok: false, message: problem };
+  return { ok: true, message: removing ? "Photo removed." : "Photo saved." };
+}
+
 /** Optional. The path starts with the user's own id, which the storage policy checks. Returns what went wrong. */
 async function savePhoto(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, formData: FormData): Promise<string | null> {
   const file = formData.get("avatar");
@@ -115,11 +132,15 @@ async function savePhoto(supabase: Awaited<ReturnType<typeof createClient>>, use
     if (!kind) return "This file isn't an image.";
     const path = `${userId}/avatar.${kind.ext}`;
     const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, { contentType: kind.type, upsert: true });
-    if (uploadError) return "Couldn't upload the photo, please try again.";
+    if (uploadError) {
+      console.error("profile photo upload:", uploadError.message);
+      return `Couldn't upload the photo (${uploadError.message}). Please try again.`;
+    }
     // Cache-bust so the new photo shows immediately instead of a stale copy at the same URL.
     const url = `${supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl}?t=${Date.now()}`;
     const error = await setPhoto(supabase, userId, url);
-    return error ? "Couldn't upload the photo, please try again." : null;
+    if (error) console.error("profile photo save:", error.message);
+    return error ? "Couldn't save the photo to your profile, please try again." : null;
   }
 
   // "Remove the current image": the photo leaves the profile, and any file of
