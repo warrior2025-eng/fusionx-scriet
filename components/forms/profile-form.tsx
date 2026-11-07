@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { updateProfile, type ProfileActionState } from "@/actions/profile";
 import { ImageField } from "@/components/admin/image-field";
+import { photoSource } from "@/lib/photo-source";
 import { useFormSubmit } from "@/components/ui/form-errors";
 import { LinkInput } from "@/components/ui/link-input";
 import { Label, Input, Textarea, FieldError, FieldHint } from "@/components/ui/field";
@@ -21,7 +22,8 @@ function fill(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
   el.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-export function ProfileForm({ profile, email, isCoreMember }: { profile: Profile; email: string; isCoreMember: boolean }) {
+export function ProfileForm({ profile, email, isCoreMember, cardHasTeamPhoto = false }: { profile: Profile; email: string; isCoreMember: boolean; cardHasTeamPhoto?: boolean }) {
+  const source = photoSource(profile.avatar_url);
   const [bio, setBio] = useState(profile.bio ?? "");
   // Remounts the fields after a save, so they show what was saved.
   const [version, setVersion] = useState(0);
@@ -103,6 +105,20 @@ export function ProfileForm({ profile, email, isCoreMember }: { profile: Profile
         currentUrl={profile.avatar_url}
         photo
       />
+      {(source !== "none" || cardHasTeamPhoto) && (
+        <div className="-mt-3 space-y-1 text-sm text-ink/70" data-photo-source={source}>
+          {source === "own" && <p>Your photo.</p>}
+          {(source === "google" || source === "github" || source === "other") && (
+            <p>
+              {source === "google" ? "Photo from your Google account." : source === "github" ? "Photo from your GitHub account." : "Photo from the account you sign in with."}{" "}
+              <label htmlFor="avatar" className="cursor-pointer font-medium text-accent-text underline underline-offset-2">
+                Upload your own
+              </label>
+            </p>
+          )}
+          {cardHasTeamPhoto && <p data-team-photo-note>Your FusionX card shows a photo set by the FusionX team.</p>}
+        </div>
+      )}
 
       <div>
         <Label>Email</Label>

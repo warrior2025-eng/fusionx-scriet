@@ -266,11 +266,14 @@ export async function EntityFormPage({
   entity,
   id,
   aside,
+  intro,
 }: {
   entity: EntityKey;
   id?: string;
   /** Extra panels shown under the form on the edit page. */
   aside?: (row: Row) => React.ReactNode;
+  /** A note shown above the form on the edit page. */
+  intro?: React.ReactNode;
 }) {
   const def = definition(entity);
   const ctx = await requireCapability(def.cap, def.adminPath);
@@ -297,6 +300,7 @@ export async function EntityFormPage({
       }
     >
       <Panel>
+        {row && intro && <div className="mb-5">{intro}</div>}
         <AdminForm
           action={saveEntity.bind(null, def.key, id ?? null)}
           submitLabel={row ? "Save changes" : (def.addLabel ?? `Create ${def.singular.toLowerCase()}`)}

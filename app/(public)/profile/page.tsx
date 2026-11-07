@@ -17,9 +17,10 @@ export default async function ProfilePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/profile");
 
-  const [{ data: profile }, { data: teamRows }] = await Promise.all([
+  const [{ data: profile }, { data: teamRows }, { data: teamPhoto }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.rpc("my_core_teams"),
+    supabase.rpc("my_card_has_admin_photo"),
   ]);
   const teams = (teamRows ?? []) as MyTeam[];
   const missing = [
@@ -55,7 +56,7 @@ export default async function ProfilePage() {
           </p>
         </section>
       )}
-      {profile && <ProfileForm profile={profile} email={user.email ?? ""} isCoreMember={teams.length > 0} />}
+      {profile && <ProfileForm profile={profile} email={user.email ?? ""} isCoreMember={teams.length > 0} cardHasTeamPhoto={teamPhoto === true} />}
     </Section>
   );
 }
