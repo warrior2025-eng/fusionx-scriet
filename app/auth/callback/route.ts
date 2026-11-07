@@ -49,7 +49,11 @@ export async function GET(request: Request) {
     (value): value is string => typeof value === "string" && value.startsWith("https://"),
   );
   if (photo) {
-    await supabase.from("profiles").update({ avatar_url: photo }).eq("id", data.user.id).is("avatar_url", null).eq("avatar_set_by_user", false);
+    const { error: photoError } = await supabase.from("profiles").update({ avatar_url: photo }).eq("id", data.user.id).is("avatar_url", null).eq("avatar_set_by_user", false);
+    // Before migration 0041 there is no such column: fill an empty photo as before.
+    if (photoError && /avatar_set_by_user/.test(photoError.message)) {
+      await supabase.from("profiles").update({ avatar_url: photo }).eq("id", data.user.id).is("avatar_url", null);
+    }
   }
 
   return NextResponse.redirect(new URL(await landingAfterSignIn(supabase, next), origin));
