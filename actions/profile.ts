@@ -93,6 +93,17 @@ export async function updateProfile(_prev: ProfileActionState, formData: FormDat
   return { status: "success", message: `Profile saved at ${savedAt()}` };
 }
 
+/**
+ * Writes the photo address and marks it as the member's own choice (migration 0041). Until
+ * that migration has run the column does not exist: the photo is then saved without the mark,
+ * rather than not at all.
+ */
+async function setPhoto(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, url: string | null) {
+  const { error } = await supabase.from("profiles").update({ avatar_url: url, avatar_set_by_user: true }).eq("id", userId);
+  if (!error || !/avatar_set_by_user/.test(error.message)) return error;
+  return (await supabase.from("profiles").update({ avatar_url: url }).eq("id", userId)).error;
+}
+
 /** Optional. The path starts with the user's own id, which the storage policy checks. Returns what went wrong. */
 async function savePhoto(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, formData: FormData): Promise<string | null> {
   const file = formData.get("avatar");
@@ -107,7 +118,7 @@ async function savePhoto(supabase: Awaited<ReturnType<typeof createClient>>, use
     if (uploadError) return "Couldn't upload the photo, please try again.";
     // Cache-bust so the new photo shows immediately instead of a stale copy at the same URL.
     const url = `${supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl}?t=${Date.now()}`;
-    const { error } = await supabase.from("profiles").update({ avatar_url: url, avatar_set_by_user: true }).eq("id", userId);
+    const error = await setPhoto(supabase, userId, url);
     return error ? "Couldn't upload the photo, please try again." : null;
   }
 
@@ -116,7 +127,7 @@ async function savePhoto(supabase: Awaited<ReturnType<typeof createClient>>, use
   if (formData.get("avatar__remove") === "on") {
     const { data: files } = await supabase.storage.from("avatars").list(userId);
     if (files?.length) await supabase.storage.from("avatars").remove(files.map((f) => `${userId}/${f.name}`));
-    const { error } = await supabase.from("profiles").update({ avatar_url: null, avatar_set_by_user: true }).eq("id", userId);
+    const error = await setPhoto(supabase, userId, null);
     return error ? "Couldn't remove the photo, please try again." : null;
   }
   return null;
