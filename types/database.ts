@@ -91,6 +91,8 @@ export interface Profile {
   github_url: string | null;
   linkedin_url: string | null;
   avatar_url: string | null;
+  /** The member uploaded or removed their photo: sign-in no longer fills it (migration 0041). */
+  avatar_set_by_user: boolean;
   membership_type: MembershipType;
   is_profile_public: boolean;
   is_contact_public: boolean;

@@ -302,6 +302,7 @@ export function EntityFields({ fields, values }: { fields: FieldDef[]; values: R
                 label={f.label}
                 hint={f.hint}
                 square={f.square}
+                removeLabel={f.removeLabel}
                 currentUrl={typeof value === "string" && value ? value : null}
                 className={span}
               />

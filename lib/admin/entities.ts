@@ -53,6 +53,8 @@ export type FieldDef = {
   /** Image fields: where the file goes, and whether it is cropped square. */
   bucket?: BucketId;
   square?: boolean;
+  /** Image fields: the words on the "remove" box. */
+  removeLabel?: string;
   /** Sits beside its neighbour on wide screens. */
   half?: boolean;
   /** Url fields: what kind of link this is, for fixing it. */
@@ -531,11 +533,12 @@ export const ENTITIES = {
       {
         name: "photo",
         column: "photo_path",
-        label: "Photo (only without a website account)",
+        label: "Admin photo (optional)",
         type: "image",
         bucket: "team-photos",
         square: true,
-        hint: "Used until a website account is linked, and when that account has no photo.",
+        removeLabel: "Remove admin photo",
+        hint: "Shown on their card instead of the photo on their profile. Without it, the card shows their own photo, then their Google photo, then initials.",
       },
       { name: "linkedin_url", label: "LinkedIn (only without a website account)", type: "url", linkKind: "linkedin", half: true },
       { name: "bio", label: "Bio (only without a website account)", type: "textarea", max: 1000, rows: 4, counter: true },

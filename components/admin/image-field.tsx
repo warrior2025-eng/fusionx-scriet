@@ -151,6 +151,7 @@ export function ImageField({
   square: squareProp,
   photo,
   accept = "image/jpeg,image/png,image/webp",
+  removeLabel = "Remove the current image",
   className,
 }: {
   name: string;
@@ -160,6 +161,7 @@ export function ImageField({
   square?: boolean;
   photo?: boolean;
   accept?: string;
+  removeLabel?: string;
   className?: string;
 }) {
   const square = squareProp || photo;
@@ -334,7 +336,7 @@ export function ImageField({
                 onChange={(e) => setRemove(e.target.checked)}
                 className="h-4 w-4 accent-accent"
               />
-              Remove the current image
+              {removeLabel}
             </label>
           )}
           {preview && (

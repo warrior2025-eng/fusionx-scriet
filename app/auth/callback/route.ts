@@ -42,13 +42,14 @@ export async function GET(request: Request) {
   if (error || !data.user) return backToLogin("oauth");
 
   // If this account has no photo yet, use the provider's. A photo the user
-  // uploaded themselves is never replaced: this only fills an empty one.
+  // uploaded themselves is never replaced, and one they removed stays removed:
+  // this only fills an empty one they never chose (avatar_set_by_user).
   const meta = data.user.user_metadata ?? {};
   const photo = [meta.avatar_url, meta.picture].find(
     (value): value is string => typeof value === "string" && value.startsWith("https://"),
   );
   if (photo) {
-    await supabase.from("profiles").update({ avatar_url: photo }).eq("id", data.user.id).is("avatar_url", null);
+    await supabase.from("profiles").update({ avatar_url: photo }).eq("id", data.user.id).is("avatar_url", null).eq("avatar_set_by_user", false);
   }
 
   return NextResponse.redirect(new URL(await landingAfterSignIn(supabase, next), origin));
