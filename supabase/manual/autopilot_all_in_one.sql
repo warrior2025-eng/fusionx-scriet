@@ -2100,7 +2100,8 @@ do $$
 declare f record;
 begin
   for f in select p.oid::regprocedure as sig from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-           where n.nspname = 'public' and (p.proname like 'ap_%' or p.proname like 'task_%' or p.proname = 'autopilot_tick') loop
+           -- "\_" is a real underscore: plain "_" would also match older functions such as apply_result_corrections.
+           where n.nspname = 'public' and (p.proname like 'ap\_%' or p.proname like 'task\_%' or p.proname = 'autopilot_tick') loop
     execute format('revoke all on function %s from public, anon, authenticated', f.sig);
   end loop;
 end $$;
