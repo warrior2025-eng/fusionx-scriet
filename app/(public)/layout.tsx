@@ -16,6 +16,7 @@ import { getMeetingSignal } from "@/lib/meetings/data";
 import { AiLauncher } from "@/components/ai/ai-launcher";
 import { aiConfigured, getAiSettings } from "@/lib/ai/settings";
 import { socialLinks } from "@/lib/site-config";
+import { ServiceWorker } from "@/components/autopilot/service-worker";
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
   // Two rounds of queries instead of one after another: everything that does not need the user, with the
@@ -30,7 +31,7 @@ export default async function PublicLayout({ children }: { children: React.React
     aiConfigured() ? getAiSettings() : Promise.resolve(null),
   ]);
   const supabase = user ? await createClient() : null;
-  const [roles, profileRow, reviewerCount, candidate, liveDay, meetings, coreTitles, mentorRow] = user && supabase
+  const [roles, profileRow, reviewerCount, candidate, liveDay, meetings, coreTitles, mentorRow, workCount, centerOpen] = user && supabase
     ? await Promise.all([
         getCurrentRoles(),
         supabase.from("profiles").select("full_name, avatar_url").eq("id", user.id).single().then((r) => r.data),
@@ -43,8 +44,11 @@ export default async function PublicLayout({ children }: { children: React.React
         // The plain line under the role badge in the account menu: their Core title, else their mentor title.
         supabase.rpc("my_core_teams").then((r) => (r.data ?? []) as { title: string | null; on_page: boolean }[]),
         supabase.from("mentors").select("role_title").eq("user_id", user.id).eq("is_published", true).limit(1).maybeSingle().then((r) => r.data),
+        // Autopilot (migration 0042; 0 / false before it): the "My work" count and Command Center.
+        supabase.rpc("ap_my_work_count").then((r) => (typeof r.data === "number" ? r.data : 0)),
+        supabase.rpc("ap_can_open_center", { p_user: user.id }).then((r) => r.data === true),
       ])
-    : [[], null, 0, null, null, null, [], null];
+    : [[], null, 0, null, null, null, [], null, 0, false];
   // Only reviewers get "Reviewer panel · Live" (admins keep their admin links).
   const reviewerLive = reviewerCount ? liveDay : null;
 
@@ -84,6 +88,8 @@ export default async function PublicLayout({ children }: { children: React.React
   // A team reviewer gets a link to their applications in the account menu.
   // Today's interview room while interviews are on, else their applications.
   if (reviewerCount) panels.push({ href: reviewerLive?.href ?? "/review", label: "Reviewer panel" });
+  // Autopilot: admins, the Head of Execution and hub leads run it from Command Center.
+  if (centerOpen) panels.push({ href: "/command", label: "Command Center" });
 
   // Footer: Recruitment and Teams links can be switched off; Recruitment is added to the second column when on.
   const hidden = new Set([...(navLinks.footerRecruitment ? [] : ["/recruitment"]), ...(navLinks.footerTeams ? [] : ["/teams"])]);
@@ -127,13 +133,14 @@ export default async function PublicLayout({ children }: { children: React.React
         recruitment={showRecruitment ? recruitmentLink : null}
         user={
           user
-            ? { email: user.email ?? "", fullName: profile?.full_name ?? "Member", avatarUrl: profile?.avatar_url ?? null, role: badgeRole, title: roleTitle, panels, candidate, reviewerLive, meetings }
+            ? { email: user.email ?? "", fullName: profile?.full_name ?? "Member", avatarUrl: profile?.avatar_url ?? null, role: badgeRole, title: roleTitle, workCount, panels, candidate, reviewerLive, meetings }
             : null
         }
       />
       <main className={candidate ? "flex-1 pb-24 lg:pb-0" : "flex-1"}>{children}</main>
       {candidate && <CandidateEntryBar entry={candidate} />}
       <SiteFooter settings={settings} columns={footerColumns} />
+      <ServiceWorker />
       {ai?.enabled && <AiLauncher welcome={ai.welcome} suggestions={ai.suggestions} allowed={aiLinks} />}
     </>
   );

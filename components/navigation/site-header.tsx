@@ -47,6 +47,8 @@ type SiteUser = {
   role?: "super_admin" | "admin" | "editor" | "faculty" | null;
   /** Their Core title, else their mentor title: a plain line under the badge. */
   title?: string | null;
+  /** Autopilot: offers, tasks and reviews waiting for them. */
+  workCount?: number;
   /** Staff and faculty panels this person may open. Empty for members. */
   panels: { href: string; label: string }[];
   /** A candidate with an interview booking: "My Interview" / "My Application" / "My Result". */
@@ -254,6 +256,10 @@ function ProfileMenu({ user }: { user: SiteUser }) {
             </Link>
           ))}
           <MeetingsMenuLink initial={user.meetings ?? null} onNavigate={() => setOpen(false)} className="block px-3.5 py-2 text-sm font-medium text-ink hover:bg-ink/5" />
+          <Link href="/my-work" onClick={() => setOpen(false)} className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-ink hover:bg-ink/5" data-my-work>
+            My work
+            {!!user.workCount && <span className="ml-auto rounded-sm bg-[#004df6] px-1.5 py-0.5 text-[11px] font-semibold text-white" data-my-work-count>{user.workCount}</span>}
+          </Link>
           <Link href="/profile" onClick={() => setOpen(false)} className="block px-3.5 py-2 text-sm text-ink/70 hover:bg-ink/5 hover:text-ink">
             My Profile
           </Link>
@@ -466,6 +472,10 @@ export function SiteHeader({
                 </Link>
               ))}
               <MeetingsMenuLink initial={user.meetings ?? null} onNavigate={() => setOpen(false)} className="py-2.5 text-sm font-medium text-ink border-b border-ink/5" />
+              <Link href="/my-work" onClick={() => setOpen(false)} className="flex items-center gap-2 py-2.5 text-sm font-medium text-ink border-b border-ink/5">
+                My work
+                {!!user.workCount && <span className="rounded-sm bg-[#004df6] px-1.5 py-0.5 text-[11px] font-semibold text-white">{user.workCount}</span>}
+              </Link>
               <Link href="/profile" onClick={() => setOpen(false)} className="py-2.5 text-sm text-ink/75 hover:text-ink border-b border-ink/5">
                 My Profile
               </Link>

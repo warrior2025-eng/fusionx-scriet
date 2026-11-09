@@ -13,7 +13,11 @@ import { getMeetingSignal } from "@/lib/meetings/data";
 const NAV: { heading: string; items: (AdminNavItem & { cap: Capability })[] }[] = [
   {
     heading: "Overview",
-    items: [{ href: "/admin", label: "Dashboard", icon: "overview", cap: "admin.access" }],
+    items: [
+      { href: "/admin", label: "Dashboard", icon: "overview", cap: "admin.access" },
+      // Autopilot's Command Center (it checks access itself: admins, the Head of Execution, hub leads).
+      { href: "/command", label: "Command Center", icon: "projects", cap: "team" },
+    ],
   },
   {
     heading: "Website",
