@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { DryRun, LevelGrid, NumbersForm, PausesForm, PermissionsGrid, SafeToAuto, UndoButton } from "@/components/autopilot/control-parts";
 import { MasterButton } from "@/components/autopilot/center-parts";
+import { CommunityToggles } from "@/components/autopilot/people-parts";
 import { getAutopilotViewer, peopleById } from "@/lib/autopilot/server";
 import type { Level } from "@/lib/autopilot/labels";
 
@@ -11,13 +12,14 @@ export default async function ControlPage() {
   const viewer = (await getAutopilotViewer())!;
   if (!viewer.superAdmin) redirect("/command");
   const { supabase } = viewer;
-  const [{ data: settings }, { data: permissions }, { data: log }, { data: playbooks }, { data: rules }, { data: missions }] = await Promise.all([
+  const [{ data: settings }, { data: permissions }, { data: log }, { data: playbooks }, { data: rules }, { data: missions }, { data: community }] = await Promise.all([
     supabase.from("autopilot_settings").select("*").eq("id", 1).maybeSingle(),
     supabase.from("autopilot_permissions").select("action, label, allowed").order("action"),
     supabase.from("automation_log").select("id, at, area, action, reason, undo, undone_at, actor").order("at", { ascending: false }).limit(100),
     supabase.from("playbooks").select("id, name").eq("status", "active").order("sort"),
     supabase.from("autopilot_rules").select("id, name").order("name"),
     supabase.from("missions").select("id, title").in("status", ["planned", "active"]).order("mission_date"),
+    supabase.from("community_settings").select("community_on, talent_on, projects_on").eq("id", 1).maybeSingle(),
   ]);
   const names = await peopleById(supabase, (log ?? []).map((l) => l.actor as string | null));
   const s = settings as { master: string; levels: Record<string, Level>; numbers: Record<string, number>; pauses: Record<string, string[]> } | null;
@@ -39,6 +41,14 @@ export default async function ControlPage() {
         <p className="mt-1 text-sm text-ink/60">Auto: it happens and is logged. Suggest: it is prepared and waits for one click in Today. Manual: Autopilot leaves it to people. Phone notifications send on Auto and Suggest; Manual turns them off.</p>
         <LevelGrid levels={s?.levels ?? {}} />
       </section>
+
+      {community && (
+        <section className="border border-line bg-surface p-4">
+          <h2 className="font-serif text-lg text-ink">Community, Rising Talent, projects</h2>
+          <p className="mt-1 text-sm text-ink/60">Head start, limits and Rising Talent thresholds are in Numbers below; who approves project support is in Permissions.</p>
+          <CommunityToggles settings={community as { community_on: boolean; talent_on: boolean; projects_on: boolean }} />
+        </section>
+      )}
 
       <section className="border border-line bg-surface p-4">
         <h2 className="font-serif text-lg text-ink">Pauses</h2>

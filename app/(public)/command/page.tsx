@@ -14,7 +14,7 @@ export default async function TodayPage() {
   const weekEnd = new Date(new Date(`${today}T00:00:00Z`).getTime() + 7 * 864e5).toISOString().slice(0, 10);
   const weekStart = new Date(new Date(`${today}T00:00:00Z`).getTime() - 7 * 864e5).toISOString().slice(0, 10);
 
-  const [queue, myTasks, deadlines, playbooks, variations, members, exams, settings, done, upcoming] = await Promise.all([
+  const [queue, myTasks, deadlines, playbooks, variations, members, exams, settings, done, upcoming, activeMissions, groups, pitches] = await Promise.all([
     supabase.from("autopilot_queue").select("id, area, kind, title, detail, payload, safe, hub, created_at").eq("status", "pending").order("safe").order("created_at").limit(200),
     supabase.from("mission_tasks").select("id, title, due_on, status, mission:missions(title)").eq("assignee_id", user.id).in("status", ["accepted", "changes", "offered"]).order("due_on"),
     supabase.from("mission_tasks").select("id, title, due_on, status, hub, assignee_id, mission:missions(id, title, status)").gte("due_on", today).lte("due_on", weekEnd).not("status", "in", "(approved,cancelled)").order("due_on").limit(60),
@@ -25,7 +25,17 @@ export default async function TodayPage() {
     supabase.from("autopilot_settings").select("master, founder_exam_mode").eq("id", 1).maybeSingle(),
     supabase.from("contributions").select("title, user_id, mission:missions(title, hubs)").gte("contributed_on", weekStart).order("contributed_on", { ascending: false }).limit(80),
     supabase.from("missions").select("title, mission_date, hubs").in("status", ["planned", "active"]).gte("mission_date", today).lte("mission_date", weekEnd).order("mission_date"),
+    supabase.from("missions").select("id, title").in("status", ["planned", "active"]).order("mission_date").limit(100),
+    supabase.from("core_groups").select("id, name").order("display_order"),
+    // Migration 0043; empty before it.
+    supabase.rpc("ap_pitch_board"),
   ]);
+  const extra = {
+    playbooks: ((playbooks.data ?? []) as { id: string; name: string }[]).map((p) => ({ id: p.id, name: p.name })),
+    missions: (activeMissions.data ?? []) as { id: string; title: string }[],
+    groups: (groups.data ?? []) as { id: string; name: string }[],
+  };
+  const pitchRows = ((pitches.data ?? []) as { id: string; title: string; status: string; votes: number; voting_ends_at: string; pitched_by_name: string }[]).filter((p) => ["voting", "waiting"].includes(p.status));
 
   type Q = { id: string; area: string; kind: string; title: string; detail: string | null; payload: Record<string, string>; safe: boolean; hub: string | null };
   type D = { id: string; title: string; due_on: string; status: string; hub: string; assignee_id: string | null; mission: { id: string; title: string; status: string } | null };
@@ -69,7 +79,7 @@ export default async function TodayPage() {
         ) : (
           <ul className="mt-4 space-y-2" data-today-list>
             {items.map((i) => (
-              <QueueItem key={i.id} item={i} members={memberOptions} variations={((variations.data ?? []) as { playbook_id: string; key: string; name: string }[])} />
+              <QueueItem key={i.id} item={i} members={memberOptions} variations={((variations.data ?? []) as { playbook_id: string; key: string; name: string }[])} extra={extra} />
             ))}
           </ul>
         )}
@@ -94,10 +104,21 @@ export default async function TodayPage() {
           <h2 className="font-serif text-lg text-ink">Quick actions</h2>
           <div className="mt-3 flex flex-col gap-2">
             <StartMission playbooks={(playbooks.data ?? []) as { id: string; name: string; default_visibility: string }[]} variations={(variations.data ?? []) as { playbook_id: string; key: string; name: string; is_default: boolean }[]} members={memberOptions} />
-            <Link href="/command/missions" className="text-sm text-accent-text underline">Run a pitch vote (with pitches, in People)</Link>
+            <Link href="/my-work#pitches" className="text-sm text-accent-text underline" data-pitch-vote>Run a pitch vote</Link>
             {viewer.superAdmin && <MasterButton on={settings.data?.master !== "paused"} />}
             {viewer.admin && <FounderExamToggle userId={user.id} on={founderMode} current={(settings.data?.founder_exam_mode as string[] | undefined) ?? []} />}
           </div>
+        </section>
+        <section className="border border-line bg-surface p-4" data-pitches>
+          <h2 className="font-serif text-lg text-ink">Pitches</h2>
+          {pitchRows.length === 0 ? <p className="mt-1 text-sm text-ink/60">No pitches in voting. Members pitch on My work.</p> : (
+            <ul className="mt-2 space-y-1 text-sm">
+              {pitchRows.map((p) => (
+                <li key={p.id} className="flex justify-between gap-2"><span className="text-ink">{p.title} <span className="text-xs text-ink/60">· {p.pitched_by_name}</span></span>
+                  <span className="shrink-0 text-xs text-ink/60">{p.votes} vote{p.votes === 1 ? "" : "s"} · {p.status === "voting" ? `until ${dayLabel(p.voting_ends_at.slice(0, 10))}` : "decide in the list"}</span></li>
+              ))}
+            </ul>
+          )}
         </section>
         <section className="border border-line bg-surface p-4">
           <h2 className="font-serif text-lg text-ink">Club exam periods</h2>

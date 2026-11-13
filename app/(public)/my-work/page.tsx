@@ -6,6 +6,7 @@ import { Section } from "@/components/ui/section";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Toaster } from "@/components/admin/toast";
 import { BusyDates, CheckinForm, OfferButtons, PreferencesForm, ProofForm, PushToggle, RequestChange, ReviewForm } from "@/components/autopilot/work-parts";
+import { PitchForm, PitchVote, TakeTask } from "@/components/autopilot/people-parts";
 import { dayLabel, daysFromToday, getAutopilotViewer, peopleById, proofHref, todayIST, type TaskRow } from "@/lib/autopilot/server";
 import { EFFORT_LABEL, PROOF_LABEL, STATUS_LABEL, TASK_STATUS_LABEL, hubLabel } from "@/lib/autopilot/labels";
 import { cn } from "@/lib/utils";
@@ -38,7 +39,7 @@ export default async function MyWorkPage() {
   const d = new Date(`${today}T00:00:00Z`);
   const week = new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 864e5).toISOString().slice(0, 10);
 
-  const [offers, mine, reviews, busy, checkin, prefs, subs, contributions, owned] = await Promise.all([
+  const [offers, mine, reviews, busy, checkin, prefs, subs, contributions, owned, community, pitchBoard, projectTasks, collab, settings] = await Promise.all([
     supabase.from("task_offers").select("id, offered_at, task:mission_tasks(id, title, due_on, effort, hub, proof, mission:missions(title))").eq("user_id", user.id).eq("status", "offered").order("offered_at"),
     supabase.from("mission_tasks").select("*, mission:missions(id, title, status)").eq("assignee_id", user.id).in("status", ["accepted", "changes", "submitted"]).order("due_on"),
     supabase.from("task_reviews").select("id, kind, due_at, task:mission_tasks(id, title, proof, proof_text, proof_url, assignee_id, checklist, mission:missions(title))").eq("reviewer_id", user.id).eq("status", "pending").order("due_at"),
@@ -48,7 +49,19 @@ export default async function MyWorkPage() {
     supabase.from("push_subscriptions").select("endpoint").eq("user_id", user.id),
     supabase.from("contributions").select("id, title, skill, contributed_on, mission:missions(title)").eq("user_id", user.id).eq("counts", true).order("contributed_on", { ascending: false }).limit(50),
     supabase.from("missions").select("id, title, status, mission_date").eq("owner_id", user.id).in("status", ["planned", "active", "review"]).order("mission_date"),
+    // Migration 0043 (people); empty before it.
+    supabase.from("mission_tasks").select("id, title, due_on, hub, effort, proof, mission:missions(title, status)").eq("community_allowed", true).eq("status", "open").is("assignee_id", null).order("due_on").limit(10),
+    supabase.rpc("ap_pitch_board"),
+    supabase.from("project_tasks").select("id, title, due_on, project:projects(id, title)").eq("assignee_id", user.id).is("done_at", null).is("mission_task_id", null).order("due_on", { nullsFirst: false }),
+    supabase.from("collaborators").select("ends_on").eq("user_id", user.id).eq("status", "active").maybeSingle(),
+    supabase.from("community_settings").select("community_on").eq("id", 1).maybeSingle(),
   ]);
+  type Pitch = { id: string; title: string; summary: string; pitched_by_name: string; mine: boolean; status: string; voting_ends_at: string; options: { key: string; name: string; description: string; votes: number }[] | null; my_vote: string | null; votes: number };
+  const pitches = (pitchBoard.data ?? []) as Pitch[];
+  const communityTasks = ((community.data ?? []) as unknown as { id: string; title: string; due_on: string; hub: string; effort: string; proof: string; mission: { title: string; status: string } | null }[])
+    .filter((t) => t.mission && ["planned", "active"].includes(t.mission.status));
+  const myProjectTasks = (projectTasks.data ?? []) as unknown as { id: string; title: string; due_on: string | null; project: { id: string; title: string } | null }[];
+  const communityOn = settings.data?.community_on !== false;
 
   type Offer = { id: string; task: { id: string; title: string; due_on: string; effort: string; hub: string; proof: string; mission: { title: string } | null } | null };
   type Mine = TaskRow & { mission: { id: string; title: string; status: string } | null };
@@ -69,11 +82,12 @@ export default async function MyWorkPage() {
       <Toaster />
       <Eyebrow>My work</Eyebrow>
       <h1 className="font-serif text-3xl tracking-tight text-ink md:text-4xl">Your FusionX tasks.</h1>
+      {collab.data && <p className="mt-2 inline-block border border-accent px-2 py-0.5 text-xs font-semibold text-accent-text" data-collaborator>Collaborator · until {dayLabel(collab.data.ends_on as string)}</p>}
       <p className="mt-2 text-sm text-ink/65">
         Offers to answer, tasks with their dates, reviews to give. Everything you finish and get approved becomes a verified contribution.
       </p>
       <nav aria-label="On this page" className="mt-5 flex flex-wrap gap-2 text-sm">
-        {[["#offers", `Offers (${offerRows.length})`], ["#tasks", `Tasks (${mineRows.length})`], ["#reviews", `Reviews (${reviewRows.length})`], ["#checkin", "Check-in"], ["#contributions", "Contributions"], ["#settings", "Settings"]].map(([href, label]) => (
+        {[["#offers", `Offers (${offerRows.length})`], ["#tasks", `Tasks (${mineRows.length + myProjectTasks.length})`], ["#reviews", `Reviews (${reviewRows.length})`], ["#community", "Community tasks"], ["#pitches", "Pitches"], ["#checkin", "Check-in"], ["#contributions", "Contributions"], ["#settings", "Settings"]].map(([href, label]) => (
           <a key={href} href={href} className="border border-line px-2.5 py-1 text-ink/75 hover:border-ink/40 hover:text-ink">{label}</a>
         ))}
       </nav>
@@ -129,6 +143,19 @@ export default async function MyWorkPage() {
           )}
         </Block>
 
+        {myProjectTasks.length > 0 && (
+          <Block id="project-tasks" title="My project tasks" hint="From your projects' milestones.">
+            <ul className="divide-y divide-line text-sm">
+              {myProjectTasks.map((t) => (
+                <li key={t.id} className="flex justify-between gap-2 py-2">
+                  <Link href={`/projects/${t.project?.id}/work`} className="text-ink hover:underline">{t.title}<span className="block text-xs text-ink/60">{t.project?.title}</span></Link>
+                  {t.due_on && <Due date={t.due_on} />}
+                </li>
+              ))}
+            </ul>
+          </Block>
+        )}
+
         <Block id="reviews" title="Reviews to give" hint="Check the proof against the checklist. Approve, or say what needs to change.">
           {reviewRows.length === 0 ? <Empty>No reviews waiting.</Empty> : (
             <ul className="space-y-3">
@@ -139,6 +166,37 @@ export default async function MyWorkPage() {
                   {r.task.proof_text && <p className="mt-2 whitespace-pre-wrap border-l-2 border-line pl-3 text-sm text-ink/80">{r.task.proof_text}</p>}
                   {proofLinks[i] && <a href={proofLinks[i]!} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm text-accent-text underline">Open the proof</a>}
                   <ReviewForm reviewId={r.id} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </Block>
+
+        {communityOn && (
+          <Block id="community" title="Community tasks" hint="Open tasks anyone signed in can take, one at a time. Same proof and review; approved work counts.">
+            {communityTasks.length === 0 ? <Empty>None open right now.</Empty> : (
+              <ul className="divide-y divide-line">
+                {communityTasks.map((t) => (
+                  <li key={t.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between" data-community-task={t.id}>
+                    <div className="min-w-0"><p className="font-medium text-ink">{t.title}</p><p className="text-xs text-ink/60">{t.mission?.title} · {hubLabel(t.hub)} · {EFFORT_LABEL[t.effort]} · <Due date={t.due_on} /></p></div>
+                    <TakeTask taskId={t.id} />
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-3 text-sm"><Link href="/autopilot/open-seats" className="text-accent-text underline">Open seats on missions</Link></p>
+          </Block>
+        )}
+
+        <Block id="pitches" title="Pitches" hint="Pitch an idea; members vote for 5 days; a lead can turn the winner into a mission with your name on it.">
+          <PitchForm />
+          {pitches.length > 0 && (
+            <ul className="mt-4 space-y-3">
+              {pitches.map((p) => (
+                <li key={p.id} className="border border-line p-3" data-pitch={p.id}>
+                  <p className="font-medium text-ink">{p.title} <span className="text-xs font-normal text-ink/60">· by {p.pitched_by_name} · {p.votes} vote{p.votes === 1 ? "" : "s"} · {p.status === "voting" ? `voting until ${dayLabel(p.voting_ends_at.slice(0, 10))}` : p.status}</span></p>
+                  <p className="text-sm text-ink/75">{p.summary}</p>
+                  {p.status === "voting" && !p.mine ? <PitchVote pitchId={p.id} options={p.options ?? []} mine={p.my_vote} /> : null}
                 </li>
               ))}
             </ul>

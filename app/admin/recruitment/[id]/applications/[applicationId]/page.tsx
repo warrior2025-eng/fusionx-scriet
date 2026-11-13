@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CycleTabs } from "@/components/admin/recruitment-parts";
+import { ApplicantContributions } from "@/components/autopilot/applicant-contributions";
 import { AdminPage } from "@/components/admin/ui";
 import { ApplicationView } from "@/components/recruitment/application-view";
 import { requireCapability } from "@/lib/admin/guard";
@@ -29,6 +30,7 @@ export default async function AdminApplicationPage({ params }: { params: Promise
       ]}
     >
       <CycleTabs cycleId={id} current="/applications" admin />
+      <ApplicantContributions supabase={ctx.supabase} userId={detail.application.user_id} />
       <ApplicationView supabase={ctx.supabase} userId={ctx.user.id} locked={locked} {...detail} />
     </AdminPage>
   );

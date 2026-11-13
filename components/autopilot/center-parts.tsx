@@ -33,15 +33,21 @@ type QueueRow = { id: string; area: string; kind: string; title: string; detail:
 const KIND_LABEL: Record<string, string> = {
   create_mission: "New mission", offer_task: "Offer", reoffer: "Re-offer", reminder: "Reminder", escalate: "Late task", red_task: "Late task",
   red_mission: "Red mission", review_reroute: "Late review", exam_shift: "Exams", change_request: "Change request", checkins: "Check-ins", weekly_email: "Weekly email",
+  seat_application: "Open seat", talent: "Rising Talent", collab_end: "Collaborator", pitch: "Pitch", project_support: "Project support",
 };
 
+/** What the people-side items (migration 0043) can be edited with before Approve. */
+export type QueueExtra = { playbooks: { id: string; name: string }[]; missions: { id: string; title: string }[]; groups: { id: string; name: string }[] };
+
 /** One prepared item: Approve, Edit (where it can be changed), Skip. */
-export function QueueItem({ item, members, variations }: { item: QueueRow; members: Member[]; variations: { playbook_id: string; key: string; name: string }[] }) {
+export function QueueItem({ item, members, variations, extra }: { item: QueueRow; members: Member[]; variations: { playbook_id: string; key: string; name: string }[]; extra?: QueueExtra }) {
   const { pending, run } = useRun();
   const [editing, setEditing] = useState(false);
-  const [edit, setEdit] = useState<Record<string, string>>({});
+  const [edit, setEdit] = useState<Record<string, unknown>>({});
   const info = ["red_mission", "red_task"].includes(item.kind);
-  const editable = ["create_mission", "offer_task", "change_request"].includes(item.kind);
+  const editable = ["create_mission", "offer_task", "change_request", "talent", "collab_end", "pitch", "project_support"].includes(item.kind);
+  // A pitch needs its playbook and date before it can become a mission.
+  const mustEdit = item.kind === "pitch" && !(edit.playbook_id && edit.date);
   return (
     <li className={cn("border p-3", info ? "border-red-500/40 bg-red-500/5" : "border-line bg-surface")} data-queue-item={item.kind}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -53,9 +59,10 @@ export function QueueItem({ item, members, variations }: { item: QueueRow; membe
           {item.detail && <p className="text-xs text-ink/60">{item.detail}</p>}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
-          <Button size="sm" disabled={pending} onClick={() => run(() => decideQueueItem(item.id, true, editing ? edit : undefined))}>{info ? "Seen" : "Approve"}</Button>
+          <Button size="sm" disabled={pending || mustEdit} title={mustEdit ? "Edit: choose a playbook and a date" : undefined} onClick={() => run(() => decideQueueItem(item.id, true, editing ? edit : undefined))}>{info ? "Seen" : "Approve"}</Button>
           {editable && <Button size="sm" variant="secondary" disabled={pending} onClick={() => setEditing((v) => !v)}>Edit</Button>}
-          {!info && <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => decideQueueItem(item.id, false))}>Skip</Button>}
+          {!info && <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => decideQueueItem(item.id, false, item.kind === "talent" ? { decision: "not_now" } : undefined))}>{item.kind === "talent" ? "Not now" : item.kind === "collab_end" ? "End" : "Skip"}</Button>}
+          {item.kind === "talent" && <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => decideQueueItem(item.id, false, { decision: "decline" }))}>Decline</Button>}
           {info && item.payload.mission_id && <a className="self-center text-xs underline" href={`/command/missions?m=${item.payload.mission_id}`}>Open</a>}
         </div>
       </div>
@@ -77,6 +84,43 @@ export function QueueItem({ item, members, variations }: { item: QueueRow; membe
             </Select>
           )}
           {item.kind === "change_request" && <Input type="date" aria-label="New date" onChange={(e) => setEdit({ new_due: e.target.value })} />}
+          {item.kind === "talent" && extra && (
+            <>
+              <label className="text-sm sm:col-span-2">Core Collaborator for these missions
+                <select multiple className="mt-1 h-24 w-full border border-line bg-paper text-sm" aria-label="Missions"
+                  onChange={(e) => setEdit((s) => ({ ...s, mission_ids: [...e.target.selectedOptions].map((o) => o.value) }))}>
+                  {extra.missions.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
+                </select>
+              </label>
+              <Select aria-label="Or a Core team" defaultValue="" onChange={(e) => setEdit((s) => ({ ...s, group_id: e.target.value }))}>
+                <option value="">…or a Core team / hub</option>{extra.groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </Select>
+              <Input type="date" aria-label="Until (default 8 weeks)" onChange={(e) => setEdit((s) => ({ ...s, until: e.target.value }))} />
+            </>
+          )}
+          {item.kind === "collab_end" && (
+            <>
+              <Select aria-label="Decision" defaultValue="extend" onChange={(e) => setEdit((s) => ({ ...s, action: e.target.value }))}>
+                <option value="extend">Extend</option><option value="shortlist">Shortlist in the next recruitment (note for admins only)</option><option value="end">End</option>
+              </Select>
+              <Input type="date" aria-label="Extend until" onChange={(e) => setEdit((s) => ({ ...s, until: e.target.value }))} />
+            </>
+          )}
+          {item.kind === "pitch" && extra && (
+            <>
+              <Select aria-label="Playbook" defaultValue="" onChange={(e) => setEdit((s) => ({ ...s, playbook_id: e.target.value }))}>
+                <option value="">Playbook…</option>{extra.playbooks.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </Select>
+              <Select aria-label="Variation" defaultValue="" onChange={(e) => setEdit((s) => ({ ...s, variation_key: e.target.value }))}>
+                <option value="">Default variation</option>{variations.filter((v) => v.playbook_id === edit.playbook_id).map((v) => <option key={v.key} value={v.key}>{v.name}</option>)}
+              </Select>
+              <Input type="date" aria-label="Mission date" onChange={(e) => setEdit((s) => ({ ...s, date: e.target.value }))} />
+              <Input aria-label="Reason if declining" placeholder="Reason (if you skip it)" onChange={(e) => setEdit((s) => ({ ...s, reason: e.target.value }))} />
+            </>
+          )}
+          {item.kind === "project_support" && (
+            <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" onChange={(e) => setEdit({ public: e.target.checked ? "true" : "false" })} /> Public outcome (Now building, story page)</label>
+          )}
           <p className="text-xs text-ink/60 sm:col-span-2">Then press Approve.</p>
         </div>
       )}

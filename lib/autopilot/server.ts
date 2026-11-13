@@ -39,6 +39,7 @@ export type TaskRow = {
   skills: string[]; effort: "S" | "M" | "L"; due_on: string; depends_on: string[]; proof: "link" | "file" | "image" | "text";
   review: "peer" | "lead" | "both"; assignee_id: string | null; locked: boolean; status: string; proof_text: string | null;
   proof_url: string | null; submitted_at: string | null; approved_at: string | null; member_for: string | null; escalation: number;
+  open_seat_allowed: boolean; community_allowed: boolean;
 };
 
 export async function healthOf(supabase: AutopilotViewer["supabase"], ids: string[]): Promise<Map<string, Health>> {
