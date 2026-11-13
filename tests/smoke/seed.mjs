@@ -19,6 +19,7 @@ export default async function seed() {
     d1: await person("smoke-d1", "Dev Designer", ["design", "canva"]),
     d2: await person("smoke-d2", "Dia Writer", ["writing", "social media"]),
     member: await person("smoke-member", "Manu Member"),
+    comm: await person("smoke-comm", "Chitra Community", ["design"]),
   };
   await q("insert into user_roles (user_id, role) values ($1, 'super_admin'), ($2, 'admin') on conflict do nothing", [P.boss, P.boss]);
   const group = async (slug) => (await one("select id from core_groups where slug = $1", [slug])).id;

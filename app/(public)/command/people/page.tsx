@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TaskControls } from "@/components/autopilot/mission-parts";
-import { dayLabel, getAutopilotViewer, todayIST } from "@/lib/autopilot/server";
+import { Nominate } from "@/components/autopilot/people-parts";
+import { dayLabel, getAutopilotViewer, peopleById, todayIST } from "@/lib/autopilot/server";
 import { HUBS, hubLabel } from "@/lib/autopilot/labels";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +13,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
   const viewer = (await getAutopilotViewer())!;
   const { supabase } = viewer;
   const today = todayIST();
+  if (sp.view === "community" || sp.view === "collaborators") return <OutsideCore view={sp.view} />;
   const hubs = viewer.operator ? HUBS.map((h) => h.slug) : viewer.leadHubs;
 
   const [{ data: memberData }, { data: taskData }, { data: offerData }, { data: busyData }, { data: contribData }, { data: reviewData }, { data: settings }] = await Promise.all([
@@ -62,6 +64,9 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
         <span className="mx-1 text-ink/30">|</span>
         <Link href={link({ flag: sp.flag === "idle" ? undefined : "idle" })} className={cn("border px-2.5 py-1", sp.flag === "idle" ? "border-ink text-ink" : "border-line text-ink/70")}>No task for 3+ weeks</Link>
         <Link href={link({ flag: sp.flag === "over" ? undefined : "over" })} className={cn("border px-2.5 py-1", sp.flag === "over" ? "border-ink text-ink" : "border-line text-ink/70")}>Overloaded</Link>
+        <span className="mx-1 text-ink/30">|</span>
+        <Link href="/command/people?view=community" className="border border-line px-2.5 py-1 text-ink/70">Community</Link>
+        <Link href="/command/people?view=collaborators" className="border border-line px-2.5 py-1 text-ink/70">Collaborators</Link>
       </div>
       {all.length === 0 ? <p className="border border-dashed border-line p-4 text-sm text-ink/70">No hub members here yet. Add people to the hubs in Admin → Core.</p> : (
         <ul className="divide-y divide-line border border-line" data-people>
@@ -84,6 +89,65 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
                   ))}
                 </ul>
               )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** Community members with verified work, and Core Collaborators (migration 0043). */
+async function OutsideCore({ view }: { view: "community" | "collaborators" }) {
+  const viewer = (await getAutopilotViewer())!;
+  const { supabase } = viewer;
+  const tabs = (
+    <div className="flex flex-wrap gap-2 text-sm">
+      <Link href="/command/people" className="border border-line px-2.5 py-1 text-ink/70">Hub members</Link>
+      <Link href="/command/people?view=community" className={cn("border px-2.5 py-1", view === "community" ? "border-ink text-ink" : "border-line text-ink/70")}>Community</Link>
+      <Link href="/command/people?view=collaborators" className={cn("border px-2.5 py-1", view === "collaborators" ? "border-ink text-ink" : "border-line text-ink/70")}>Collaborators</Link>
+    </div>
+  );
+  if (view === "collaborators") {
+    const { data } = await supabase.from("collaborators").select("id, user_id, mission_ids, core_group_id, starts_on, ends_on, status, shortlisted").order("ends_on", { ascending: false });
+    const rows = (data ?? []) as { id: string; user_id: string; mission_ids: string[]; starts_on: string; ends_on: string; status: string; shortlisted: boolean }[];
+    const names = await peopleById(supabase, rows.map((r) => r.user_id));
+    return (
+      <div className="space-y-4">{tabs}
+        {rows.length === 0 ? <p className="border border-dashed border-line p-4 text-sm text-ink/70">No Core Collaborators yet. Rising Talent suggestions appear in Today; approving one makes a collaborator.</p> : (
+          <ul className="divide-y divide-line border border-line text-sm" data-collaborators>
+            {rows.map((r) => (
+              <li key={r.id} className="flex flex-wrap justify-between gap-2 p-3">
+                <span className="text-ink">{names.get(r.user_id)?.full_name}{r.shortlisted && <span className="ml-2 text-xs text-ink/60">recommended by FusionX Core (admins only)</span>}</span>
+                <span className="text-xs text-ink/60">{r.status} · {r.starts_on} → {r.ends_on} · {r.mission_ids.length} mission{r.mission_ids.length === 1 ? "" : "s"}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
+  const [{ data: contribs }, { data: core }] = await Promise.all([
+    supabase.from("contributions").select("user_id, contributed_on").eq("counts", true),
+    supabase.from("core_group_members").select("user_id, title"),
+  ]);
+  const coreIds = new Set(((core ?? []) as { user_id: string; title: string }[]).filter((c) => c.title !== "Collaborator").map((c) => c.user_id));
+  const byUser = new Map<string, { n: number; last: string }>();
+  for (const c of (contribs ?? []) as { user_id: string; contributed_on: string }[]) {
+    if (coreIds.has(c.user_id)) continue;
+    const cur = byUser.get(c.user_id) ?? { n: 0, last: c.contributed_on };
+    byUser.set(c.user_id, { n: cur.n + 1, last: cur.last > c.contributed_on ? cur.last : c.contributed_on });
+  }
+  const names = await peopleById(supabase, [...byUser.keys()]);
+  const rows = [...byUser.entries()].sort((a, b) => b[1].n - a[1].n);
+  return (
+    <div className="space-y-4">{tabs}
+      {rows.length === 0 ? <p className="border border-dashed border-line p-4 text-sm text-ink/70">No community contributions yet. They come from open seats and community tasks.</p> : (
+        <ul className="divide-y divide-line border border-line text-sm" data-community>
+          {rows.map(([id, r]) => (
+            <li key={id} className="flex flex-col gap-1 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-ink">{names.get(id)?.full_name} <span className="text-xs text-ink/60">· {r.n} verified contribution{r.n === 1 ? "" : "s"} · last {r.last}</span></span>
+              <Nominate userId={id} />
             </li>
           ))}
         </ul>

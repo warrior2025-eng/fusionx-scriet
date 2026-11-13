@@ -133,6 +133,14 @@ export async function createProject(
     return { status: "error", message: "Could not create the project. Please try again." };
   }
 
+  // Autopilot tracking (migration 0043), only when a plan was chosen. The project is created either way.
+  const plan = String(formData.get("plan") ?? "");
+  const target = String(formData.get("target_date") ?? "");
+  if (["lite", "standard", "ambitious"].includes(plan) && /^\d{4}-\d{2}-\d{2}$/.test(target)) {
+    const { error: planError } = await supabase.rpc("ap_project_set_plan", { p_project: data.id, p_variation: plan, p_target: target, p_apply: true });
+    if (planError) console.error("project plan not saved:", planError.message);
+  }
+
   revalidatePath("/projects");
   redirect("/projects/mine");
 }

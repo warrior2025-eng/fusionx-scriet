@@ -102,6 +102,26 @@ export function ProjectForm({
         Publish (visible on the public Projects page)
       </label>
 
+      {!project && (
+        // Autopilot tracking (optional): milestones from the Flagship sprint, counted back from a target date.
+        <fieldset className="grid gap-5 border border-ink/10 p-4 sm:grid-cols-2">
+          <legend className="px-1 text-sm text-ink/70">Plan (optional)</legend>
+          <div>
+            <Label htmlFor="plan">Plan</Label>
+            <Select id="plan" name="plan" defaultValue="">
+              <option value="">No plan, I&apos;ll add milestones myself</option>
+              <option value="lite">Lite · 4 weeks</option>
+              <option value="standard">Standard · 8 weeks</option>
+              <option value="ambitious">Ambitious · 12 weeks (public launch)</option>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="target_date">Target date</Label>
+            <Input id="target_date" name="target_date" type="date" />
+          </div>
+        </fieldset>
+      )}
+
       <Button type="submit" loading={pending}>
         {project ? "Save changes" : "Create project"}
       </Button>

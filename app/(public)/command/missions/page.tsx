@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChangePlan, MissionActions, TaskControls, VersionRestore } from "@/components/autopilot/mission-parts";
+import { OpenSeatButton, SeatDecision } from "@/components/autopilot/people-parts";
 import { dayLabel, daysFromToday, getAutopilotViewer, healthOf, peopleById, proofHref, type MissionRow, type TaskRow } from "@/lib/autopilot/server";
 import { EFFORT_LABEL, HUBS, STATUS_LABEL, TASK_STATUS_LABEL, hubLabel, type Health } from "@/lib/autopilot/labels";
 import { cn } from "@/lib/utils";
@@ -134,13 +135,17 @@ async function MissionDetail({ mission: m, viewer, people, playbookName, variati
   playbookName: string; variations: { key: string; name: string }[]; health: Health; close: string;
 }) {
   const { supabase } = viewer;
-  const [{ data: taskData }, { data: versions }, { data: hubMembers }] = await Promise.all([
+  const [{ data: taskData }, { data: versions }, { data: hubMembers }, { data: seats }] = await Promise.all([
     supabase.from("mission_tasks").select("*").eq("mission_id", m.id).order("due_on").order("sort"),
     supabase.from("mission_versions").select("version, reason, changed_by, created_at").eq("mission_id", m.id).order("version", { ascending: false }),
     supabase.from("core_group_members").select("user_id, group:core_groups(slug)"),
+    // Open seats and who applied (migration 0043; empty before it).
+    supabase.from("open_seats").select("id, task_id, status, applications:seat_applications(id, user_id, pitch, previous_work, status)").eq("mission_id", m.id),
   ]);
+  type Seat = { id: string; task_id: string; status: string; applications: { id: string; user_id: string; pitch: string; previous_work: string | null; status: string }[] };
+  const seatRows = (seats ?? []) as unknown as Seat[];
   const tasks = (taskData ?? []) as TaskRow[];
-  const extra = await peopleById(supabase, [...tasks.map((t) => t.assignee_id), ...((versions ?? []) as { changed_by: string | null }[]).map((v) => v.changed_by), ...((hubMembers ?? []) as { user_id: string }[]).map((h) => h.user_id)]);
+  const extra = await peopleById(supabase, [...tasks.map((t) => t.assignee_id), ...((versions ?? []) as { changed_by: string | null }[]).map((v) => v.changed_by), ...((hubMembers ?? []) as { user_id: string }[]).map((h) => h.user_id), ...seatRows.flatMap((x) => x.applications.map((a) => a.user_id))]);
   const name = (id: string | null) => (id ? extra.get(id)?.full_name ?? people.get(id)?.full_name ?? "someone" : "nobody yet");
   const members = [...new Set(((hubMembers ?? []) as unknown as { user_id: string; group: { slug: string } | null }[]).filter((h) => h.group && m.hubs.includes(h.group.slug)).map((h) => h.user_id))].map((id) => ({ id, name: name(id) })).sort((a, b) => a.name.localeCompare(b.name));
   const proofs = await Promise.all(tasks.map((t) => proofHref(supabase, t.proof_url)));
@@ -167,7 +172,7 @@ async function MissionDetail({ mission: m, viewer, people, playbookName, variati
       <h3 className="mt-5 text-sm font-semibold text-ink">Tasks ({live.filter((t) => t.status === "approved").length}/{live.length} done)</h3>
       <ul className="mt-2 divide-y divide-line border border-line">
         {tasks.map((t, i) => (
-          <li key={t.id} className={cn("flex flex-col gap-2 p-2.5 text-sm lg:flex-row lg:items-center lg:justify-between", t.status === "cancelled" && "opacity-55")} data-task-row={t.status}>
+          <li key={t.id} className={cn("flex flex-col gap-2 p-2.5 text-sm lg:flex-row lg:flex-wrap lg:items-center lg:justify-between", t.status === "cancelled" && "opacity-55")} data-task-row={t.status}>
             <div className="min-w-0">
               <p className="text-ink">{t.title}{t.locked && <span className="ml-2 text-xs text-ink/60">(locked)</span>}</p>
               <p className="text-xs text-ink/60">
@@ -178,6 +183,18 @@ async function MissionDetail({ mission: m, viewer, people, playbookName, variati
               </p>
             </div>
             {t.status !== "cancelled" && <TaskControls task={{ id: t.id, status: t.status, locked: t.locked, due: t.due_on, assignee: t.assignee_id }} members={members} />}
+            {t.open_seat_allowed && ["open", "offered"].includes(t.status) && !t.assignee_id && !seatRows.some((x) => x.task_id === t.id && x.status === "open") && <div className="w-full basis-full"><OpenSeatButton taskId={t.id} /></div>}
+            {seatRows.filter((x) => x.task_id === t.id && x.status === "open").map((x) => (
+              <div key={x.id} className="w-full basis-full border-t border-line pt-2 text-xs" data-seat-open>
+                <p className="font-semibold text-ink">Open seat · {x.applications.filter((a) => a.status === "pending").length} applied</p>
+                {x.applications.filter((a) => a.status === "pending").map((a) => (
+                  <div key={a.id} className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="text-ink/80"><strong>{name(a.user_id)}</strong>: {a.pitch}{a.previous_work && <> · <a href={a.previous_work} target="_blank" rel="noopener noreferrer" className="underline">work</a></>}</span>
+                    <SeatDecision applicationId={a.id} />
+                  </div>
+                ))}
+              </div>
+            ))}
           </li>
         ))}
       </ul>
