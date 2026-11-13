@@ -17,6 +17,7 @@ import { AiLauncher } from "@/components/ai/ai-launcher";
 import { aiConfigured, getAiSettings } from "@/lib/ai/settings";
 import { socialLinks } from "@/lib/site-config";
 import { ServiceWorker } from "@/components/autopilot/service-worker";
+import { SiteAnalytics } from "@/components/autopilot/site-analytics";
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
   // Two rounds of queries instead of one after another: everything that does not need the user, with the
@@ -141,6 +142,7 @@ export default async function PublicLayout({ children }: { children: React.React
       {candidate && <CandidateEntryBar entry={candidate} />}
       <SiteFooter settings={settings} columns={footerColumns} />
       <ServiceWorker />
+      <SiteAnalytics />
       {ai?.enabled && <AiLauncher welcome={ai.welcome} suggestions={ai.suggestions} allowed={aiLinks} />}
     </>
   );

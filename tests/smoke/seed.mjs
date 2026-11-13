@@ -2,6 +2,7 @@
 // on a fresh database first). Passwords are the stand-in's fixed "test-password".
 import fs from "node:fs";
 import { STATE, one, q } from "./db.mjs";
+import { startMockAi } from "./mock-ai.mjs";
 
 export default async function seed() {
   const host = await one("select inet_server_addr()::text a, current_setting('port') p");
@@ -27,5 +28,11 @@ export default async function seed() {
   await q("insert into core_group_members (group_id, user_id, title) values ($1, $2, 'Head of Execution') on conflict do nothing", [core, P.hoe]);
   await q("insert into core_group_members (group_id, user_id, title, is_lead) values ($1, $2, 'Lead', true) on conflict do nothing", [design, P.lead]);
   for (const u of [P.d1, P.d2]) await q("insert into core_group_members (group_id, user_id) values ($1, $2) on conflict do nothing", [design, u]);
+  // The Idea Engine stays off (and no real website is read) until its own test switches it on.
+  await q("update autopilot_settings set levels = levels || '{\"idea_projects\":\"manual\",\"idea_research\":\"manual\",\"idea_radar\":\"manual\"}'");
+  await q("update opportunity_sources set active = false");
   fs.writeFileSync(STATE, JSON.stringify({ people: P }));
+  // The AI stand-in for the Idea Engine (the app is built with AI_GEMINI_BASE pointing here).
+  const ai = startMockAi(4010);
+  return () => new Promise((resolve) => ai.close(resolve));
 }

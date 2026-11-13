@@ -60,6 +60,7 @@ export const NUMBERS: { key: string; label: string; def: number; min: number; ma
   { key: "idea_projects_per_week", label: "Project ideas per week", def: 3, min: 0, max: 10, later: "outcomes" },
   { key: "idea_research_per_month", label: "Research topics per month", def: 3, min: 0, max: 10, later: "outcomes" },
   { key: "idea_daily_cap", label: "Idea Engine AI calls per day", def: 20, min: 0, max: 200, later: "outcomes" },
+  { key: "radar_grounding", label: "Radar: Google Search grounding (1 = on; only on a key without billing)", def: 0, min: 0, max: 1, later: "outcomes" },
 ];
 
 export const HUBS: { slug: string; label: string }[] = [

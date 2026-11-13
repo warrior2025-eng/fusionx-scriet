@@ -34,6 +34,7 @@ const KIND_LABEL: Record<string, string> = {
   create_mission: "New mission", offer_task: "Offer", reoffer: "Re-offer", reminder: "Reminder", escalate: "Late task", red_task: "Late task",
   red_mission: "Red mission", review_reroute: "Late review", exam_shift: "Exams", change_request: "Change request", checkins: "Check-ins", weekly_email: "Weekly email",
   seat_application: "Open seat", talent: "Rising Talent", collab_end: "Collaborator", pitch: "Pitch", project_support: "Project support",
+  idea_draft: "Idea draft · auto", opportunity_draft: "Opportunity · auto", certificate: "Certificate", recognition: "Recognition", public_update: "Now building",
 };
 
 /** What the people-side items (migration 0043) can be edited with before Approve. */
@@ -45,7 +46,7 @@ export function QueueItem({ item, members, variations, extra }: { item: QueueRow
   const [editing, setEditing] = useState(false);
   const [edit, setEdit] = useState<Record<string, unknown>>({});
   const info = ["red_mission", "red_task"].includes(item.kind);
-  const editable = ["create_mission", "offer_task", "change_request", "talent", "collab_end", "pitch", "project_support"].includes(item.kind);
+  const editable = ["create_mission", "offer_task", "change_request", "talent", "collab_end", "pitch", "project_support", "idea_draft", "opportunity_draft"].includes(item.kind);
   // A pitch needs its playbook and date before it can become a mission.
   const mustEdit = item.kind === "pitch" && !(edit.playbook_id && edit.date);
   return (
@@ -61,7 +62,7 @@ export function QueueItem({ item, members, variations, extra }: { item: QueueRow
         <div className="flex shrink-0 flex-wrap gap-2">
           <Button size="sm" disabled={pending || mustEdit} title={mustEdit ? "Edit: choose a playbook and a date" : undefined} onClick={() => run(() => decideQueueItem(item.id, true, editing ? edit : undefined))}>{info ? "Seen" : "Approve"}</Button>
           {editable && <Button size="sm" variant="secondary" disabled={pending} onClick={() => setEditing((v) => !v)}>Edit</Button>}
-          {!info && <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => decideQueueItem(item.id, false, item.kind === "talent" ? { decision: "not_now" } : undefined))}>{item.kind === "talent" ? "Not now" : item.kind === "collab_end" ? "End" : "Skip"}</Button>}
+          {!info && <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => decideQueueItem(item.id, false, item.kind === "talent" ? { decision: "not_now" } : undefined))}>{item.kind === "talent" ? "Not now" : item.kind === "collab_end" ? "End" : item.kind === "idea_draft" || item.kind === "opportunity_draft" ? "Reject" : "Skip"}</Button>}
           {item.kind === "talent" && <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => decideQueueItem(item.id, false, { decision: "decline" }))}>Decline</Button>}
           {info && item.payload.mission_id && <a className="self-center text-xs underline" href={`/command/missions?m=${item.payload.mission_id}`}>Open</a>}
         </div>
@@ -117,6 +118,27 @@ export function QueueItem({ item, members, variations, extra }: { item: QueueRow
               <Input type="date" aria-label="Mission date" onChange={(e) => setEdit((s) => ({ ...s, date: e.target.value }))} />
               <Input aria-label="Reason if declining" placeholder="Reason (if you skip it)" onChange={(e) => setEdit((s) => ({ ...s, reason: e.target.value }))} />
             </>
+          )}
+          {item.kind === "idea_draft" && extra && (
+            <>
+              <Select aria-label="Variation" defaultValue="" onChange={(e) => setEdit((s) => ({ ...s, variation_key: e.target.value }))}>
+                <option value="">Default (Standard / Paper)</option><option value="lite">Lite · 4 weeks</option><option value="standard">Standard · 8 weeks</option><option value="ambitious">Ambitious · 12 weeks</option><option value="paper">Research: paper</option><option value="patent">Research: idea to patent</option>
+              </Select>
+              <Select aria-label="Owner" defaultValue="" onChange={(e) => setEdit((s) => ({ ...s, owner_id: e.target.value }))}>
+                <option value="">Owner: Projects hub lead (or the mentor)</option>{members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </Select>
+              <Input type="date" aria-label="Target date" onChange={(e) => setEdit((s) => ({ ...s, date: e.target.value }))} />
+              <Select aria-label="If not adopted" defaultValue="reject" onChange={(e) => setEdit((s) => ({ ...s, action: e.target.value }))}>
+                <option value="reject">Reject (no similar repeats)</option><option value="save">Save for members to like and start</option>
+              </Select>
+              <Input aria-label="Reason" placeholder="Reason (if rejected)" onChange={(e) => setEdit((s) => ({ ...s, reason: e.target.value }))} />
+              <a href="/command/ideas" className="self-center text-xs underline">See the full draft</a>
+            </>
+          )}
+          {item.kind === "opportunity_draft" && (
+            <Select aria-label="Approve as" defaultValue="publish" onChange={(e) => setEdit({ action: e.target.value })}>
+              <option value="publish">Publish (Source checked: today)</option><option value="mission">Run as mission</option>
+            </Select>
           )}
           {item.kind === "project_support" && (
             <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" onChange={(e) => setEdit({ public: e.target.checked ? "true" : "false" })} /> Public outcome (Now building, story page)</label>

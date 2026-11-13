@@ -17,10 +17,12 @@ export default async function ProfilePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/profile");
 
-  const [{ data: profile }, { data: teamRows }, { data: teamPhoto }] = await Promise.all([
+  const [{ data: profile }, { data: teamRows }, { data: teamPhoto }, { data: badges }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.rpc("my_core_teams"),
     supabase.rpc("my_card_has_admin_photo"),
+    // Skill badges from verified work (migration 0044; empty before it).
+    supabase.from("skill_badges").select("label, count").eq("user_id", user.id).order("count", { ascending: false }),
   ]);
   const teams = (teamRows ?? []) as MyTeam[];
   const missing = [
@@ -34,6 +36,11 @@ export default async function ProfilePage() {
     <Section className="pt-16 pb-24 max-w-2xl">
       <Eyebrow>My Profile</Eyebrow>
       <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-ink mb-8">Edit your profile.</h1>
+      {(badges ?? []).length > 0 && (
+        <ul className="mb-8 flex flex-wrap gap-2" aria-label="Skill badges from verified work" data-profile-badges>
+          {((badges ?? []) as { label: string; count: number }[]).map((b) => <li key={b.label} className="border border-accent px-2 py-0.5 text-sm font-medium text-accent-text">{b.label} ×{b.count}</li>)}
+        </ul>
+      )}
       {teams.length > 0 && (
         <section aria-labelledby="your-teams" className="mb-8 border border-line bg-surface p-5">
           <h2 id="your-teams" className="font-serif text-xl text-ink">

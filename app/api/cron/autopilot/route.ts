@@ -1,6 +1,10 @@
 import { timingSafeEqual } from "node:crypto";
 import { deliverPendingEmails } from "@/lib/email/outbox";
 import { sendPendingPushes } from "@/lib/push/server";
+import { runIdeaEngine } from "@/lib/autopilot/ideas";
+
+// The Idea Engine's runs (when due) read pages and wait for the model.
+export const maxDuration = 60;
 import { createAdminClient } from "@/lib/supabase/server";
 
 /**
@@ -23,9 +27,11 @@ export async function GET(request: Request) {
     console.error("autopilot run failed:", error.message);
     return Response.json({ error: "The run failed. Has migration 0042 been run?" }, { status: 500 });
   }
+  // Project ideas weekly, research topics monthly, the radar twice a week: only when due, by the levels in Control.
+  const ideas = await runIdeaEngine().catch((e: unknown) => ({ state: "failed", error: e instanceof Error ? e.message : "crashed" }));
   const [email, push] = await Promise.all([
     deliverPendingEmails().catch((e: unknown) => ({ state: "failed", sent: 0, error: e instanceof Error ? e.message : "crashed" })),
     sendPendingPushes().catch(() => 0),
   ]);
-  return Response.json({ ok: true, ran_at: new Date().toISOString(), result: data, email: { state: email.state, sent: email.sent }, push });
+  return Response.json({ ok: true, ran_at: new Date().toISOString(), result: data, ideas, email: { state: email.state, sent: email.sent }, push });
 }

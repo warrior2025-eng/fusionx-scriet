@@ -7,6 +7,7 @@ import { PersonCard } from "@/components/ui/person-card";
 import { CoreMemberCard } from "@/components/ui/core-member-card";
 import { siteName } from "@/lib/site-config";
 import { getCoreTeams } from "@/lib/data/core-teams";
+import { createClient } from "@/lib/supabase/server";
 import { getMentors } from "@/lib/data/mentors";
 import { getPeople, peopleIn } from "@/lib/data/people";
 import { pageMetadata } from "@/lib/data/seo";
@@ -31,7 +32,12 @@ const TEAM_EYEBROW = { core: "Core", hub: "Hub", custom: "Team" } as const;
 export default async function CorePage() {
   // Managed from the admin panel (Core). Until that data exists, getPeople
   // returns the people this page has always listed.
-  const [people, teams, mentors] = await Promise.all([getPeople(), getCoreTeams(), getMentors()]);
+  const [people, teams, mentors, badgeRows] = await Promise.all([
+    getPeople(), getCoreTeams(), getMentors(),
+    // Skill badges from verified work (migration 0044; none before it).
+    createClient().then((db) => db.rpc("ap_core_badges")).then((r) => (r.data ?? []) as { member_id: string; labels: string[] }[]),
+  ]);
+  const badges = new Map(badgeRows.map((b) => [b.member_id, b.labels]));
   const founders = peopleIn(people, "founder");
   const onCore = mentors.filter((m) => m.show_on_core);
   const mentorSection = onCore.length > 0 && (
@@ -105,7 +111,7 @@ export default async function CorePage() {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {team.members.map((member, i) => (
               <ScrollReveal key={member.id} delay={(i + 1) * 100} className="h-full">
-                <CoreMemberCard member={member} />
+                <CoreMemberCard member={member} tags={badges.get(member.id)} />
               </ScrollReveal>
             ))}
           </div>

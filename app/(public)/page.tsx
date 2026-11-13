@@ -24,6 +24,7 @@ import { getCoreTeams } from "@/lib/data/core-teams";
 import { getPeople, peopleIn } from "@/lib/data/people";
 import { getHubs } from "@/lib/data/hubs";
 import { HubCards } from "@/components/hubs/hub-cards";
+import { NowBuilding } from "@/components/autopilot/now-building";
 import { pageMetadata } from "@/lib/data/seo";
 import { getContent } from "@/lib/data/site-content";
 import { getCurrentCycle } from "@/lib/recruitment/data";
@@ -537,6 +538,8 @@ export default async function HomePage() {
 
       {/* Not a scene window: below the hero the scene sits behind an 85% scrim, so it rests (a still frame) instead of drawing. */}
       <div className="home-below">
+        {/* FusionX Autopilot: public missions while they move (hidden when there is nothing at all). */}
+        <NowBuilding compact band="surface" />
         {visibleSections.map((section, i) => (
           <Fragment key={section.key}>{section.render(i + 1, BANDS[i % BANDS.length])}</Fragment>
         ))}

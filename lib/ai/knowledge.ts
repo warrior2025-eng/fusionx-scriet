@@ -164,6 +164,16 @@ export async function buildKnowledge(extraFacts: string): Promise<Knowledge> {
   if (open.length) add("Opportunities", "/opportunities", open.map((op) => `- ${op.title} by ${op.organizer}${op.deadline ? `, deadline ${day(op.deadline as string)}` : ""}`));
   if (resources.length) add("Resources", "/resources", [`Free resources by category: ${[...new Set(resources.map((r) => r.category as string))].join(", ")}.`, ...resources.slice(0, 12).map((r) => `- ${r.title}`)]);
 
+  // 6b. Impact and Now building (migration 0044): the same public, positive, verified records as /impact.
+  const [impact, building] = await Promise.all([
+    db.rpc("ap_impact_stats", { p_from: null }).then((r) => (r.error ? null : (r.data as Record<string, number> | null))),
+    rows(db.rpc("ap_now_building")),
+  ]);
+  if (impact) add("Impact", "/impact", [
+    `From FusionX's records of finished, reviewed work: ${impact.missions ?? 0} missions completed, ${impact.workshops ?? 0} workshops, ${impact.hackathons ?? 0} hackathon entries, ${impact.projects_shipped ?? 0} projects shipped, ${impact.contributions ?? 0} verified contributions.`,
+    ...building.slice(0, 6).map((m) => `- Now building: ${m.title}${m.goal ? `: ${clip(m.goal as string, 120)}` : ""} (${m.done} of ${m.total} steps done)`),
+  ]);
+
   // 7. Contact and where to find FusionX
   add("Contact", "/contact", [
     `Email: ${o.official_email || OFFICIAL_EMAIL} (or the form on ${SITE}/contact).`,
