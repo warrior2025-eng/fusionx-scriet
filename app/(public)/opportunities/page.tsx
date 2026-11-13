@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { ArrowRight } from "lucide-react";
 import { linkHref } from "@/lib/validation/link";
+import Link from "next/link";
 
 export const generateMetadata = (): Promise<Metadata> =>
   pageMetadata("opportunities", {
@@ -15,13 +16,22 @@ export const generateMetadata = (): Promise<Metadata> =>
     description: "Hackathons, competitions, internships, and other opportunities shared by FusionX.",
   });
 
-export default async function OpportunitiesPage() {
+export default async function OpportunitiesPage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
+  const { show } = await searchParams;
   const supabase = await createClient();
-  const { data: opportunities } = await supabase
+  // "*": the radar's distance (migration 0044) comes along when it exists.
+  const { data: all } = await supabase
     .from("opportunities")
-    .select("id, title, organizer, category, description, deadline, registration_url, status")
+    .select("*")
     .eq("is_published", true)
     .order("deadline", { ascending: true });
+  // Filters: within a day's travel of Meerut (about 350 km by road), or closing within 7 days.
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const week = new Date(new Date(`${today}T00:00:00Z`).getTime() + 7 * 864e5).toISOString().slice(0, 10);
+  const opportunities = (all ?? []).filter((o) =>
+    show === "near" ? typeof o.distance_km === "number" && o.distance_km <= 350
+    : show === "closing" ? !!o.deadline && o.deadline >= today && o.deadline <= week
+    : true);
 
   return (
     <>
@@ -38,6 +48,11 @@ export default async function OpportunitiesPage() {
               of verification. Always confirm details on the organizer&rsquo;s official page before
               applying.
             </p>
+            <nav aria-label="Filter" className="mt-6 flex flex-wrap gap-2 text-sm" data-opp-filters>
+              {[["", "All"], ["near", "Near Meerut"], ["closing", "Closing soon"]].map(([k, label]) => (
+                <Link key={k} href={k ? `/opportunities?show=${k}` : "/opportunities"} className={(show ?? "") === k ? "border border-ink px-3 py-1 text-ink" : "border border-line px-3 py-1 text-ink/70"}>{label}</Link>
+              ))}
+            </nav>
           </ScrollReveal>
         </div>
       </section>

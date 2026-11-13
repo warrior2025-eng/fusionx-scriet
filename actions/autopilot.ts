@@ -137,8 +137,8 @@ export async function removePushSubscription(endpoint: string): Promise<ActionSt
 // ── Command Center ──────────────────────────────────────────────────────
 
 export async function decideQueueItem(id: string, approve: boolean, edit?: Record<string, unknown>) {
-  // Migration 0043's wrapper: open seats, Rising Talent, pitches and project support, then the rest as before.
-  return rpc("ap_queue_decide_people", { p_item: id, p_approve: approve, p_edit: edit ?? null }, "Done.");
+  // Migration 0044's wrapper: outcomes and the Idea Engine, then 0043's (people), then the rest as before.
+  return rpc("ap_queue_decide_outcomes", { p_item: id, p_approve: approve, p_edit: edit ?? null }, "Done.");
 }
 
 export async function approveAllSafe() {

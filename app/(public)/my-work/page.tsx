@@ -7,6 +7,7 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { Toaster } from "@/components/admin/toast";
 import { BusyDates, CheckinForm, OfferButtons, PreferencesForm, ProofForm, PushToggle, RequestChange, ReviewForm } from "@/components/autopilot/work-parts";
 import { PitchForm, PitchVote, TakeTask } from "@/components/autopilot/people-parts";
+import { SavedIdea, ShareCardButton, ShowOnImpact, SuggestOpportunity } from "@/components/autopilot/outcome-parts";
 import { dayLabel, daysFromToday, getAutopilotViewer, peopleById, proofHref, todayIST, type TaskRow } from "@/lib/autopilot/server";
 import { EFFORT_LABEL, PROOF_LABEL, STATUS_LABEL, TASK_STATUS_LABEL, hubLabel } from "@/lib/autopilot/labels";
 import { cn } from "@/lib/utils";
@@ -39,7 +40,7 @@ export default async function MyWorkPage() {
   const d = new Date(`${today}T00:00:00Z`);
   const week = new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 864e5).toISOString().slice(0, 10);
 
-  const [offers, mine, reviews, busy, checkin, prefs, subs, contributions, owned, community, pitchBoard, projectTasks, collab, settings] = await Promise.all([
+  const [offers, mine, reviews, busy, checkin, prefs, subs, contributions, owned, community, pitchBoard, projectTasks, collab, settings, badges, cards, certs, savedIdeas, opps, me] = await Promise.all([
     supabase.from("task_offers").select("id, offered_at, task:mission_tasks(id, title, due_on, effort, hub, proof, mission:missions(title))").eq("user_id", user.id).eq("status", "offered").order("offered_at"),
     supabase.from("mission_tasks").select("*, mission:missions(id, title, status)").eq("assignee_id", user.id).in("status", ["accepted", "changes", "submitted"]).order("due_on"),
     supabase.from("task_reviews").select("id, kind, due_at, task:mission_tasks(id, title, proof, proof_text, proof_url, assignee_id, checklist, mission:missions(title))").eq("reviewer_id", user.id).eq("status", "pending").order("due_at"),
@@ -47,7 +48,7 @@ export default async function MyWorkPage() {
     supabase.from("checkins").select("done, next, blocked").eq("user_id", user.id).eq("week_start", week).maybeSingle(),
     supabase.from("work_preferences").select("delivery, push").eq("user_id", user.id).maybeSingle(),
     supabase.from("push_subscriptions").select("endpoint").eq("user_id", user.id),
-    supabase.from("contributions").select("id, title, skill, contributed_on, mission:missions(title)").eq("user_id", user.id).eq("counts", true).order("contributed_on", { ascending: false }).limit(50),
+    supabase.from("contributions").select("id, title, skill, contributed_on, mission_id, mission:missions(title)").eq("user_id", user.id).eq("counts", true).order("contributed_on", { ascending: false }).limit(50),
     supabase.from("missions").select("id, title, status, mission_date").eq("owner_id", user.id).in("status", ["planned", "active", "review"]).order("mission_date"),
     // Migration 0043 (people); empty before it.
     supabase.from("mission_tasks").select("id, title, due_on, hub, effort, proof, mission:missions(title, status)").eq("community_allowed", true).eq("status", "open").is("assignee_id", null).order("due_on").limit(10),
@@ -55,7 +56,26 @@ export default async function MyWorkPage() {
     supabase.from("project_tasks").select("id, title, due_on, project:projects(id, title)").eq("assignee_id", user.id).is("done_at", null).is("mission_task_id", null).order("due_on", { nullsFirst: false }),
     supabase.from("collaborators").select("ends_on").eq("user_id", user.id).eq("status", "active").maybeSingle(),
     supabase.from("community_settings").select("community_on").eq("id", 1).maybeSingle(),
+    // Migration 0044 (outcomes); empty before it.
+    supabase.from("skill_badges").select("label, count").eq("user_id", user.id).order("count", { ascending: false }),
+    supabase.from("share_cards").select("code, mission_id").eq("user_id", user.id),
+    supabase.from("certificate_verifications").select("code, period_label, issued_at").eq("user_id", user.id).eq("status", "issued"),
+    supabase.rpc("ap_saved_ideas"),
+    supabase.from("opportunities").select("id, title, organizer, deadline, registration_url, city, distance_km, value_score, mode").eq("is_published", true).gte("deadline", today).order("value_score", { ascending: false, nullsFirst: false }).limit(20),
+    supabase.from("profiles").select("show_on_impact, skills").eq("id", user.id).maybeSingle(),
   ]);
+  // Finished public missions I did verified work on: a share card each.
+  const doneMissionIds = [...new Set(((contributions.data ?? []) as unknown as { mission_id?: string }[]).map((c) => c.mission_id).filter(Boolean))] as string[];
+  const { data: doneMissions } = doneMissionIds.length
+    ? await supabase.from("missions").select("id, title").in("id", doneMissionIds).eq("status", "done").eq("visibility", "public")
+    : { data: [] };
+  const cardBy = new Map(((cards.data ?? []) as { code: string; mission_id: string }[]).map((c) => [c.mission_id, c.code]));
+  // "Top 5 for you": the radar's value, then the hubs and skills that fit.
+  const mySkills = ((me.data?.skills as string[] | undefined) ?? []).map((x) => x.toLowerCase());
+  const top5 = ((opps.data ?? []) as { id: string; title: string; organizer: string; deadline: string; registration_url: string | null; city: string | null; distance_km: number | null; value_score: number | null; mode: string | null }[])
+    .map((o) => ({ ...o, fit: (o.value_score ?? 0) + mySkills.filter((k) => o.title.toLowerCase().includes(k)).length * 10 }))
+    .sort((a, b) => b.fit - a.fit).slice(0, 5);
+  type Idea = { id: string; title: string; pitch: string; likes: number; liked: boolean };
   type Pitch = { id: string; title: string; summary: string; pitched_by_name: string; mine: boolean; status: string; voting_ends_at: string; options: { key: string; name: string; description: string; votes: number }[] | null; my_vote: string | null; votes: number };
   const pitches = (pitchBoard.data ?? []) as Pitch[];
   const communityTasks = ((community.data ?? []) as unknown as { id: string; title: string; due_on: string; hub: string; effort: string; proof: string; mission: { title: string; status: string } | null }[])
@@ -239,9 +259,62 @@ export default async function MyWorkPage() {
           )}
         </Block>
 
+        {(badges.data ?? []).length > 0 && (
+          <Block id="badges" title="Skill badges" hint="From your verified contributions.">
+            <ul className="flex flex-wrap gap-2" data-badges>
+              {((badges.data ?? []) as { label: string; count: number }[]).map((b) => <li key={b.label} className="border border-accent px-2 py-0.5 text-sm font-medium text-accent-text">{b.label} ×{b.count}</li>)}
+            </ul>
+          </Block>
+        )}
+
+        {((doneMissions ?? []) as { id: string; title: string }[]).length > 0 && (
+          <Block id="share" title="Share your work" hint="A LinkedIn card for each finished public mission you worked on. Only your verified tasks; nothing is posted for you.">
+            <ul className="space-y-2">
+              {((doneMissions ?? []) as { id: string; title: string }[]).map((m) => (
+                <li key={m.id} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"><span className="text-sm text-ink">{m.title}</span><ShareCardButton missionId={m.id} code={cardBy.get(m.id) ?? null} /></li>
+              ))}
+            </ul>
+          </Block>
+        )}
+
+        {(certs.data ?? []).length > 0 && (
+          <Block id="certificates" title="Certificates">
+            <ul className="space-y-1 text-sm">
+              {((certs.data ?? []) as { code: string; period_label: string }[]).map((c) => (
+                <li key={c.code} className="flex flex-wrap justify-between gap-2"><span>{c.period_label} · {c.code}</span><span className="flex gap-3"><a href={`/api/autopilot/certificate/${c.code}`} className="underline">Download PDF</a><Link href={`/verify/${c.code}`} className="underline">Verify page</Link></span></li>
+              ))}
+            </ul>
+          </Block>
+        )}
+
+        <Block id="opportunities" title="Top 5 for you" hint="Open opportunities, closest and most urgent first, then the ones that fit your skills.">
+          {top5.length === 0 ? <Empty>None open right now.</Empty> : (
+            <ul className="divide-y divide-line text-sm" data-top5>
+              {top5.map((o) => (
+                <li key={o.id} className="flex flex-col gap-0.5 py-2 sm:flex-row sm:justify-between">
+                  {o.registration_url ? <a href={o.registration_url} target="_blank" rel="noopener noreferrer" className="text-ink underline-offset-2 hover:underline">{o.title}</a> : <span className="text-ink">{o.title}</span>}
+                  <span className="text-xs text-ink/60">{o.organizer} · closes {dayLabel(o.deadline)}{o.distance_km !== null ? ` · ~${o.distance_km} km` : o.mode === "online" ? " · online" : ""}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="mt-3 flex gap-4"><Link href="/opportunities" className="text-sm text-accent-text underline">All opportunities</Link><SuggestOpportunity /></div>
+        </Block>
+
+        {((savedIdeas.data ?? []) as Idea[]).length > 0 && (
+          <Block id="ideas" title="Project ideas to start" hint="Saved by the team from the Idea Engine. Like one, or start it as your own project with a plan.">
+            <ul className="space-y-3">
+              {((savedIdeas.data ?? []) as Idea[]).map((i) => (
+                <li key={i.id} className="border border-line p-3"><p className="font-medium text-ink">{i.title}</p><p className="text-sm text-ink/75">{i.pitch}</p><SavedIdea id={i.id} liked={i.liked} likes={i.likes} /></li>
+              ))}
+            </ul>
+          </Block>
+        )}
+
         <Block id="settings" title="Notifications">
           <PreferencesForm delivery={(prefs.data?.delivery as "instant" | "daily" | undefined) ?? "instant"} push={(prefs.data?.push as boolean | undefined) ?? true} />
           <div className="mt-4"><PushToggle subscribed={(subs.data ?? []).map((s) => s.endpoint as string)} /></div>
+          {me.data && <div className="mt-4"><ShowOnImpact show={me.data.show_on_impact !== false} /></div>}
         </Block>
       </div>
     </Section>
