@@ -41,7 +41,7 @@ export function AutomationsCard({ items, canPause, superAdmin, masterOn }: { ite
           <Button className="mt-3 min-h-11 w-full font-semibold" disabled={pending || !masterOn}
             onClick={() => { if (window.confirm("Run all automations now? New ideas, research topics, opportunities and a tool are added, and members get notified.")) { setRunning("all"); run(() => runAutomationNow("all"), () => setRunning(null)); } }}
             data-run-all>
-            <RefreshCw size={16} className={running === "all" && pending ? "animate-spin" : ""} aria-hidden /> {running === "all" && pending ? "Running… (up to a minute)" : "Run all now"}
+            <RefreshCw size={16} className={running === "all" && pending ? "animate-spin" : ""} aria-hidden /> {running === "all" && pending ? "Starting…" : "Run all now"}
           </Button>
           <p className="mt-1 text-xs text-ink/60">Adds everything right away instead of waiting for the next run.</p>
         </>
