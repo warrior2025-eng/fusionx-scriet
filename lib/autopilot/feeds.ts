@@ -182,6 +182,8 @@ async function opportunityDesk(): Promise<FeedItem[]> {
 
 /** Every open item from the feeds (a feed that fails adds nothing). */
 export async function readFeeds(): Promise<{ items: FeedItem[]; counts: Record<string, number> }> {
+  // Local tests set OPPORTUNITY_FEEDS=off so no real website is called.
+  if (process.env.OPPORTUNITY_FEEDS === "off") return { items: [], counts: {} };
   const [a, b, c, d, e] = await Promise.all([devpost().catch(() => []), unstop().catch(() => []), devfolio().catch(() => []), unstopFests().catch(() => []), opportunityDesk().catch(() => [])]);
   return { items: [...a, ...b, ...c, ...d, ...e].filter((i) => i.title && i.official_link), counts: { Devpost: a.length, Unstop: b.length + d.length, Devfolio: c.length, "Opportunity Desk": e.length } };
 }

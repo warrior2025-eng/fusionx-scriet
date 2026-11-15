@@ -5,6 +5,7 @@ import { Section } from "@/components/ui/section";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { createClient } from "@/lib/supabase/server";
 import { CardGrid, FilterBar, OpportunityCard } from "@/components/opportunities/parts";
+import { squadCounts, squadable } from "@/lib/opportunities/squads";
 import { SECTIONS, applyFilters, daysLeft, isNewToday, sectionOf, todayIST, withParams, type Opp, type Params } from "@/lib/opportunities/sections";
 
 export const generateMetadata = (): Promise<Metadata> =>
@@ -26,13 +27,14 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
     supabase.rpc("ap_past_opportunities"),
   ]);
   const all = (data ?? []) as Opp[];
+  const squads = await squadCounts(supabase, all.filter(squadable).map((o) => o.id));
   const list = applyFilters(all, p, today);
   const newToday = list.filter((o) => isNewToday(o, today)).slice(0, 8);
   const closing = list.filter((o) => { const d = daysLeft(o.deadline, today); return d !== null && d <= 3; }).slice(0, 8);
   const strip = (title: string, items: Opp[], key: string) => items.length > 0 && (
     <section aria-labelledby={key} className="mb-10" data-strip={key}>
       <h2 id={key} className="font-serif text-xl text-ink">{title} <span className="text-base text-ink/60">({items.length})</span></h2>
-      <ul className="mt-4 grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-4">{items.map((o) => <li key={o.id} className="min-w-0"><OpportunityCard o={o} today={today} /></li>)}</ul>
+      <ul className="mt-4 grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-4">{items.map((o) => <li key={o.id} className="min-w-0"><OpportunityCard o={o} today={today} squad={squads[o.id]} /></li>)}</ul>
     </section>
   );
 
@@ -61,7 +63,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
                   <h2 id={`sec-${s.key}`} className="font-serif text-2xl text-ink">{s.label} <span className="text-base text-ink/60">({items.length})</span></h2>
                   {items.length > 6 && <Link href={withParams(`/opportunities/${s.key}`, { ...p, section: undefined }, {})} className="inline-flex min-h-11 items-center text-sm font-medium text-accent-text underline">See all {items.length}</Link>}
                 </div>
-                <div className="mt-4">{items.length ? <CardGrid items={items.slice(0, 6)} today={today} /> : <p className="border border-dashed border-line p-4 text-sm text-ink/70">{s.empty}</p>}</div>
+                <div className="mt-4">{items.length ? <CardGrid items={items.slice(0, 6)} today={today} squads={squads} /> : <p className="border border-dashed border-line p-4 text-sm text-ink/70">{s.empty}</p>}</div>
               </section>
             );
           })}

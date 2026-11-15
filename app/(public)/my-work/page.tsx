@@ -9,6 +9,7 @@ import { BusyDates, CheckinForm, OfferButtons, PreferencesForm, ProofForm, PushT
 import { PitchForm, PitchVote, TakeTask } from "@/components/autopilot/people-parts";
 import { ShareCardButton, ShowOnImpact, SuggestOpportunity } from "@/components/autopilot/outcome-parts";
 import { IdeaCard, type IdeaCardData } from "@/components/autopilot/ideas-for-you";
+import { MySquadsBlock, type MySquads } from "@/components/squads/my-squads";
 import { dayLabel, daysFromToday, getAutopilotViewer, peopleById, proofHref, todayIST, type TaskRow } from "@/lib/autopilot/server";
 import { EFFORT_LABEL, PROOF_LABEL, STATUS_LABEL, TASK_STATUS_LABEL, hubLabel } from "@/lib/autopilot/labels";
 import { cn } from "@/lib/utils";
@@ -86,6 +87,9 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
         supabase.rpc("ap_idea_teams", { p_ids: rawIdeas.map((i) => i.id) }),
       ])
     : [{ data: [] }, { data: [] }];
+  // Squad Match (migration 0047): invites to answer and my squads.
+  const { data: squadData } = await supabase.rpc("ap_squad_my");
+  const mySquads = (squadData ?? { invites: [], squads: [] }) as MySquads;
   const stateBy = new Map(((states ?? []) as { idea_id: string; state: "saved" | "hidden" }[]).map((x) => [x.idea_id, x.state]));
   const teamsBy = new Map<string, { project_id: string; started_by: string; joinable: boolean }[]>();
   for (const t of (teamRows ?? []) as { idea_id: string; project_id: string; started_by: string; joinable: boolean }[]) teamsBy.set(t.idea_id, [...(teamsBy.get(t.idea_id) ?? []), t]);
@@ -141,6 +145,12 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
             Nothing waiting for you right now. When a task fits your hub and skills, it is offered here and you get a notification.
             Add your skills on <Link href="/profile" className="underline">your profile</Link> so the right tasks find you.
           </p>
+        )}
+
+        {(mySquads.invites.length > 0 || mySquads.squads.length > 0) && (
+          <Block id="squads" title="Squads" hint="Teams for hackathons and competitions. Find one from any opportunity card: Find a team.">
+            <MySquadsBlock data={mySquads} me={user.id} />
+          </Block>
         )}
 
         <Block id="ideas" title={`Ideas for you (${current.length})`} hint="New project ideas every Sunday, from beginner to startup-grade. Pick any: hub tags are only hints.">

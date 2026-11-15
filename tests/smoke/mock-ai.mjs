@@ -46,7 +46,14 @@ export function startMockAi(port = 4010) {
     const body = await new Promise((r) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => r(b)); });
     const url = req.url ?? "";
     if (url === "/robots.txt") { res.writeHead(200, { "Content-Type": "text/plain" }); return res.end("User-agent: *\nAllow: /\n"); }
-    if (url === "/fest") { res.writeHead(200, { "Content-Type": "text/html" }); return res.end(`<html><body><h1>Smoke Near Hack</h1><a href="http://127.0.0.1:4010/ok/near-hack">Register</a></body></html>`); }
+    // A fest page with real text (the morning job skips pages with almost no text, as JavaScript-only sites give).
+    if (url === "/fest") {
+      res.writeHead(200, { "Content-Type": "text/html" });
+      return res.end(`<html><body><h1>Smoke Near Hack</h1><p>Smoke Near Hack is a 24-hour student hackathon at IIT Delhi for teams of two to four. Build something useful for your campus, ` +
+        `present it to judges from industry, and win prizes. Registration is free and open to students of every year and branch. Mentors are available through the night, ` +
+        `and meals are provided. Themes include campus tools, health, sustainability and open data.</p><p>Schedule: check-in, opening talk, hacking, mentor rounds, demos, results.</p>` +
+        `<a href="http://127.0.0.1:4010/ok/near-hack">Register</a></body></html>`);
+    }
     if (url.startsWith("/ok/")) { res.writeHead(200, { "Content-Type": "text/html" }); return res.end("<html><body>ok</body></html>"); }
     if (url === "/__last") { res.writeHead(200, { "Content-Type": "application/json" }); return res.end(JSON.stringify(state)); }
     if (url === "/__gemini-down") { state.geminiDown = true; res.writeHead(200); return res.end("down"); }
