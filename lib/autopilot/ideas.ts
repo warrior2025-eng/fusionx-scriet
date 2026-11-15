@@ -35,7 +35,11 @@ async function callsToday(admin: Admin): Promise<number> {
 }
 
 /** One JSON answer from Gemini (each free model in turn), then Groq. Null when none answers or the cap is reached. */
-export async function askJson(admin: Admin, area: string, prompt: string, cap: number): Promise<unknown | null> {
+export async function askJson(admin: Admin, area: string, prompt: string, cap: number, opts: { until?: number; maxTokens?: number } = {}): Promise<unknown | null> {
+  // "until": the whole job must end by then (the platform stops it at 60 s), so each model gets only the time left.
+  const left = () => (opts.until ? opts.until - Date.now() : 60_000);
+  const timeout = () => AbortSignal.timeout(Math.max(1_000, Math.min(45_000, left())));
+  const maxTokens = opts.maxTokens ?? 4096;
   if ((await callsToday(admin)) >= cap) {
     await log(admin, area, "Daily AI cap reached", `Waiting until tomorrow (cap ${cap})`);
     return null;
@@ -47,11 +51,12 @@ export async function askJson(admin: Admin, area: string, prompt: string, cap: n
   };
   if (process.env.GEMINI_API_KEY) {
     for (const model of GEMINI_MODELS) {
+      if (left() < 4_000) break;
       const res = await fetch(`${GEMINI}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY },
-        body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.6, maxOutputTokens: 4096, responseMimeType: "application/json" } }),
-        signal: AbortSignal.timeout(60_000), cache: "no-store",
+        body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.6, maxOutputTokens: maxTokens, responseMimeType: "application/json" } }),
+        signal: timeout(), cache: "no-store",
       }).catch(() => null);
       if (res?.ok) {
         const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
@@ -60,12 +65,12 @@ export async function askJson(admin: Admin, area: string, prompt: string, cap: n
       }
     }
   }
-  if (process.env.GROQ_API_KEY) {
+  if (process.env.GROQ_API_KEY && left() >= 4_000) {
     const res = await fetch(`${GROQ}/openai/v1/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
-      body: JSON.stringify({ model: GROQ_MODEL, temperature: 0.6, max_tokens: 4096, response_format: { type: "json_object" }, messages: [{ role: "user", content: prompt }] }),
-      signal: AbortSignal.timeout(60_000), cache: "no-store",
+      body: JSON.stringify({ model: GROQ_MODEL, temperature: 0.6, max_tokens: Math.min(maxTokens, 8000), response_format: { type: "json_object" }, messages: [{ role: "user", content: prompt }] }),
+      signal: timeout(), cache: "no-store",
     }).catch(() => null);
     if (res?.ok) {
       const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
@@ -130,7 +135,7 @@ export async function draftResearchTopics(admin: Admin, count: number, cap: numb
 Do not repeat: ${(past ?? []).map((p) => p.title).join("; ") || "none"}.
 STRICT: Do NOT cite or name any paper, author or DOI. For data sources name only well-known public datasets you are sure exist, else write "verify". For venues write a venue only if you are sure it fits, else "find with your mentor".
 Reply with JSON: {"topics":[{"title":"","question":"","why":"","scope":"","method":"","data_sources":"","tools":"","plan":["week 1-2: ...", "... 10-12 weeks"],"output":"","venues":"","ethics":"","keywords":["search keywords"],"where_to_search":"Google Scholar, arXiv, IEEE Xplore, Semantic Scholar"}]}`;
-  const out = (await askJson(admin, "idea_research", prompt, cap)) as { topics?: Record<string, unknown>[] } | null;
+  const out = (await askJson(admin, "idea_research", prompt, cap, { until: Date.now() + 50_000, maxTokens: 8192 })) as { topics?: Record<string, unknown>[] } | null;
   let n = 0;
   for (const t of (out?.topics ?? []).slice(0, count)) {
     const data: Record<string, unknown> = {};

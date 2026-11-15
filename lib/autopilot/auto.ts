@@ -101,17 +101,28 @@ export async function weeklyIdeas(force = false): Promise<Record<string, unknown
   const counts = new Map<string, number>();
   for (const p of skills ?? []) for (const s of (p.skills as string[]) ?? []) counts.set(s.toLowerCase(), (counts.get(s.toLowerCase()) ?? 0) + 1);
   const avoid = [...(projects ?? []).map((p) => `${p.title}`), ...(recent ?? []).map((r) => `${r.title}`)];
-  const levelText = mix.map((n, i) => (n ? `${Math.ceil(n * 1.5)} at level ${i + 1}` : "")).filter(Boolean).join(", ");
-  const generate = async (extra: number) => {
+  // The run must end within the platform's 60 s: one deadline for every AI call.
+  const until = Date.now() + 50_000;
+  // About 1.5× this week's mix is written, in parallel parts of at most 6 ideas, so each answer stays short
+  // (complete JSON, quick) and each part looks at a different kind of problem (fewer near-duplicates).
+  const THEMES = ["campus life and student services at SCRIET", "health, safety and the environment in Meerut", "learning, careers, clubs and events", "local shops, farmers, NGOs and the community"];
+  const ask = (perLevel: number[]) => perLevel.flatMap((n, i) => Array<number>(Math.max(0, n)).fill(i + 1));
+  const describe = (levels: number[]) => [1, 2, 3, 4, 5].map((l) => [l, levels.filter((x) => x === l).length]).filter(([, n]) => n).map(([l, n]) => `${n} at level ${l}`).join(", ");
+  const generateAll = async (levels: number[]) => {
+    const parts: number[][] = [];
+    for (let i = 0; i < levels.length; i += 6) parts.push(levels.slice(i, i + 6));
+    return (await Promise.all(parts.map((p, i) => generate(p, THEMES[i % THEMES.length])))).flat();
+  };
+  const generate = async (levels: number[], theme: string) => {
     const prompt = `You help FusionX@SCRIET, a student innovation club at SCRIET, CCS University, Meerut (Uttar Pradesh, India), with project ideas for ALL its members (any branch, any year).
 Levels: 1 Beginner (1–2 weeks, simple stack), 2 Easy, 3 Intermediate, 4 Advanced, 5 Startup-grade.
-Write project ideas: ${extra ? `${extra} more, any levels` : levelText}. Real problems on campus or in the Meerut region. Simple English.
+Write exactly ${levels.length} project ideas: ${describe(levels)}. Focus on ${theme}. Real problems on campus or in the Meerut region. Simple English.
 Members' skills (counts): ${[...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 25).map(([s, n]) => `${s} ×${n}`).join(", ") || "unknown"}.
 Do NOT repeat or closely copy: ${avoid.slice(0, 120).join("; ") || "none"}.
 Open opportunities: ${(opps ?? []).map((o) => o.title).join("; ") || "none"}.
 Never invent statistics, studies, prices or products. Name a similar product only if sure, else "check similar products".
 Reply with JSON: {"ideas":[{"level":1,"learn":"one line: what you'll learn","hubs":["design|competitions|projects|events"],"title":"","pitch":"one line","problem":"who has it, how often, evidence to collect","users":"","solution":"","different":"","mvp":"","stack":"comma separated","data":"free data or APIs","effort":"S|M|L","variations":{"lite":["milestones"],"standard":["milestones"],"ambitious":["milestones"]},"team":{"Design & Branding":"","Competitions & Opportunities":"","Projects, Research & Startups":"","FusionX Event Crew":""},"validate":"","measures":"","startup_path":"","risks":"","opportunity":""}]}`;
-    const out = (await askJson(admin, "idea_projects", prompt, cap)) as { ideas?: Record<string, unknown>[] } | null;
+    const out = (await askJson(admin, "idea_projects", prompt, cap, { until, maxTokens: 8192 })) as { ideas?: Record<string, unknown>[] } | null;
     return (out?.ideas ?? []).map((i): Idea => {
       const data: Record<string, unknown> = {};
       for (const f of PROJECT_FIELDS) data[f] = f === "variations" || f === "team" ? i[f] ?? null : str(i[f], 800);
@@ -124,7 +135,7 @@ Reply with JSON: {"ideas":[{"level":1,"learn":"one line: what you'll learn","hub
     const prompt = `Score each student project idea from 1 to 10 for usefulness, originality, feasibility for students, clarity and completeness. Be strict.
 Reply with JSON: {"scores":[{"i":0,"score":7}]}
 ${ideas.map((x, i) => `${i}. [L${x.level}] ${x.title}: ${x.pitch} | MVP: ${x.mvp} | Stack: ${x.stack}`).join("\n")}`;
-    const out = (await askJson(admin, "idea_projects", prompt, cap)) as { scores?: { i: number; score: number }[] } | null;
+    const out = (await askJson(admin, "idea_projects", prompt, cap, { until: until + 8_000, maxTokens: 2048 })) as { scores?: { i: number; score: number }[] } | null;
     const map = new Map((out?.scores ?? []).map((s) => [Number(s.i), Number(s.score)]));
     return ideas.map((_, i) => map.get(i) ?? 0);
   };
@@ -139,11 +150,17 @@ ${ideas.map((x, i) => `${i}. [L${x.level}] ${x.title}: ${x.pitch} | MVP: ${x.mvp
       keep.push(x);
     });
   };
-  const first = await generate(0);
-  take(first, await score(first));
-  if (keep.length < want) {
-    // Retry once; then fill any level that came short from the best of the rest.
-    const more = await generate(want - keep.length + 4);
+  const first = await generateAll(ask(mix.map((n) => Math.ceil(n * 1.5))));
+  const firstScores = await score(first);
+  take(first, firstScores);
+  if (keep.length < want && Date.now() >= until - 25_000) {
+    // No time for a retry: fill from the best of the rest at any level (the quality bar still applies).
+    first.map((x, i) => ({ ...x, score: firstScores[i] })).filter((x) => x.score >= minScore && !keep.some((k) => k.title === x.title || similar(`${k.title} ${k.pitch}`, `${x.title} ${x.pitch}`)))
+      .sort((a, b) => b.score - a.score).slice(0, want - keep.length).forEach((x) => keep.push(x));
+  } else if (keep.length < want) {
+    // Retry once (only when there is time left): the levels that came short, plus a few spare.
+    const short = mix.map((n, i) => n - keep.filter((k) => k.level === i + 1).length);
+    const more = await generateAll(ask(short.map((n, i) => (n > 0 ? n + (i < 2 ? 2 : 1) : 0))));
     const all = [...first.filter((f) => !keep.some((k) => k.title === f.title)), ...more];
     const sc = await score(all);
     take(all, sc);
@@ -185,6 +202,8 @@ export async function monthlyResearch(force = false): Promise<Record<string, unk
     await admin.from("autopilot_queue").update({ status: "done" }).eq("kind", "idea_draft").eq("area", "idea_research").eq("status", "pending");
     await admin.rpc("ap_notify_everyone", { p_title: `${n} new research topics in My work`, p_body: "Starting one needs a mentor's approval.", p_link: "/my-work#ideas" });
   }
+  await log(admin, "idea_research", n ? `${g.level === "auto" ? "Delivered" : "Drafted"} ${n} research topics` : "No research topics this run",
+    n ? (g.level === "auto" ? "Sent to everyone's My work" : "Waiting for approval") : "The AI gave no complete topic; trying next run");
   return { state: "done", count: n };
 }
 
