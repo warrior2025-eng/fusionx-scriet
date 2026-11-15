@@ -215,6 +215,11 @@ const SECTION_CATEGORY: Record<string, string> = {
   research: "research", "research call": "research", "paper submission": "conference", conference: "conference",
 };
 const category = (type: string) => SECTION_CATEGORY[type.toLowerCase().trim()] ?? (/(hack)/i.test(type) ? "hackathon" : /(intern)/i.test(type) ? "internship" : /(fellow)/i.test(type) ? "fellowship" : /(scholar)/i.test(type) ? "scholarship" : /(fest)/i.test(type) ? "tech_fest" : /(confer|paper)/i.test(type) ? "conference" : /(research)/i.test(type) ? "research" : /(idea)/i.test(type) ? "ideathon" : "competition");
+/** Our category → the Opportunities section (the same rule as ap_opp_section in migration 0045). */
+const SECTION_OF: Record<string, string> = {
+  hackathon: "hackathons", competition: "competitions", innovation_challenge: "ideathons", ideathon: "ideathons", internship: "internships",
+  scholarship: "fellowships", fellowship: "fellowships", workshop: "fests", tech_fest: "fests", research: "research", conference: "research",
+};
 const region = (dist: number | null, country: string, near: number) => (/india/i.test(country) || !country ? (dist === null ? "india" : dist <= near ? "near" : dist <= 200 ? "ncr" : "india") : "international");
 
 export async function dailyOpportunities(): Promise<Record<string, unknown>> {
@@ -259,22 +264,36 @@ ${texts.join("\n\n").slice(0, 60_000)}`;
   let published = 0, skipped = 0;
   const reasons: Record<string, number> = {};
   const skip = (why: string) => { skipped++; reasons[why] = (reasons[why] ?? 0) + 1; };
-  // Cheap checks first, then the best ones by value; only those have their link checked (in parallel), to stay fast.
-  const MAX_PER_RUN = 40;
+  // Cheap checks first, then the best new ones by value, at most PER_SECTION per Opportunities section so every
+  // section gets its share; only those have their link checked (10 at a time), to stay within the time limit.
+  const MAX_PER_RUN = 60, PER_SECTION = 10;
+  const keyOf = (title: string, deadline: string) => `${title.toLowerCase().replace(/[^a-z0-9]+/g, "")}|${deadline}`;
+  const { data: listed } = await admin.from("opportunity_drafts").select("dedupe_key").gte("deadline", today);
+  const known = new Set((listed ?? []).map((x) => x.dedupe_key as string));
+  let already = 0;
   const ready = all.flatMap((it) => {
     const official = str(it.official_link, 500), deadline = str(it.deadline, 10), title = str(it.title, 160);
     const organiser = str(it.organiser, 120), mode = str(it.mode, 20).toLowerCase();
     if (!title || !organiser) { skip("no title or organiser"); return []; }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline) || deadline < today) { skip("no future deadline"); return []; }
     if (!["online", "offline", "hybrid"].includes(mode)) { skip("no mode"); return []; }
+    if (known.has(keyOf(title, deadline))) { already++; return []; }
     const city = str(it.city, 60), dist = distanceKm(city);
     const hubs = list(it.hubs, 4).filter((h) => ["design-branding", "competitions-opportunities", "projects-research-startups", "event-crew"].includes(h));
     const score = valueScore({ distance_km: dist, mode, deadline, organiser, prizes: str(it.prizes), hubs, team_size: str(it.team) });
     if (score < threshold) { skip("value score below the threshold"); return []; }
     return [{ it, official, deadline, title, organiser, mode, city, dist, hubs, score }];
   }).sort((a, b) => b.score - a.score);
-  if (ready.length > MAX_PER_RUN) reasons["kept for the next run"] = ready.length - MAX_PER_RUN;
-  const chosen = ready.slice(0, MAX_PER_RUN);
+  const perSection = new Map<string, number>();
+  const chosen = ready.filter((c) => {
+    const sec = SECTION_OF[category(str(c.it.type, 60))] ?? "competitions";
+    const n = perSection.get(sec) ?? 0;
+    if (n >= PER_SECTION) return false;
+    perSection.set(sec, n + 1);
+    return true;
+  }).slice(0, MAX_PER_RUN);
+  if (ready.length > chosen.length) reasons["kept for the next run"] = ready.length - chosen.length;
+  if (already) reasons["already listed"] = already;
   const loads: boolean[] = [];
   for (let i = 0; i < chosen.length; i += 10) loads.push(...(await Promise.all(chosen.slice(i, i + 10).map((c) => linkLoads(c.official)))));
   for (const [n, c] of chosen.entries()) {
