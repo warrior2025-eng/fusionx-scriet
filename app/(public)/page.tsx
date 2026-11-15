@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, FlaskConical, Hammer, Rocket, ShieldCheck } from "lucide-react";
 import { LinkButton } from "@/components/ui/button";
 import { Section, SectionHeading } from "@/components/ui/section";
 import { Eyebrow } from "@/components/ui/eyebrow";
@@ -31,6 +31,14 @@ import { getContent } from "@/lib/data/site-content";
 import { getCurrentCycle } from "@/lib/recruitment/data";
 import { publicResultsHidden, resultsVisible } from "@/lib/recruitment/results";
 import { createClient } from "@/lib/supabase/server";
+
+// The About section's four points: the same four things its sentence names, nothing more.
+const ABOUT_PILLARS = [
+  { icon: Hammer, title: "Build projects", text: "Turn an idea into something people can use." },
+  { icon: FlaskConical, title: "Do research", text: "Ask a real question and work it through with a mentor." },
+  { icon: ShieldCheck, title: "Protect ideas", text: "Learn how to keep credit for your work." },
+  { icon: Rocket, title: "Carry work forward", text: "Keep going after the competition ends." },
+];
 
 export const generateMetadata = (): Promise<Metadata> => pageMetadata("home", {});
 
@@ -152,17 +160,36 @@ export default async function HomePage() {
       render: (index, band) => (
         <Section band={band}>
           <ScrollReveal>
-            <SectionHeading index={index} eyebrow="About" title="An ecosystem, not just a club." />
-            <CutCard className="p-8 md:p-10">
-              <p className="max-w-3xl text-base leading-relaxed text-ink/80 md:text-lg">
-                {settings.chapter_name} exists to help students move beyond attending events and into
-                actually building projects, conducting research, protecting their ideas, and carrying
-                work forward past a single competition.
-              </p>
-              <Link href="/about" className="group mt-6 inline-flex items-center gap-2 text-sm font-medium text-accent">
-                <span className="link-slide">Why FusionX exists</span>
-                <ArrowRight size={14} className="arrow-nudge" />
-              </Link>
+            <SectionHeading index={index} eyebrow="About" title="FusionX is an ecosystem, not just a club." />
+            <CutCard className="p-6 sm:p-8 md:p-10">
+              <div className="grid gap-8 lg:grid-cols-[1.1fr_1fr] lg:gap-12">
+                <div className="min-w-0">
+                  <p className="font-serif text-2xl leading-snug tracking-tight text-ink md:text-3xl">
+                    Don&apos;t just attend events. <span className="text-accent-text">Build what comes after.</span>
+                  </p>
+                  <p className="mt-4 text-base leading-relaxed text-ink/75 md:text-lg">
+                    <strong className="font-semibold text-ink">FusionX</strong> exists to help students move beyond attending events and into
+                    actually building projects, conducting research, protecting their ideas, and carrying
+                    work forward past a single competition.
+                  </p>
+                  <LinkButton href="/about" size="lg" className="mt-8 min-h-12 w-full font-semibold sm:w-auto">
+                    Why FusionX exists <ArrowRight size={18} aria-hidden />
+                  </LinkButton>
+                </div>
+                <ul className="grid min-w-0 gap-3 sm:grid-cols-2" aria-label="What FusionX members do">
+                  {ABOUT_PILLARS.map(({ icon: Icon, title, text }) => (
+                    <li key={title} className="flex gap-3 border border-line bg-paper/60 p-4 transition-colors hover:border-accent/50">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center bg-accent/10 text-accent-text" aria-hidden>
+                        <Icon size={20} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block font-semibold text-ink">{title}</span>
+                        <span className="mt-1 block text-sm leading-relaxed text-ink/70">{text}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </CutCard>
           </ScrollReveal>
         </Section>
