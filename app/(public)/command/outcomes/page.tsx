@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { NowBuilding } from "@/components/autopilot/now-building";
+import { ContentNav } from "@/components/autopilot/content-admin";
 import { CertificateTools, Foreword, HideToggle, PublishNow, RevokeCertificate, StorySummary } from "@/components/autopilot/outcome-parts";
 import { dayLabel, getAutopilotViewer, peopleById, todayIST } from "@/lib/autopilot/server";
 import { semesterStart } from "@/lib/autopilot/outcomes";
@@ -37,6 +38,8 @@ export default async function OutcomesPage() {
   const names = await peopleById(supabase, ((certs ?? []) as C[]).map((c) => c.user_id));
 
   return (
+    <>
+    <ContentNav />
     <div className="grid gap-5 lg:grid-cols-2" data-outcomes>
       <section className="border border-line bg-surface p-4 lg:col-span-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -104,5 +107,6 @@ export default async function OutcomesPage() {
         <p className="text-sm text-ink/70">{ideas ?? 0} idea draft{ideas === 1 ? "" : "s"} and {opps ?? 0} opportunit{opps === 1 ? "y" : "ies"} waiting. <Link href="/command/ideas" className="text-accent-text underline">Open the Idea Engine</Link></p>
       </section>
     </div>
+    </>
   );
 }

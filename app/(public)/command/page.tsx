@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AutomationsCard } from "@/components/autopilot/content-admin";
+import { AUTOMATIONS, nextRun } from "@/lib/autopilot/schedule";
 import { ApproveAllSafe, CopyText, ExamPeriods, FounderExamToggle, MasterButton, QueueItem, StartMission } from "@/components/autopilot/center-parts";
 import { dayLabel, daysFromToday, getAutopilotViewer, peopleById, todayIST } from "@/lib/autopilot/server";
 import { HUBS, hubLabel, TASK_STATUS_LABEL } from "@/lib/autopilot/labels";
@@ -22,7 +24,7 @@ export default async function TodayPage() {
     supabase.from("playbook_variations").select("playbook_id, key, name, is_default").order("sort"),
     supabase.from("core_group_members").select("user_id, is_lead, group:core_groups(slug, kind)"),
     supabase.from("club_exam_periods").select("id, name, starts_on, ends_on").gte("ends_on", today).order("starts_on"),
-    supabase.from("autopilot_settings").select("master, founder_exam_mode").eq("id", 1).maybeSingle(),
+    supabase.from("autopilot_settings").select("*").eq("id", 1).maybeSingle(),
     supabase.from("contributions").select("title, user_id, mission:missions(title, hubs)").gte("contributed_on", weekStart).order("contributed_on", { ascending: false }).limit(80),
     supabase.from("missions").select("title, mission_date, hubs").in("status", ["planned", "active"]).gte("mission_date", today).lte("mission_date", weekEnd).order("mission_date"),
     supabase.from("missions").select("id, title").in("status", ["planned", "active"]).order("mission_date").limit(100),
@@ -45,6 +47,10 @@ export default async function TodayPage() {
   const people = await peopleById(supabase, [...memberRows.map((m) => m.user_id), ...due.map((d) => d.assignee_id), ...((done.data ?? []) as { user_id: string }[]).map((c) => c.user_id)]);
   const memberOptions = [...people.entries()].map(([id, p]) => ({ id, name: p.full_name })).sort((a, b) => a.name.localeCompare(b.name));
   const safeCount = items.filter((i) => i.safe).length;
+  // Automations (migration 0045): On / Paused each, and when they run next.
+  const pauses = ((settings.data as { feature_pauses?: Record<string, { name?: string; at?: string }> } | null)?.feature_pauses ?? {});
+  const { data: canPause } = await supabase.rpc("ap_can", { p_action: "automations.pause", p_hub: null, p_user: user.id });
+  const automations = AUTOMATIONS.map((a) => ({ key: a.key, label: a.label, next: nextRun(a.key), paused: pauses[a.key] ?? null }));
   const founderMode = ((settings.data?.founder_exam_mode as string[] | undefined) ?? []).includes(user.id);
 
   // "Copy WhatsApp update": real records only, per hub and for the club.
@@ -100,6 +106,7 @@ export default async function TodayPage() {
       </section>
 
       <aside className="space-y-5">
+        <AutomationsCard items={automations} canPause={canPause === true} superAdmin={viewer.superAdmin} masterOn={settings.data?.master !== "paused"} />
         <section className="border border-line bg-surface p-4">
           <h2 className="font-serif text-lg text-ink">Quick actions</h2>
           <div className="mt-3 flex flex-col gap-2">

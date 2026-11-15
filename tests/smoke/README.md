@@ -35,9 +35,9 @@ The local stack is described in `tests/meetings-polish/local/README.txt`. LiveKi
 
    - `test:autopilot` runs the engine checks in SQL with a mocked time.
    - `test:smoke` runs the browser tests in the Chrome already installed on the machine.
-   - `node tests/autopilot/people.mjs` and `node tests/autopilot/outcomes.mjs` run the engine checks for PR 2 and PR 3.
+   - `node tests/autopilot/people.mjs`, `node tests/autopilot/outcomes.mjs` and `node tests/autopilot/auto.mjs` run the engine checks for PR 2, PR 3 and PR 4.
 
-   Build the app with `AI_GEMINI_BASE=http://127.0.0.1:4010` and any `GEMINI_API_KEY`. The tests start a local AI stand-in there (`mock-ai.mjs`), so no real AI or website is called.
+   Build the app with `AI_GEMINI_BASE=http://127.0.0.1:4010`, `AI_GROQ_BASE=http://127.0.0.1:4010` and any `GEMINI_API_KEY` and `GROQ_API_KEY`. The tests start a local AI stand-in there (`mock-ai.mjs`), so no real AI or website is called.
 
 Each run needs a fresh database (step 1 again). `FX_PG` must point to a folder whose `node_modules` has the `pg` package. `pg` is not a project dependency.
 
@@ -69,6 +69,13 @@ Each run needs a fresh database (step 1 again). `FX_PG` must point to a folder w
   - The story page summary, the share card page and its 1200×627 image, and skill badges.
   - The verify page shows a certificate as valid, then as revoked.
   - The Outcomes tab loads and the Impact Report downloads as a PDF.
-  - The Idea Engine makes 3 complete project ideas and 3 research topics with no invented DOIs. The radar keeps only items with an official link and an open deadline, merges repeats, sorts by value, and logs the grounding fallback.
   - The Near Meerut and Closing soon filters.
   - Analytics count only public pages.
+- **Automatic ideas, opportunities and tools (PR 4):**
+  - Sunday (mocked): 15 levelled ideas for everyone, each scored 7 or more, near-duplicates dropped, the week 1 level mix, one notification per member.
+  - Every member type sees the same 15. "Not for me" hides one. "Accept and start" makes a public project, "In progress · Started by …".
+  - 7:00 (mocked): only items with a loading link, a future deadline and a mode are published, in their sections, with the reason for each one left out. New today, days left, filters in the URL, See all, and Past after the deadline.
+  - A college opportunity added from Command Center. The Automations card pauses one job only.
+  - Tools Library: 12 seeded pages, search, categories, the home section, the daily tool (both links checked, no prices). A deleted tool shows "no longer listed", goes on the do-not-add list, and can be restored.
+  - FusionX AI: 9 example questions answered from public data with links, never a closed or hidden item; private questions declined; Groq answers when Gemini fails; the chat keeps working when the automations reach their AI cap. The answers are saved to `fx-ai-answers.json` in the system temp folder.
+  - Members cannot open Command Center pages.

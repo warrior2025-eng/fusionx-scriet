@@ -824,3 +824,8 @@ select[aria-invalid="true"] {
   }
 }
 @keyframes role-shine { 0% { transform: translateX(-100%); } 45%, 100% { transform: translateX(100%); } }
+
+/* Phones and tablets: every button and field on My work is at least 44px tall, so it is easy to tap. */
+@media (max-width: 899px) {
+  .touch-44 :is(button, select, a.inline-flex, input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])) { min-height: 44px; }
+}

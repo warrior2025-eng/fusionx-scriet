@@ -64,33 +64,6 @@ test("Outcomes tab and the Semester Impact Report PDF", async ({ page }) => {
   expect(res.headers()["content-type"]).toContain("application/pdf");
 });
 
-test("Idea Engine: complete drafts, no invented DOIs, only valid radar items, sorted by value", async ({ page }) => {
-  // Only the local fest page as a source; grounding switched on to check the logged fallback.
-  await q("update opportunity_sources set active = false");
-  await q("insert into opportunity_sources (name, url, region) values ('Smoke fest', 'http://127.0.0.1:4010/fest', 'near') on conflict (url) do update set active = true");
-  await q("update autopilot_settings set numbers = numbers || '{\"radar_grounding\":1}', levels = levels || '{\"idea_projects\":\"suggest\",\"idea_research\":\"suggest\",\"idea_radar\":\"suggest\"}'");
-  const r = await cron();
-  expect(r.ideas.projects).toBe(3);
-  expect(r.ideas.research).toBe(3);
-  const projects = await q("select data from idea_drafts where kind = 'project'");
-  expect(projects.every((p) => ["problem", "mvp", "validate", "startup_path", "variations", "team"].every((k) => p.data[k]))).toBe(true);
-  const research = JSON.stringify(await q("select title, pitch, data from idea_drafts where kind = 'research'"));
-  expect(research).not.toMatch(/10\.\d{4,9}\//);
-  expect(research).not.toMatch(/et al\./);
-  const drafts = await q("select title, official_link, deadline from opportunity_drafts order by value_score desc");
-  expect(drafts.map((d) => d.title)).toEqual(["Smoke Near Hack", "Smoke Online Ideathon"]); // no link, past and duplicate dropped; nearest first
-  expect((await one("select count(*)::int n from automation_log where action = 'Grounding skipped'")).n).toBe(1);
-
-  await signIn(page, "smoke-boss", "/command/ideas");
-  await expect(page.locator('[data-idea="project"]')).toHaveCount(3);
-  await page.locator("[data-opportunity-draft]", { hasText: "Smoke Near Hack" }).locator("[data-publish-opp]").click();
-  await expect(page.getByText('Published with "Source checked".')).toBeVisible();
-  await page.goto("/opportunities?show=near");
-  await expect(page.locator("main")).toContainText("Smoke Near Hack");
-  await page.goto("/opportunities?show=closing");
-  await expect(page.locator("main")).not.toContainText("Smoke Online Ideathon");
-});
-
 test("analytics: public pages counted, Command Center and My work not", async ({ page }) => {
   await q("delete from site_visits");
   await page.goto("/impact");

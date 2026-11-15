@@ -4,6 +4,8 @@ import { Section } from "@/components/ui/section";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { JoinProject } from "@/components/autopilot/join-project";
+import { Toaster } from "@/components/admin/toast";
 import { LinkButton } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { Eyebrow } from "@/components/ui/eyebrow";
@@ -33,9 +35,17 @@ export default async function ProjectsPage({
   if (params.tech) query = query.contains("technologies", [params.tech]);
 
   const { data: projects } = await query;
+  // Autopilot (migration 0045): started from an idea, or open for a team; empty before it.
+  const [{ data: metaRows }, { data: auth }] = await Promise.all([
+    projects?.length ? supabase.rpc("ap_public_project_meta", { p_ids: projects.map((p) => p.id) }) : Promise.resolve({ data: [] }),
+    supabase.auth.getUser(),
+  ]);
+  type Meta = { project_id: string; started_by: string; from_idea: boolean; open_for_team: boolean; joins_closed: boolean; teams: number };
+  const meta = new Map(((metaRows ?? []) as Meta[]).map((m) => [m.project_id, m]));
 
   return (
     <>
+      <Toaster />
       <section className="border-b border-line">
 
         <div className="container-fx pt-20 pb-12 md:pt-24 md:pb-16">
@@ -113,6 +123,17 @@ export default async function ProjectsPage({
                         {p.title}
                       </p>
                       <p className="mt-2 text-sm text-ink/55 line-clamp-3 leading-relaxed">{p.description}</p>
+                      {(() => {
+                        const m = meta.get(p.id);
+                        if (!m || !(m.open_for_team || m.from_idea)) return null;
+                        return (
+                          <div className="mt-3 space-y-2" data-project-meta>
+                            <p className="text-xs font-semibold text-accent-text">{m.open_for_team ? "Open project · looking for a team" : `In progress · Started by ${m.started_by || "a member"}`}</p>
+                            {m.teams > 1 && <p className="text-xs text-ink/65">{m.teams} teams are building this</p>}
+                            {!m.joins_closed && <JoinProject id={p.id} signedIn={!!auth.user} label={m.open_for_team ? "Join this project" : "Join the team"} />}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                   {p.technologies?.length > 0 && (
