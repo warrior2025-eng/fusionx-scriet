@@ -31,7 +31,7 @@ export type Opp = { title: string; organizer: string; section: string | null; mo
   eligibility: string | null; eligibility_level: string | null; cost: string | null; has_prize: boolean | null; registration_url: string | null; region: string | null; value_score: number | null; rolling: boolean | null };
 
 export const oppLine = (o: Opp, today = todayIST()) =>
-  `- ${o.title} by ${o.organizer}${o.section ? ` (${o.section})` : ""} · ${o.mode ?? "mode not stated"}${o.city ? ` · ${o.city}${o.distance_km ? ` ~${o.distance_km} km from Meerut` : ""}` : ""}` +
+  `- ${o.title} by ${o.organizer}${o.section ? ` (${o.section})` : ""} · ${o.mode ?? "mode not stated"}${o.city ? ` · ${o.city}` : ""}` +
   ` · deadline ${o.deadline ?? "rolling"} (${daysLeftText(o.deadline, today)}) · ${o.cost === "free" ? "free" : o.cost === "paid" ? "paid" : "cost not stated"}` +
   `${o.eligibility_level === "first_year" ? " · 1st year friendly" : ""}${o.has_prize ? " · prize/stipend" : ""} · ${o.registration_url ?? `${SITE}/opportunities`}`;
 
