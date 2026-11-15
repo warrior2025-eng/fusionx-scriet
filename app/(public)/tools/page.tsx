@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Section } from "@/components/ui/section";
-import { Eyebrow } from "@/components/ui/eyebrow";
+import { NewToolBadge } from "@/components/tools/tools-section";
 import { ToolCard, isNewThisWeek, type ToolRow } from "@/components/tools/tool-card";
 import { TOOL_CATEGORIES } from "@/lib/tools/candidates";
 import { createClient } from "@/lib/supabase/server";
@@ -26,8 +26,8 @@ export default async function ToolsPage({ searchParams }: { searchParams: Promis
   };
   return (
     <Section className="pb-24 pt-14">
-      <Eyebrow>Tools Library</Eyebrow>
-      <h1 className="font-serif text-4xl tracking-tight text-ink md:text-5xl">Tools we use.</h1>
+      <NewToolBadge />
+      <h1 className="mt-4 font-serif text-4xl tracking-tight text-ink md:text-5xl">The FusionX <span className="text-accent-text">Tools Library</span></h1>
       <p className="mt-3 max-w-2xl text-ink/75">What each tool is, why it matters for students, and how to start in five steps. A new one is added every day.</p>
       <form action="/tools" className="mt-8 flex flex-col gap-3 sm:flex-row" role="search">
         <input type="search" name="q" defaultValue={q} placeholder="Search tools" aria-label="Search tools" className="min-h-11 w-full min-w-0 border border-line bg-paper px-3 text-sm text-ink sm:max-w-md" />
