@@ -43,8 +43,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
           <Eyebrow>Opportunities</Eyebrow>
           <h1 className="font-serif text-4xl tracking-tight text-ink md:text-5xl">Hackathons, internships, and more.</h1>
           <p className="mt-4 max-w-2xl text-sm leading-relaxed text-ink/70">
-            Updated every morning; each one stays until its deadline. Items marked &ldquo;auto&rdquo; were found and checked automatically
-            (the official link loaded): still confirm the details on the organiser&rsquo;s official page before applying.
+            Updated every morning; each one stays until its deadline. Always confirm the details on the organiser&rsquo;s official page before applying.
           </p>
         </div>
       </section>

@@ -24,7 +24,6 @@ export function OpportunityCard({ o, today }: { o: Opp; today: string }) {
             {daysLeftLabel(o.deadline, o.rolling, today)}
           </span>
           {isNewToday(o, today) && <span className="border border-accent px-2 py-0.5 font-semibold text-accent-text">New today</span>}
-          {o.source === "auto" && <span className="text-ink/55">auto</span>}
         </div>
         <h3 className="mt-3 break-words font-serif text-lg leading-snug text-ink">{o.title}</h3>
         <p className="mt-1 break-words text-sm text-ink/70">{o.organizer}</p>

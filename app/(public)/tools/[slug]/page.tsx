@@ -66,7 +66,7 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
       {related.length > 0 && (
         <p className="mt-6 text-sm text-ink/80">Related: {related.map((r, i) => <span key={r.slug}>{i > 0 && " · "}<Link href={`/tools/${r.slug}`} className="underline">{r.name}</Link></span>)}</p>
       )}
-      <p className="mt-6 text-xs text-ink/55">Last updated {new Date(tool.updated_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })}{tool.auto ? " · auto" : ""}. Pricing and features change: check the official site.</p>
+      <p className="mt-6 text-xs text-ink/55">Last updated {new Date(tool.updated_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })}. Pricing and features change: check the official site.</p>
     </Section>
   );
 }

@@ -28,7 +28,6 @@ export function IdeaCard({ idea }: { idea: IdeaCardData }) {
       <div className="flex flex-wrap items-center gap-2 text-xs">
         {idea.level && <span className="border border-accent px-2 py-0.5 font-semibold text-accent-text" data-level>Level {idea.level} · {LEVEL[idea.level]}</span>}
         {idea.kind === "research" && <span className="border border-line px-2 py-0.5 text-ink/75">Research · needs a mentor</span>}
-        <span className="text-ink/55">auto</span>
         {idea.state === "saved" && <span className="text-ink/70">Saved</span>}
       </div>
       <h3 className="mt-2 break-words font-serif text-lg leading-snug text-ink">{idea.title}</h3>
