@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { TOOL_CANDIDATES } from "@/lib/tools/candidates";
+import { FEED_HOSTS, readFeeds } from "./feeds";
 import { PROJECT_FIELDS, RESEARCH_FIELDS, askJson, distanceKm, ideaEngineConfigured, list, log, pageText, robotsAllow, str, valueScore, type Admin } from "./ideas";
 
 /**
@@ -207,42 +208,63 @@ export async function dailyOpportunities(): Promise<Record<string, unknown>> {
   const threshold = g.s.numbers?.opp_value_threshold ?? 40;
   const near = g.s.numbers?.near_km ?? 100;
   if (g.s.numbers?.radar_grounding === 1) await log(admin, "idea_radar", "Grounding skipped", "Search grounding is not used: only free sources (it cannot see the key's billing)");
+  // Two kinds of source, read together: the platforms' public JSON feeds (Devpost, Unstop, Devfolio: data
+  // straight from the platform, no AI), and the other listed pages, read as text by the AI (only what the pages say).
+  const fromPages = async (): Promise<Record<string, unknown>[]> => {
   const { data: sources } = await admin.from("opportunity_sources").select("*").eq("active", true);
   const texts: string[] = [];
   for (const s of sources ?? []) {
     const url = new URL(s.url as string);
+    if (FEED_HOSTS.some((h) => url.hostname === h || url.hostname.endsWith(`.${h}`))) continue; // read from the feed instead
     if (!(await robotsAllow(url))) { await admin.from("opportunity_sources").update({ last_fetched_at: new Date().toISOString(), last_result: "robots.txt disallows" }).eq("id", s.id); continue; }
-    const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "text/html" }, signal: AbortSignal.timeout(20_000), redirect: "follow" }).catch(() => null);
+    const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "text/html" }, signal: AbortSignal.timeout(15_000), redirect: "follow" }).catch(() => null);
     const ok = res?.ok && (res.headers.get("content-type") ?? "").includes("html");
-    await admin.from("opportunity_sources").update({ last_fetched_at: new Date().toISOString(), last_result: ok ? "fetched" : `failed ${res?.status ?? "network"}` }).eq("id", s.id);
-    if (ok) texts.push(`SOURCE ${s.name} (${s.url}, region ${s.region}):\n${pageText(await res!.text())}`);
+    const text = ok ? pageText(await res!.text()) : "";
+    // A page that needs JavaScript gives almost no text: nothing to read there.
+    const result = !ok ? `failed ${res?.status ?? "network"}` : text.length < 400 ? "no readable text (needs JavaScript)" : "fetched";
+    await admin.from("opportunity_sources").update({ last_fetched_at: new Date().toISOString(), last_result: result }).eq("id", s.id);
+    if (ok && text.length >= 400) texts.push(`SOURCE ${s.name} (${s.url}, region ${s.region}):\n${text}`);
   }
-  if (!texts.length) { await log(admin, "opportunities_publish", "No readable source this morning", "Nothing to read; trying tomorrow"); return { state: "no_sources" }; }
-  const prompt = `From the page texts below, list student opportunities whose registration deadline is after ${today}: hackathons, competitions (coding, design, case, pitch, quiz), ideathons, tech fests and events, internships, fellowships and scholarships, research calls and conferences.
+  if (!texts.length) return [];
+  const prompt =`From the page texts below, list student opportunities whose registration deadline is after ${today}: hackathons, competitions (coding, design, case, pitch, quiz), ideathons, tech fests and events, internships, fellowships and scholarships, research calls and conferences.
 Use ONLY what the pages say; never guess a link, date, prize, fee or eligibility (use "" when not stated). "official_link" must be the event's own page as written in the text ([link ...]).
 Reply with JSON: {"items":[{"title":"","organiser":"","type":"hackathon|competition|ideathon|tech fest|internship|fellowship|scholarship|research call|conference|workshop","mode":"online|offline|hybrid","city":"","country":"India or the country","deadline":"YYYY-MM-DD","dates":"","team":"solo|team|either|","eligibility":"","first_year_ok":"yes|no|","fees":"","free":"yes|no|","prizes":"","hubs":["design-branding|competitions-opportunities|projects-research-startups|event-crew"],"official_link":"","source_link":""}]}
 
 ${texts.join("\n\n").slice(0, 60_000)}`;
   const out = (await askJson(admin, "opportunities_publish", prompt, cap)) as { items?: Record<string, unknown>[] } | null;
+  return out?.items ?? [];
+  };
+  const [feeds, pageItems] = await Promise.all([readFeeds(), fromPages().catch(() => [] as Record<string, unknown>[])]);
+  const all: Record<string, unknown>[] = [...feeds.items, ...pageItems];
   const run = crypto.randomUUID();
   let published = 0, skipped = 0;
   const reasons: Record<string, number> = {};
   const skip = (why: string) => { skipped++; reasons[why] = (reasons[why] ?? 0) + 1; };
-  for (const it of out?.items ?? []) {
+  // Cheap checks first, then the best ones by value; only those have their link checked (in parallel), to stay fast.
+  const MAX_PER_RUN = 40;
+  const ready = all.flatMap((it) => {
     const official = str(it.official_link, 500), deadline = str(it.deadline, 10), title = str(it.title, 160);
     const organiser = str(it.organiser, 120), mode = str(it.mode, 20).toLowerCase();
-    if (!title || !organiser) { skip("no title or organiser"); continue; }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline) || deadline < today) { skip("no future deadline"); continue; }
-    if (!["online", "offline", "hybrid"].includes(mode)) { skip("no mode"); continue; }
-    if (!(await linkLoads(official))) { skip("official link does not load"); continue; }
+    if (!title || !organiser) { skip("no title or organiser"); return []; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline) || deadline < today) { skip("no future deadline"); return []; }
+    if (!["online", "offline", "hybrid"].includes(mode)) { skip("no mode"); return []; }
     const city = str(it.city, 60), dist = distanceKm(city);
     const hubs = list(it.hubs, 4).filter((h) => ["design-branding", "competitions-opportunities", "projects-research-startups", "event-crew"].includes(h));
     const score = valueScore({ distance_km: dist, mode, deadline, organiser, prizes: str(it.prizes), hubs, team_size: str(it.team) });
-    if (score < threshold) { skip("value score below the threshold"); continue; }
+    if (score < threshold) { skip("value score below the threshold"); return []; }
+    return [{ it, official, deadline, title, organiser, mode, city, dist, hubs, score }];
+  }).sort((a, b) => b.score - a.score);
+  if (ready.length > MAX_PER_RUN) reasons["kept for the next run"] = ready.length - MAX_PER_RUN;
+  const chosen = ready.slice(0, MAX_PER_RUN);
+  const loads: boolean[] = [];
+  for (let i = 0; i < chosen.length; i += 10) loads.push(...(await Promise.all(chosen.slice(i, i + 10).map((c) => linkLoads(c.official)))));
+  for (const [n, c] of chosen.entries()) {
+    const { it, official, deadline, title, organiser, mode, city, dist, hubs, score } = c;
+    if (!loads[n]) { skip("official link does not load"); continue; }
     const cat = category(str(it.type, 60));
     const key = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "")}|${deadline}`;
     const { data: draft } = await admin.from("opportunity_drafts").upsert({
-      title, organiser, kind: str(it.type, 60) || cat, mode, city: city || null, distance_km: dist, deadline, dates: str(it.dates, 120) || null, team_size: str(it.team, 40) || null,
+      title, organiser, kind: str(it.type, 60) || cat, mode, city: city || null, distance_km: dist, deadline, dates: str(it.dates, 120) || (it.source ? "Listed on " + str(it.source, 40) : null), team_size: str(it.team, 40) || null,
       eligibility: str(it.eligibility, 300) || null, fees: str(it.fees, 80) || null, prizes: str(it.prizes, 200) || null, official_link: official, source_link: str(it.source_link, 500) || null,
       hubs: hubs.length ? hubs : ["competitions-opportunities"], value_score: score, dedupe_key: key, section: cat,
     }, { onConflict: "dedupe_key", ignoreDuplicates: true }).select("id");
@@ -263,7 +285,7 @@ ${texts.join("\n\n").slice(0, 60_000)}`;
         detail: `Deadline ${deadline} · value ${score} · link checked`, payload: { draft_id: draft[0].id }, dedupe: `opp:${draft[0].id}`, safe: false, hub: "competitions-opportunities" });
     }
   }
-  await log(admin, "opportunities_publish", `Morning run: ${published} published, ${skipped} skipped`, Object.entries(reasons).map(([k, v]) => `${v} ${k}`).join("; ") || "nothing skipped");
+  await log(admin, "opportunities_publish", `Morning run: ${published} published, ${skipped} skipped`, [`found ${feeds.items.length} in feeds (${Object.entries(feeds.counts).map(([k, v]) => `${k} ${v}`).join(", ")}) and ${pageItems.length} on other pages`, ...Object.entries(reasons).map(([k, v]) => `${v} ${k}`)].join("; "));
   // One notification a day, only when something new is near Meerut or closes within 3 days.
   if (published) {
     const soon = new Date(new Date(`${today}T00:00:00Z`).getTime() + 3 * 864e5).toISOString().slice(0, 10);
@@ -271,7 +293,7 @@ ${texts.join("\n\n").slice(0, 60_000)}`;
     if (count) await admin.rpc("ap_notify_everyone", { p_title: `${count} new opportunit${count === 1 ? "y" : "ies"} near Meerut or closing soon`, p_body: "See them on the Opportunities page.", p_link: "/opportunities" });
     await admin.rpc("ap_ai_refresh");
   }
-  return { state: "done", run, published, skipped, reasons };
+  return { state: "done", run, published, skipped, reasons, found: feeds.counts, from_pages: pageItems.length };
 }
 
 // ── Tools Library: one new tool a day ───────────────────────────────────

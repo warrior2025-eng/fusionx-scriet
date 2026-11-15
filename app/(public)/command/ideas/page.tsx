@@ -101,7 +101,7 @@ export default async function IdeasPage({ searchParams }: { searchParams: Promis
         )}
         <details className="mt-4">
           <summary className="cursor-pointer text-sm font-semibold text-ink">Sources ({(sources ?? []).length})</summary>
-          <p className="mt-1 text-xs text-ink/60">Fetched at most twice a week, respecting robots.txt; no logins. Edit the list in the database table opportunity_sources.</p>
+          <p className="mt-1 text-xs text-ink/60">Devpost, Unstop and Devfolio are read every morning from their free public feeds. The pages below are read as text, respecting robots.txt; no logins. Edit the list in the database table opportunity_sources.</p>
           <ul className="mt-2 space-y-1 text-sm">
             {((sources ?? []) as { name: string; url: string; region: string; active: boolean; last_fetched_at: string | null; last_result: string | null }[]).map((s) => (
               <li key={s.url}>{s.name} <span className="text-xs text-ink/60">· {s.region} · {s.active ? "on" : "off"}{s.last_fetched_at ? ` · ${s.last_result} ${dayLabel(s.last_fetched_at.slice(0, 10))}` : " · not fetched yet"}</span></li>
