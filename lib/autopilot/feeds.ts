@@ -131,6 +131,8 @@ async function devfolio(): Promise<FeedItem[]> {
  */
 const OD_GENERIC = /^(africa|america|asia|australia and oceania|europe|india|scholarships|fellowships|undergraduate|masters\/postgraduate|phd\/postdoctoral|postdoctoral|grants|awards|training|short courses|online courses|study abroad|conferences|competitions|internships|uncategorized|our blog)$/i;
 const SOCIAL = /opportunitydesk|facebook|twitter|linkedin|whatsapp|telegram|instagram|pinterest|youtube|google|wp\.com|gravatar|\bx\.com|t\.me|reddit|feedburner|wordpress/i;
+const INDIA_OK = /\bindia(n|ns)?\b|\b(all|any|every)\s+(countries|country|nationalit(y|ies))\b|\bregardless of (nationality|country)\b|\bopen to (applicants|students|candidates) from (all|any|every|around the world)\b|\bno nationality restrictions?\b/i;
+const INDIA_EXCLUDED = /\b(not|except|excluding|excluded|ineligible)\b[^.]{0,60}\bindia(n|ns)?\b/i;
 async function opportunityDesk(): Promise<FeedItem[]> {
   const pages = await Promise.all([1, 2, 3].map(async (n) => {
     const res = await fetch(`https://opportunitydesk.org/category/fellowships-and-scholarships/feed/?paged=${n}`, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(15_000), cache: "no-store" }).catch(() => null);
@@ -157,6 +159,9 @@ async function opportunityDesk(): Promise<FeedItem[]> {
     const res = await fetch(p.link, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(12_000), cache: "no-store" }).catch(() => null);
     const html = res?.ok ? await res.text() : "";
     const body = html.slice(html.indexOf("<article"), html.indexOf("</article>") > 0 ? html.indexOf("</article>") : undefined);
+    // Indian students must be eligible: the post names India, or says every country or nationality may apply.
+    const text = body.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;|\s+/g, " ");
+    if (!INDIA_OK.test(text) || INDIA_EXCLUDED.test(text)) return null;
     const links = [...body.matchAll(/<a[^>]+href="(https?:\/\/[^"]+)"[^>]*>([\s\S]{0,200}?)<\/a>/g)].map((m) => ({ url: m[1], text: m[2].replace(/<[^>]+>/g, "").trim() })).filter((l) => !SOCIAL.test(l.url));
     const words = p.title.toLowerCase().split(/\W+/).filter((w) => w.length > 4);
     const official = links.find((l) => /official|website|webpage/i.test(l.text)) ?? links.find((l) => words.some((w) => l.text.toLowerCase().includes(w))) ?? links.find((l) => /apply|click here/i.test(l.text));

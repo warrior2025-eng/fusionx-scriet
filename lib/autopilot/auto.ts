@@ -279,6 +279,10 @@ ${texts.join("\n\n").slice(0, 60_000)}`;
     if (!["online", "offline", "hybrid"].includes(mode)) { skip("no mode"); return []; }
     if (known.has(keyOf(title, deadline))) { already++; return []; }
     const city = str(it.city, 60), dist = distanceKm(city);
+    // In person (offline or hybrid): only in India (the country says so, or the city is a known Indian city).
+    // Online events can be from anywhere.
+    const country = str(it.country, 60);
+    if (mode !== "online" && !(/\bindia\b/i.test(country) || (!country && dist !== null))) { skip("in person outside India"); return []; }
     const hubs = list(it.hubs, 4).filter((h) => ["design-branding", "competitions-opportunities", "projects-research-startups", "event-crew"].includes(h));
     const score = valueScore({ distance_km: dist, mode, deadline, organiser, prizes: str(it.prizes), hubs, team_size: str(it.team) });
     if (score < threshold) { skip("value score below the threshold"); return []; }
