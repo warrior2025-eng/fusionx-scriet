@@ -8,6 +8,8 @@ import { HUBS, hubLabel, TASK_STATUS_LABEL } from "@/lib/autopilot/labels";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Command Center · Today" };
+// "Run now" in the Automations card waits for the AI (up to a minute).
+export const maxDuration = 60;
 
 export default async function TodayPage() {
   const viewer = (await getAutopilotViewer())!;
