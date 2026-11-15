@@ -9,7 +9,8 @@ export function OpportunityCard({ o, today }: { o: Opp; today: string }) {
   const d = daysLeft(o.deadline, today);
   const href = linkHref(o.registration_url, "any", { allowPath: true });
   const facts = [
-    o.mode ? o.mode[0].toUpperCase() + o.mode.slice(1) : null,
+    // A scholarship or fellowship is applied for, not attended: no Online/Offline.
+    o.category === "scholarship" || o.category === "fellowship" ? "Apply online" : o.mode ? o.mode[0].toUpperCase() + o.mode.slice(1) : null,
     o.city ? `${o.city}${typeof o.distance_km === "number" && o.distance_km > 0 ? ` · ~${o.distance_km} km` : ""}` : null,
     o.cost === "free" ? "Free" : o.cost === "paid" ? "Paid" : null,
     o.team_mode === "solo" ? "Solo" : o.team_mode === "team" ? "Team" : o.team_mode === "either" ? "Solo or team" : null,

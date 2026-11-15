@@ -124,10 +124,61 @@ async function devfolio(): Promise<FeedItem[]> {
   });
 }
 
-/** Every open item from the three feeds (a feed that fails adds nothing). */
+/**
+ * Scholarships and fellowships from Opportunity Desk's public RSS feed (its robots.txt allows it). Kept only when
+ * the post states a deadline, is open to students from Asia or India (or names no region), is not PhD-only, and its
+ * article links to the organiser's own page: that page is the link shown, never the article.
+ */
+const OD_GENERIC = /^(africa|america|asia|australia and oceania|europe|india|scholarships|fellowships|undergraduate|masters\/postgraduate|phd\/postdoctoral|postdoctoral|grants|awards|training|short courses|online courses|study abroad|conferences|competitions|internships|uncategorized|our blog)$/i;
+const SOCIAL = /opportunitydesk|facebook|twitter|linkedin|whatsapp|telegram|instagram|pinterest|youtube|google|wp\.com|gravatar|\bx\.com|t\.me|reddit|feedburner|wordpress/i;
+async function opportunityDesk(): Promise<FeedItem[]> {
+  const pages = await Promise.all([1, 2, 3].map(async (n) => {
+    const res = await fetch(`https://opportunitydesk.org/category/fellowships-and-scholarships/feed/?paged=${n}`, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(15_000), cache: "no-store" }).catch(() => null);
+    return res?.ok ? res.text() : "";
+  }));
+  const posts = pages.join("").split("<item>").slice(1).map((it) => {
+    const tag = (t: string) => (new RegExp(`<${t}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${t}>`).exec(it) ?? [])[1] ?? "";
+    const cats = [...it.matchAll(/<category><!\[CDATA\[([\s\S]*?)\]\]><\/category>/g)].map((m) => m[1].trim());
+    const title = tag("title").replace(/&#8211;/g, "–").replace(/&#8217;/g, "’").replace(/&amp;/g, "&").trim();
+    const m = /Deadline:\s*([A-Za-z]+ \d{1,2}, \d{4})/i.exec(it);
+    const t = m ? Date.parse(`${m[1]} 12:00 UTC`) : NaN;
+    return { title, link: tag("link").trim(), cats, deadline: Number.isNaN(t) ? "" : new Date(t).toISOString().slice(0, 10) };
+  });
+  const today = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
+  const fit = posts.filter((p) => {
+    const has = (re: RegExp) => p.cats.some((c) => re.test(c));
+    if (!p.title || !p.deadline || p.deadline < today || has(/^our blog$/i)) return false;
+    const regions = p.cats.filter((c) => /^(africa|america|asia|australia and oceania|europe)$/i.test(c));
+    if (regions.length && !has(/^(asia|india)$/i)) return false; // not open to students from India
+    if (has(/^phd\/postdoctoral$/i) && !has(/^(undergraduate|masters\/postgraduate)$/i)) return false; // PhD only
+    return true;
+  }).slice(0, 12);
+  const out = await Promise.all(fit.map(async (p): Promise<FeedItem | null> => {
+    const res = await fetch(p.link, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(12_000), cache: "no-store" }).catch(() => null);
+    const html = res?.ok ? await res.text() : "";
+    const body = html.slice(html.indexOf("<article"), html.indexOf("</article>") > 0 ? html.indexOf("</article>") : undefined);
+    const links = [...body.matchAll(/<a[^>]+href="(https?:\/\/[^"]+)"[^>]*>([\s\S]{0,200}?)<\/a>/g)].map((m) => ({ url: m[1], text: m[2].replace(/<[^>]+>/g, "").trim() })).filter((l) => !SOCIAL.test(l.url));
+    const words = p.title.toLowerCase().split(/\W+/).filter((w) => w.length > 4);
+    const official = links.find((l) => /official|website|webpage/i.test(l.text)) ?? links.find((l) => words.some((w) => l.text.toLowerCase().includes(w))) ?? links.find((l) => /apply|click here/i.test(l.text));
+    if (!official) return null;
+    const named = (c: string) => !OD_GENERIC.test(c) && p.title.toLowerCase().includes(c.toLowerCase()) && c.length < 80 && !/\d{4}/.test(c);
+    // The organisation's own name first (e.g. "Swedish Institute"), else the programme's name.
+    const organiser = p.cats.find((c) => named(c) && !/scholarship|fellowship|programme|program|award/i.test(c)) ?? p.cats.find(named)
+      ?? (/^(.*?)\s+(scholarship|fellowship|programme|program|award)/i.exec(p.title)?.[1] ?? "");
+    const fellowship = /fellowship/i.test(p.title) || (p.cats.some((c) => /^fellowships$/i.test(c)) && !/scholarship/i.test(p.title));
+    return {
+      title: s(p.title, 160), organiser: s(organiser, 120), type: fellowship ? "fellowship" : "scholarship", mode: "online", city: "", country: "",
+      deadline: p.deadline, team: "solo", eligibility: p.cats.filter((c) => /^(undergraduate|masters\/postgraduate)$/i.test(c)).join(", "), first_year_ok: "",
+      free: "yes", prizes: "", hubs: ["projects-research-startups"], official_link: official.url, source_link: p.link, source: "Opportunity Desk",
+    };
+  }));
+  return out.filter((x): x is FeedItem => x !== null);
+}
+
+/** Every open item from the feeds (a feed that fails adds nothing). */
 export async function readFeeds(): Promise<{ items: FeedItem[]; counts: Record<string, number> }> {
-  const [a, b, c, d] = await Promise.all([devpost().catch(() => []), unstop().catch(() => []), devfolio().catch(() => []), unstopFests().catch(() => [])]);
-  return { items: [...a, ...b, ...c, ...d].filter((i) => i.title && i.official_link), counts: { Devpost: a.length, Unstop: b.length + d.length, Devfolio: c.length } };
+  const [a, b, c, d, e] = await Promise.all([devpost().catch(() => []), unstop().catch(() => []), devfolio().catch(() => []), unstopFests().catch(() => []), opportunityDesk().catch(() => [])]);
+  return { items: [...a, ...b, ...c, ...d, ...e].filter((i) => i.title && i.official_link), counts: { Devpost: a.length, Unstop: b.length + d.length, Devfolio: c.length, "Opportunity Desk": e.length } };
 }
 
 /** Hosts the feeds already cover: their HTML pages need JavaScript, so they are not read as page text. */
