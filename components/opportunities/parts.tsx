@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { ArrowUpRight, SlidersHorizontal } from "lucide-react";
+import { ArrowUpRight, SlidersHorizontal, Users } from "lucide-react";
+import { squadable, type SquadCount } from "@/lib/opportunities/squads";
 import { FILTERS, FILTER_KEYS, SECTIONS, activeFilters, daysLeft, daysLeftLabel, isNewToday, sectionLabel, sectionOf, type Opp, type Params } from "@/lib/opportunities/sections";
 import { linkHref } from "@/lib/validation/link";
 import { cn } from "@/lib/utils";
 
 /** One opportunity: equal height in its row, long names wrap, the link is a 44px target. */
-export function OpportunityCard({ o, today }: { o: Opp; today: string }) {
+export function OpportunityCard({ o, today, squad }: { o: Opp; today: string; squad?: SquadCount }) {
   const d = daysLeft(o.deadline, today);
   const href = linkHref(o.registration_url, "any", { allowPath: true });
   const facts = [
@@ -31,19 +32,33 @@ export function OpportunityCard({ o, today }: { o: Opp; today: string }) {
         {facts.length > 0 && <p className="mt-2 text-xs text-ink/65">{facts.join(" · ")}</p>}
         {o.deadline && <p className="mt-1 text-xs text-ink/60">Deadline {new Date(`${o.deadline}T00:00:00+05:30`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })}</p>}
       </div>
-      {href && (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex min-h-11 items-center gap-1.5 self-start text-sm font-medium text-accent-text underline-offset-2 hover:underline focus-visible:outline-2">
-          Official page <ArrowUpRight size={14} aria-hidden />
-        </a>
-      )}
+      <div>
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1">
+          {href && (
+            <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-accent-text underline-offset-2 hover:underline focus-visible:outline-2">
+              Official page <ArrowUpRight size={14} aria-hidden />
+            </a>
+          )}
+          {squadable(o) && (
+            <Link href={`/opportunities/squad/${o.id}`} className="inline-flex min-h-11 items-center gap-1.5 border border-accent/60 px-3 text-sm font-semibold text-ink hover:bg-accent/10" data-find-team>
+              <Users size={14} aria-hidden /> Find a team
+            </Link>
+          )}
+        </div>
+        {squad && (squad.forming > 0 || squad.going > 0) && (
+          <p className="mt-1 text-xs text-ink/65" data-squad-count>
+            {[squad.forming ? `${squad.forming} FusionX squad${squad.forming === 1 ? "" : "s"} forming` : "", squad.going ? `${squad.going} going` : ""].filter(Boolean).join(" · ")}
+          </p>
+        )}
+      </div>
     </article>
   );
 }
 
-export function CardGrid({ items, today }: { items: Opp[]; today: string }) {
+export function CardGrid({ items, today, squads = {} }: { items: Opp[]; today: string; squads?: Record<string, SquadCount> }) {
   return (
     <ul className="grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-      {items.map((o) => <li key={o.id} className="min-w-0"><OpportunityCard o={o} today={today} /></li>)}
+      {items.map((o) => <li key={o.id} className="min-w-0"><OpportunityCard o={o} today={today} squad={squads[o.id]} /></li>)}
     </ul>
   );
 }

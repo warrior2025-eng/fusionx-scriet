@@ -35,9 +35,9 @@ The local stack is described in `tests/meetings-polish/local/README.txt`. LiveKi
 
    - `test:autopilot` runs the engine checks in SQL with a mocked time.
    - `test:smoke` runs the browser tests in the Chrome already installed on the machine.
-   - `node tests/autopilot/people.mjs`, `node tests/autopilot/outcomes.mjs` and `node tests/autopilot/auto.mjs` run the engine checks for PR 2, PR 3 and PR 4.
+   - `node tests/autopilot/people.mjs`, `outcomes.mjs`, `auto.mjs` and `squads.mjs` run the engine checks for PR 2, PR 3, PR 4 and Squad Match.
 
-   Build the app with `AI_GEMINI_BASE=http://127.0.0.1:4010`, `AI_GROQ_BASE=http://127.0.0.1:4010` and any `GEMINI_API_KEY` and `GROQ_API_KEY`. The tests start a local AI stand-in there (`mock-ai.mjs`), so no real AI or website is called.
+   Build the app with `AI_GEMINI_BASE=http://127.0.0.1:4010`, `AI_GROQ_BASE=http://127.0.0.1:4010`, `OPPORTUNITY_FEEDS=off` and any `GEMINI_API_KEY` and `GROQ_API_KEY`. The tests start a local AI stand-in there (`mock-ai.mjs`), so no real AI or website is called.
 
 Each run needs a fresh database (step 1 again). `FX_PG` must point to a folder whose `node_modules` has the `pg` package. `pg` is not a project dependency.
 
@@ -79,3 +79,8 @@ Each run needs a fresh database (step 1 again). `FX_PG` must point to a folder w
   - Tools Library: 12 seeded pages, search, categories, the home section, the daily tool (both links checked, no prices). A deleted tool shows "no longer listed", goes on the do-not-add list, and can be restored.
   - FusionX AI: 9 example questions answered from public data with links, never a closed or hidden item; private questions declined; Groq answers when Gemini fails; the chat keeps working when the automations reach their AI cap. The answers are saved to `fx-ai-answers.json` in the system temp folder.
   - Members cannot open Command Center pages.
+- **Squad Match:**
+  - A visitor sees "Find a team" on a team hackathon and is asked to sign in.
+  - A member joins the pool as a designer; another starts a squad that needs a designer and sees them as a smart pick.
+  - The invite is accepted from My work, with no code. The lead marks the squad registered, and the card shows "1 going".
+  - `node tests/autopilot/squads.mjs` checks the rules in SQL: privacy, one squad per person, lead-only actions, ranking and counts.
