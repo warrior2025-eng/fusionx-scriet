@@ -16,7 +16,8 @@ export function useRun() {
   const [pending, start] = useTransition();
   const run = (fn: () => Promise<ActionState>, after?: (r: ActionState) => void) =>
     start(async () => {
-      const result = await fn();
+      // A dropped or timed-out request shows a message instead of the error page.
+      const result = await fn().catch((): ActionState => ({ status: "error", message: "That took too long or the connection dropped. Refresh the page to see what changed." }));
       toastResult(result);
       if (result.status === "success") {
         after?.(result);
