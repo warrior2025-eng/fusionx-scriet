@@ -26,7 +26,8 @@ const istDate = (iso: unknown) => {
 };
 const hubsFor = (type: string) =>
   type === "internship" || type === "scholarship" ? ["projects-research-startups"]
-    : type === "hackathon" ? ["projects-research-startups", "competitions-opportunities"]
+    : type === "hackathon" || type === "ideathon" ? ["projects-research-startups", "competitions-opportunities"]
+      : type === "workshop" || type === "conference" ? ["projects-research-startups"]
       : ["competitions-opportunities"];
 const teamOf = (min: unknown, max: unknown) => {
   const lo = Number(min) || 0, hi = Number(max) || 0;
@@ -57,13 +58,25 @@ async function devpost(): Promise<FeedItem[]> {
   });
 }
 
-const UNSTOP_TYPES: [string, string][] = [["hackathons", "hackathon"], ["competitions", "competition"], ["internships", "internship"], ["scholarships", "scholarship"]];
+// Unstop list → our type (and so the Opportunities section). Competitions that are idea, pitch, business-plan or
+// innovation contests are shown as ideathons.
+const UNSTOP_TYPES: [string, string, number][] = [
+  ["hackathons", "hackathon", 30], ["competitions", "competition", 50], ["quizzes", "competition", 20], ["internships", "internship", 30],
+  ["scholarships", "scholarship", 20], ["workshops", "workshop", 30], ["conferences", "conference", 20],
+];
+const IDEATHON = /\b(ideathon|idea(s)? (challenge|competition|contest)|innovation challenge|business plan|b-?plan|pitch|case (study|competition)|startup challenge)\b/i;
+const RESEARCH = /\b(research|paper|poster|symposium|journal|conference|colloquium|thesis)\b/i;
 async function unstop(): Promise<FeedItem[]> {
-  const pages = await Promise.all(UNSTOP_TYPES.map(async ([kind, type]) => {
-    const j = (await getJson(`https://unstop.com/api/public/opportunity/search-result?opportunity=${kind}&per_page=30&oppstatus=open`)) as { data?: { data?: Record<string, unknown>[] } } | null;
-    return (j?.data?.data ?? []).map((o) => ({ o, type }));
+  const pages = await Promise.all(UNSTOP_TYPES.map(async ([kind, type, n]) => {
+    const j = (await getJson(`https://unstop.com/api/public/opportunity/search-result?opportunity=${kind}&per_page=${n}&oppstatus=open`)) as { data?: { data?: Record<string, unknown>[] } } | null;
+    return (j?.data?.data ?? []).map((o) => ({
+      o, kind,
+      type: type === "competition" && (o.subtype === "innovation_challenge" || o.subtype === "case_competition" || IDEATHON.test(s(o.title, 200))) ? "ideathon"
+        // Unstop's "conferences" also hold debates, talks and schools: only research-like ones go to Research.
+        : type === "conference" && !RESEARCH.test(s(o.title, 200)) ? "tech fest" : type,
+    }));
   }));
-  return pages.flat().filter(({ o }) => o.regn_open === 1 || o.regn_open === true).map(({ o, type }) => {
+  return pages.flat().filter(({ o }) => o.regn_open === 1 || o.regn_open === true).map(({ o, type, kind }) => {
     const reg = (o.regnRequirements ?? {}) as Record<string, unknown>;
     const addr = (o.address_with_country_logo ?? {}) as { city?: string; country?: { name?: string } };
     const prizes = Array.isArray(o.prizes) ? (o.prizes as { cash?: number; currency?: string }[]) : [];
@@ -77,7 +90,22 @@ async function unstop(): Promise<FeedItem[]> {
       deadline: istDate(reg.end_regn_dt ?? o.end_date), team: teamOf(reg.min_team_size, reg.max_team_size), eligibility: eligible.join(", ").slice(0, 300),
       first_year_ok: eligible.some((e) => /first year|1st year|all years|everyone/i.test(e)) ? "yes" : "",
       free: o.isPaid === false ? "yes" : o.isPaid === true ? "no" : "", prizes: cash > 0 ? `${rupee ? "₹" : ""}${cash.toLocaleString("en-IN")}${rupee ? "" : " (cash)"}` : "",
-      hubs: hubsFor(type), official_link: s(o.seo_url, 500), source_link: `https://unstop.com/${UNSTOP_TYPES.find(([, t]) => t === type)?.[0] ?? ""}`, source: "Unstop",
+      hubs: hubsFor(type), official_link: s(o.seo_url, 500), source_link: `https://unstop.com/${kind}`, source: "Unstop",
+    };
+  });
+}
+
+/** College fests on Unstop: shown until the fest's last day, while its registration is not closed. */
+async function unstopFests(): Promise<FeedItem[]> {
+  const j = (await getJson("https://unstop.com/api/public/opportunity/search-result?opportunity=festivals&per_page=30&oppstatus=open")) as { data?: { data?: Record<string, unknown>[] } } | null;
+  return (j?.data?.data ?? []).filter((f) => f.regn_open !== 0 && f.visibility !== "private").map((f) => {
+    const where = s(f.location, 120);
+    const mode = /^online$/i.test(where) ? "online" : /^hybrid$/i.test(where) ? "hybrid" : where ? "offline" : "";
+    const city = mode === "offline" ? (where.split(",").map((x) => x.trim()).filter(Boolean).find((x) => /^[A-Za-z .]+$/.test(x) && x.length < 30 && !/institute|university|college|school/i.test(x)) ?? "") : "";
+    return {
+      title: s(f.name, 160), organiser: s(f.organisation_name, 120), type: "tech fest", mode, city, country: "India",
+      deadline: istDate(typeof f.end_date === "string" ? f.end_date.replace(" ", "T") + "+05:30" : ""), team: "", eligibility: "", first_year_ok: "", free: "", prizes: "",
+      hubs: ["event-crew", "competitions-opportunities"], official_link: s(f.seo_url, 500), source_link: "https://unstop.com/festivals", source: "Unstop",
     };
   });
 }
@@ -98,8 +126,8 @@ async function devfolio(): Promise<FeedItem[]> {
 
 /** Every open item from the three feeds (a feed that fails adds nothing). */
 export async function readFeeds(): Promise<{ items: FeedItem[]; counts: Record<string, number> }> {
-  const [a, b, c] = await Promise.all([devpost().catch(() => []), unstop().catch(() => []), devfolio().catch(() => [])]);
-  return { items: [...a, ...b, ...c].filter((i) => i.title && i.official_link), counts: { Devpost: a.length, Unstop: b.length, Devfolio: c.length } };
+  const [a, b, c, d] = await Promise.all([devpost().catch(() => []), unstop().catch(() => []), devfolio().catch(() => []), unstopFests().catch(() => [])]);
+  return { items: [...a, ...b, ...c, ...d].filter((i) => i.title && i.official_link), counts: { Devpost: a.length, Unstop: b.length + d.length, Devfolio: c.length } };
 }
 
 /** Hosts the feeds already cover: their HTML pages need JavaScript, so they are not read as page text. */
