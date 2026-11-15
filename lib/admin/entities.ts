@@ -430,6 +430,10 @@ export const ENTITIES = {
           { value: "scholarship", label: "Scholarship" },
           { value: "conference", label: "Conference" },
           { value: "innovation_challenge", label: "Innovation challenge" },
+          // Migration 0045: the new sections (fellowships, tech fests, ideathons).
+          { value: "ideathon", label: "Ideathon" },
+          { value: "fellowship", label: "Fellowship" },
+          { value: "tech_fest", label: "Tech fest / event" },
         ],
       },
       { name: "description", label: "Description", type: "textarea", required: true, max: 3000, rows: 5 },

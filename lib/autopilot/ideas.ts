@@ -15,14 +15,14 @@ import { GEMINI_MODELS, GROQ_MODEL } from "@/lib/ai/settings";
  * future deadline, and are merged when they repeat.
  */
 
-type Admin = ReturnType<typeof createAdminClient>;
+export type Admin = ReturnType<typeof createAdminClient>;
 const GEMINI = (process.env.AI_GEMINI_BASE || "https://generativelanguage.googleapis.com").replace(/\/$/, "");
 const GROQ = (process.env.AI_GROQ_BASE || "https://api.groq.com").replace(/\/$/, "");
 const UA = "FusionX-Radar/1.0 (+https://fxscriet.com)";
 
 export const ideaEngineConfigured = () => Boolean(process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY);
 
-async function log(admin: Admin, area: string, action: string, reason: string) {
+export async function log(admin: Admin, area: string, action: string, reason: string) {
   await admin.from("automation_log").insert({ area, action: action.slice(0, 200), reason: reason.slice(0, 500) });
 }
 
@@ -77,12 +77,12 @@ export async function askJson(admin: Admin, area: string, prompt: string, cap: n
   return null;
 }
 
-const str = (v: unknown, max = 600) => (typeof v === "string" ? v.trim().slice(0, max) : "");
-const list = (v: unknown, max = 12) => (Array.isArray(v) ? v.map((x) => str(x, 200)).filter(Boolean).slice(0, max) : []);
+export const str = (v: unknown, max = 600) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+export const list = (v: unknown, max = 12) => (Array.isArray(v) ? v.map((x) => str(x, 200)).filter(Boolean).slice(0, max) : []);
 // DOIs and "Author et al. (2020)"-style citations: never stored (we cannot check them).
 const DOI = /\b10\.\d{4,9}\/\S+/gi;
 const CITATION = /\b[A-Z][a-z]+ et al\.?,? \(?\d{4}\)?/g;
-const scrub = (s: string) => s.replace(DOI, "").replace(CITATION, "").replace(/\s{2,}/g, " ").trim();
+export const scrub = (s: string) => s.replace(DOI, "").replace(CITATION, "").replace(/\s{2,}/g, " ").trim();
 
 export const PROJECT_FIELDS = ["title", "pitch", "problem", "users", "solution", "different", "mvp", "stack", "data", "effort", "variations", "team", "validate", "measures", "startup_path", "risks", "opportunity"] as const;
 export const RESEARCH_FIELDS = ["title", "question", "why", "scope", "method", "data_sources", "tools", "plan", "output", "venues", "ethics", "keywords", "where_to_search"] as const;
@@ -187,7 +187,7 @@ export function valueScore(o: { distance_km: number | null; mode: string; deadli
 }
 
 /** robots.txt: is this path allowed for us (User-agent: * rules)? */
-async function robotsAllow(url: URL): Promise<boolean> {
+export async function robotsAllow(url: URL): Promise<boolean> {
   const res = await fetch(`${url.origin}/robots.txt`, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(10_000) }).catch(() => null);
   if (!res?.ok) return true;
   const lines = (await res.text()).split(/\r?\n/).map((l) => l.replace(/#.*/, "").trim());
@@ -204,7 +204,7 @@ async function robotsAllow(url: URL): Promise<boolean> {
   return match ? match.allow : true;
 }
 
-const pageText = (html: string) => html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ")
+export const pageText = (html: string) => html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ")
   .replace(/<a [^>]*href="([^"]+)"[^>]*>/gi, " [link $1] ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").slice(0, 30_000);
 
 /** Twice a week: fetch the active sources (robots.txt respected), ask the model to list opportunities, keep the valid ones. */

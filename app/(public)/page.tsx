@@ -25,6 +25,7 @@ import { getPeople, peopleIn } from "@/lib/data/people";
 import { getHubs } from "@/lib/data/hubs";
 import { HubCards } from "@/components/hubs/hub-cards";
 import { NowBuilding } from "@/components/autopilot/now-building";
+import { ToolsSection } from "@/components/tools/tools-section";
 import { pageMetadata } from "@/lib/data/seo";
 import { getContent } from "@/lib/data/site-content";
 import { getCurrentCycle } from "@/lib/recruitment/data";
@@ -540,6 +541,8 @@ export default async function HomePage() {
       <div className="home-below">
         {/* FusionX Autopilot: public missions while they move (hidden when there is nothing at all). */}
         <NowBuilding compact band="surface" />
+        {/* The Tools Library (migration 0045): six tools and "See all tools". */}
+        <ToolsSection band="tint" />
         {visibleSections.map((section, i) => (
           <Fragment key={section.key}>{section.render(i + 1, BANDS[i % BANDS.length])}</Fragment>
         ))}

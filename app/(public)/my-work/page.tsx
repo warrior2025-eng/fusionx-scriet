@@ -7,7 +7,8 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { Toaster } from "@/components/admin/toast";
 import { BusyDates, CheckinForm, OfferButtons, PreferencesForm, ProofForm, PushToggle, RequestChange, ReviewForm } from "@/components/autopilot/work-parts";
 import { PitchForm, PitchVote, TakeTask } from "@/components/autopilot/people-parts";
-import { SavedIdea, ShareCardButton, ShowOnImpact, SuggestOpportunity } from "@/components/autopilot/outcome-parts";
+import { ShareCardButton, ShowOnImpact, SuggestOpportunity } from "@/components/autopilot/outcome-parts";
+import { IdeaCard, type IdeaCardData } from "@/components/autopilot/ideas-for-you";
 import { dayLabel, daysFromToday, getAutopilotViewer, peopleById, proofHref, todayIST, type TaskRow } from "@/lib/autopilot/server";
 import { EFFORT_LABEL, PROOF_LABEL, STATUS_LABEL, TASK_STATUS_LABEL, hubLabel } from "@/lib/autopilot/labels";
 import { cn } from "@/lib/utils";
@@ -32,7 +33,8 @@ function Block({ id, title, hint, children }: { id?: string; title: string; hint
 
 const Empty = ({ children }: { children: React.ReactNode }) => <p className="text-sm text-ink/60">{children}</p>;
 
-export default async function MyWorkPage() {
+export default async function MyWorkPage({ searchParams }: { searchParams: Promise<{ ideas?: string }> }) {
+  const { ideas: ideaFilter } = await searchParams;
   const viewer = await getAutopilotViewer();
   if (!viewer) redirect("/login?next=/my-work");
   const { supabase, user } = viewer;
@@ -60,7 +62,7 @@ export default async function MyWorkPage() {
     supabase.from("skill_badges").select("label, count").eq("user_id", user.id).order("count", { ascending: false }),
     supabase.from("share_cards").select("code, mission_id").eq("user_id", user.id),
     supabase.from("certificate_verifications").select("code, period_label, issued_at").eq("user_id", user.id).eq("status", "issued"),
-    supabase.rpc("ap_saved_ideas"),
+    supabase.from("idea_drafts").select("id, kind, title, pitch, level, learn, data, batch_date, published_at").not("published_at", "is", null).order("batch_date", { ascending: false }).order("level").limit(200),
     supabase.from("opportunities").select("id, title, organizer, deadline, registration_url, city, distance_km, value_score, mode").eq("is_published", true).gte("deadline", today).order("value_score", { ascending: false, nullsFirst: false }).limit(20),
     supabase.from("profiles").select("show_on_impact, skills").eq("id", user.id).maybeSingle(),
   ]);
@@ -75,7 +77,28 @@ export default async function MyWorkPage() {
   const top5 = ((opps.data ?? []) as { id: string; title: string; organizer: string; deadline: string; registration_url: string | null; city: string | null; distance_km: number | null; value_score: number | null; mode: string | null }[])
     .map((o) => ({ ...o, fit: (o.value_score ?? 0) + mySkills.filter((k) => o.title.toLowerCase().includes(k)).length * 10 }))
     .sort((a, b) => b.fit - a.fit).slice(0, 5);
-  type Idea = { id: string; title: string; pitch: string; likes: number; liked: boolean };
+  // Ideas for you (migration 0045): every delivered idea for everyone; 4 weeks here, then the archive.
+  type Raw = { id: string; kind: "project" | "research"; title: string; pitch: string; level: number | null; learn: string | null; data: Record<string, unknown>; batch_date: string | null; published_at: string };
+  const rawIdeas = (savedIdeas.data ?? []) as Raw[];
+  const [{ data: states }, { data: teamRows }] = rawIdeas.length
+    ? await Promise.all([
+        supabase.from("idea_member_states").select("idea_id, state").eq("user_id", user.id),
+        supabase.rpc("ap_idea_teams", { p_ids: rawIdeas.map((i) => i.id) }),
+      ])
+    : [{ data: [] }, { data: [] }];
+  const stateBy = new Map(((states ?? []) as { idea_id: string; state: "saved" | "hidden" }[]).map((x) => [x.idea_id, x.state]));
+  const teamsBy = new Map<string, { project_id: string; started_by: string; joinable: boolean }[]>();
+  for (const t of (teamRows ?? []) as { idea_id: string; project_id: string; started_by: string; joinable: boolean }[]) teamsBy.set(t.idea_id, [...(teamsBy.get(t.idea_id) ?? []), t]);
+  const fourWeeks = new Date(new Date(`${today}T00:00:00Z`).getTime() - 28 * 864e5).toISOString().slice(0, 10);
+  const hubWords: Record<string, RegExp> = { design: /(design|figma|canva|ui|ux|video)/i, competitions: /(research|pitch|writing|marketing)/i, projects: /(program|code|web|python|data|ml|app)/i, events: /(event|host|plan|manage)/i };
+  const myText = mySkills.join(" ");
+  const ideaCards: (IdeaCardData & { batch: string })[] = rawIdeas.filter((i) => stateBy.get(i.id) !== "hidden").map((i) => ({
+    id: i.id, kind: i.kind, title: i.title, pitch: i.pitch, level: i.level, learn: i.learn, data: i.data, state: stateBy.get(i.id) ?? null,
+    teams: teamsBy.get(i.id) ?? [], hubs: (i.data.hubs as string[] | undefined) ?? [], batch: i.batch_date ?? i.published_at.slice(0, 10),
+  }));
+  const suits = (i: IdeaCardData) => !mySkills.length || i.hubs.some((h) => hubWords[h]?.test(myText)) || mySkills.some((k) => String(i.data.stack ?? "").toLowerCase().includes(k));
+  const current = ideaCards.filter((i) => i.batch >= fourWeeks || i.state === "saved").filter((i) => ideaFilter !== "mine" || suits(i));
+  const archive = ideaCards.filter((i) => i.batch < fourWeeks && i.state !== "saved");
   type Pitch = { id: string; title: string; summary: string; pitched_by_name: string; mine: boolean; status: string; voting_ends_at: string; options: { key: string; name: string; description: string; votes: number }[] | null; my_vote: string | null; votes: number };
   const pitches = (pitchBoard.data ?? []) as Pitch[];
   const communityTasks = ((community.data ?? []) as unknown as { id: string; title: string; due_on: string; hub: string; effort: string; proof: string; mission: { title: string; status: string } | null }[])
@@ -98,7 +121,7 @@ export default async function MyWorkPage() {
   const nothing = offerRows.length + mineRows.length + reviewRows.length === 0;
 
   return (
-    <Section className="max-w-3xl pb-24 pt-12">
+    <Section className="touch-44 max-w-3xl pb-24 pt-12">
       <Toaster />
       <Eyebrow>My work</Eyebrow>
       <h1 className="font-serif text-3xl tracking-tight text-ink md:text-4xl">Your FusionX tasks.</h1>
@@ -107,7 +130,7 @@ export default async function MyWorkPage() {
         Offers to answer, tasks with their dates, reviews to give. Everything you finish and get approved becomes a verified contribution.
       </p>
       <nav aria-label="On this page" className="mt-5 flex flex-wrap gap-2 text-sm">
-        {[["#offers", `Offers (${offerRows.length})`], ["#tasks", `Tasks (${mineRows.length + myProjectTasks.length})`], ["#reviews", `Reviews (${reviewRows.length})`], ["#community", "Community tasks"], ["#pitches", "Pitches"], ["#checkin", "Check-in"], ["#contributions", "Contributions"], ["#settings", "Settings"]].map(([href, label]) => (
+        {[["#ideas", "Ideas"], ["#offers", `Offers (${offerRows.length})`], ["#tasks", `Tasks (${mineRows.length + myProjectTasks.length})`], ["#reviews", `Reviews (${reviewRows.length})`], ["#community", "Community tasks"], ["#pitches", "Pitches"], ["#checkin", "Check-in"], ["#contributions", "Contributions"], ["#settings", "Settings"]].map(([href, label]) => (
           <a key={href} href={href} className="border border-line px-2.5 py-1 text-ink/75 hover:border-ink/40 hover:text-ink">{label}</a>
         ))}
       </nav>
@@ -119,6 +142,22 @@ export default async function MyWorkPage() {
             Add your skills on <Link href="/profile" className="underline">your profile</Link> so the right tasks find you.
           </p>
         )}
+
+        <Block id="ideas" title={`Ideas for you (${current.length})`} hint="New project ideas every Sunday, from beginner to startup-grade. Pick any: hub tags are only hints.">
+          <nav aria-label="Idea filter" className="mb-3 flex gap-2 text-sm">
+            <Link href="/my-work#ideas" className={`inline-flex min-h-11 items-center border px-3 ${ideaFilter !== "mine" ? "border-ink text-ink" : "border-line text-ink/70"}`}>All</Link>
+            <Link href="/my-work?ideas=mine#ideas" className={`inline-flex min-h-11 items-center border px-3 ${ideaFilter === "mine" ? "border-ink text-ink" : "border-line text-ink/70"}`}>Suits my skills</Link>
+          </nav>
+          {current.length === 0 ? <Empty>No ideas yet. New ones arrive every Sunday morning.</Empty> : (
+            <ul className="grid auto-rows-fr gap-3 md:grid-cols-2" data-ideas-for-you>{current.map((i) => <li key={i.id} className="min-w-0"><IdeaCard idea={i} /></li>)}</ul>
+          )}
+          {archive.length > 0 && (
+            <details className="mt-4" data-idea-archive>
+              <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-semibold text-ink">Idea archive ({archive.length})</summary>
+              <ul className="mt-2 grid auto-rows-fr gap-3 md:grid-cols-2">{archive.slice(0, 40).map((i) => <li key={i.id} className="min-w-0"><IdeaCard idea={i} /></li>)}</ul>
+            </details>
+          )}
+        </Block>
 
         <Block id="offers" title="Offers" hint="A task offered to you. Answer within a day, or it goes to the next person.">
           {offerRows.length === 0 ? <Empty>No offers right now.</Empty> : (
@@ -300,16 +339,6 @@ export default async function MyWorkPage() {
           )}
           <div className="mt-3 flex gap-4"><Link href="/opportunities" className="text-sm text-accent-text underline">All opportunities</Link><SuggestOpportunity /></div>
         </Block>
-
-        {((savedIdeas.data ?? []) as Idea[]).length > 0 && (
-          <Block id="ideas" title="Project ideas to start" hint="Saved by the team from the Idea Engine. Like one, or start it as your own project with a plan.">
-            <ul className="space-y-3">
-              {((savedIdeas.data ?? []) as Idea[]).map((i) => (
-                <li key={i.id} className="border border-line p-3"><p className="font-medium text-ink">{i.title}</p><p className="text-sm text-ink/75">{i.pitch}</p><SavedIdea id={i.id} liked={i.liked} likes={i.likes} /></li>
-              ))}
-            </ul>
-          </Block>
-        )}
 
         <Block id="settings" title="Notifications">
           <PreferencesForm delivery={(prefs.data?.delivery as "instant" | "daily" | undefined) ?? "instant"} push={(prefs.data?.push as boolean | undefined) ?? true} />

@@ -15,6 +15,7 @@ import { getCandidateEntry, getLiveInterviewDay } from "@/lib/recruitment/my-ent
 import { getMeetingSignal } from "@/lib/meetings/data";
 import { AiLauncher } from "@/components/ai/ai-launcher";
 import { aiConfigured, getAiSettings } from "@/lib/ai/settings";
+import { freshSuggestions } from "@/lib/ai/lookup";
 import { socialLinks } from "@/lib/site-config";
 import { ServiceWorker } from "@/components/autopilot/service-worker";
 import { SiteAnalytics } from "@/components/autopilot/site-analytics";
@@ -31,6 +32,8 @@ export default async function PublicLayout({ children }: { children: React.React
     // FusionX AI: only with a key on the server and switched on in Settings (migration 0038).
     aiConfigured() ? getAiSettings() : Promise.resolve(null),
   ]);
+  // Suggested questions from what is new (migration 0045), then the admin's own.
+  const fresh = ai?.enabled ? await freshSuggestions() : [];
   const supabase = user ? await createClient() : null;
   const [roles, profileRow, reviewerCount, candidate, liveDay, meetings, coreTitles, mentorRow, workCount, centerOpen] = user && supabase
     ? await Promise.all([
@@ -143,7 +146,7 @@ export default async function PublicLayout({ children }: { children: React.React
       <SiteFooter settings={settings} columns={footerColumns} />
       <ServiceWorker />
       <SiteAnalytics />
-      {ai?.enabled && <AiLauncher welcome={ai.welcome} suggestions={ai.suggestions} allowed={aiLinks} />}
+      {ai?.enabled && <AiLauncher welcome={ai.welcome} suggestions={[...fresh, ...ai.suggestions].slice(0, 6)} allowed={aiLinks} />}
     </>
   );
 }

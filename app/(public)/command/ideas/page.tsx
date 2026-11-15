@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { IdeaActions, OpportunityActions } from "@/components/autopilot/outcome-parts";
+import { BulkList, ContentNav, DeleteBatchButton, PublishOpen } from "@/components/autopilot/content-admin";
 import { dayLabel, getAutopilotViewer, peopleById } from "@/lib/autopilot/server";
 
 export const metadata: Metadata = { title: "Command Center · Idea Engine" };
@@ -23,12 +24,17 @@ export default async function IdeasPage({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   const viewer = (await getAutopilotViewer())!;
   const { supabase } = viewer;
-  const [{ data: ideas }, { data: opps }, { data: sources }, { data: members }] = await Promise.all([
+  const [{ data: ideas }, { data: opps }, { data: sources }, { data: members }, { data: delivered }] = await Promise.all([
     supabase.from("idea_drafts").select("id, kind, title, pitch, data, status, created_at").in("status", sp.show === "all" ? ["draft", "saved", "adopted", "rejected"] : ["draft"]).order("created_at", { ascending: false }).limit(40),
     supabase.from("opportunity_drafts").select("*").eq("status", "draft").gte("deadline", new Date().toISOString().slice(0, 10)).order("value_score", { ascending: false }).limit(40),
     supabase.from("opportunity_sources").select("name, url, region, active, last_fetched_at, last_result").order("region"),
     supabase.from("core_group_members").select("user_id"),
+    // Delivered to everyone's My work (migration 0045).
+    supabase.from("idea_drafts").select("id, kind, title, pitch, level, score, batch_date, hidden").not("published_at", "is", null).is("deleted_at", null).order("batch_date", { ascending: false }).order("level").limit(300),
   ]);
+  type Dl = { id: string; kind: string; title: string; pitch: string; level: number | null; score: number | null; batch_date: string | null; hidden: boolean };
+  const batches = new Map<string, Dl[]>();
+  for (const d of (delivered ?? []) as Dl[]) { const k = d.batch_date ?? "earlier"; batches.set(k, [...(batches.get(k) ?? []), d]); }
   const people = await peopleById(supabase, ((members ?? []) as { user_id: string }[]).map((m) => m.user_id));
   const memberList = [...people.entries()].map(([id, p]) => ({ id, name: p.full_name })).sort((a, b) => a.name.localeCompare(b.name));
   type I = { id: string; kind: "project" | "research"; title: string; pitch: string; data: Record<string, unknown>; status: string; created_at: string };
@@ -37,6 +43,20 @@ export default async function IdeasPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="space-y-8" data-ideas>
+      <ContentNav />
+      <section data-delivered>
+        <h2 className="font-serif text-xl text-ink">Delivered to everyone</h2>
+        <p className="text-xs text-ink/60">Every Sunday, straight to My work. Hide or delete one or a whole batch: it leaves My work at once; projects started from it stay with their owners.</p>
+        {batches.size === 0 ? <p className="mt-3 border border-dashed border-line p-4 text-sm text-ink/70">Nothing delivered yet. The first batch arrives on Sunday at 9:00 AM.</p> : [...batches.entries()].map(([date, list]) => (
+          <div key={date} className="mt-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold text-ink">{date === "earlier" ? "Earlier" : dayLabel(date)} · {list.length} ideas</h3>{viewer.admin && date !== "earlier" && <DeleteBatchButton kind="ideas" batch={date} label="Delete this batch" />}</div>
+            <BulkList kind="idea" actions={["hide", "show", "delete"]} rows={list.map((d) => ({
+              id: d.id, title: d.title, meta: `${d.kind === "research" ? "Research" : `Level ${d.level ?? "?"}`} · score ${d.score ?? "—"} · ${d.hidden ? "hidden" : "visible"} · ${d.pitch}`,
+              extra: d.kind === "project" && viewer.admin ? <PublishOpen id={d.id} /> : undefined,
+            }))} />
+          </div>
+        ))}
+      </section>
       <p className="text-sm"><Link href="/command/outcomes" className="underline">← Outcomes</Link> · <Link href={sp.show === "all" ? "/command/ideas" : "/command/ideas?show=all"} className="underline">{sp.show === "all" ? "Only drafts" : "All decided ideas too"}</Link></p>
       {(["project", "research"] as const).map((kind) => (
         <section key={kind}>

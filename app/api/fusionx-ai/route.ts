@@ -3,6 +3,7 @@ import { z } from "zod";
 import { faqAnswer } from "@/lib/ai/fallback";
 import { RESTING, isHindi, redactingStream, refusalFor, refusalText, saysDontKnow } from "@/lib/ai/guard";
 import { getKnowledge } from "@/lib/ai/knowledge";
+import { lookupForQuestion } from "@/lib/ai/lookup";
 import { answer, type Turn } from "@/lib/ai/model";
 import { aiConfigured, getAiSettings } from "@/lib/ai/settings";
 import { getOrganizationSettings } from "@/lib/data/organization";
@@ -80,7 +81,12 @@ export async function POST(request: Request) {
     whatsapp: [socialLinks.whatsapp, linkHref(org.whatsapp_url, "whatsapp_group") ?? ""].filter(Boolean),
   };
 
-  const stream = answer(pack.text, history, message);
+  // On demand: the public opportunities, tools or projects this question is about (closed, hidden and deleted ones can't be read).
+  const matching = await lookupForQuestion(message).catch(() => "");
+  const stream = answer(matching ? `${pack.text}
+
+## Matching items for this question (${new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })})
+${matching}` : pack.text, history, message);
   // The first piece decides: no model at all means the fallback, not an empty stream.
   let first: IteratorResult<string>;
   try {

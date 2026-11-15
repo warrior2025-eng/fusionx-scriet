@@ -5,6 +5,7 @@ import { CONTENT, withFallback } from "@/lib/site-content/schema";
 import { publicResultsHidden, resultsVisible, type PublicResults } from "@/lib/recruitment/results";
 import { cycleState, type Cycle } from "@/lib/recruitment/shared";
 import { linkHref } from "@/lib/validation/link";
+import { oppLine, type Opp } from "@/lib/ai/lookup";
 
 /**
  * What FusionX AI knows: only what a signed-out visitor can already see.
@@ -173,6 +174,27 @@ export async function buildKnowledge(extraFacts: string): Promise<Knowledge> {
     `From FusionX's records of finished, reviewed work: ${impact.missions ?? 0} missions completed, ${impact.workshops ?? 0} workshops, ${impact.hackathons ?? 0} hackathon entries, ${impact.projects_shipped ?? 0} projects shipped, ${impact.contributions ?? 0} verified contributions.`,
     ...building.slice(0, 6).map((m) => `- Now building: ${m.title}${m.goal ? `: ${clip(m.goal as string, 120)}` : ""} (${m.done} of ${m.total} steps done)`),
   ]);
+
+  // 6c. Opportunities, the Tools Library, public projects and how things work for members (migration 0045).
+  const todayIso = new Date(now).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const [openOpps, tools, projects] = await Promise.all([
+    rows(db.from("opportunities").select("title, organizer, section, mode, city, distance_km, deadline, eligibility, eligibility_level, cost, has_prize, registration_url, region, value_score, rolling")
+      .eq("is_published", true).gte("deadline", todayIso).order("deadline").limit(25)),
+    rows(db.from("tools").select("slug, name, category, what, free_label").eq("status", "published").is("deleted_at", null).order("sort").order("name")),
+    rows(db.from("projects").select("id, title, status").eq("is_published", true).order("updated_at", { ascending: false }).limit(15)),
+  ]);
+  add("How FusionX works for members", "/my-work", [
+    "Every Sunday members get 15 new project ideas in My work (from beginner to startup-grade); anyone can Accept and start one (it becomes their project, shown in Projects as \"In progress\"), save it, or hide it. Research topics arrive once a month and need a mentor to start.",
+    `Members join a project from the Projects page (${SITE}/projects): \"Join the team\" on projects started from ideas, or \"Join this project\" on open projects.`,
+    `Open seats on FusionX missions are listed for signed-in members at ${SITE}/autopilot/open-seats.`,
+    `Opportunities are updated every morning and stay until their deadline: ${SITE}/opportunities. Tools Library: ${SITE}/tools.`,
+  ]);
+  if (openOpps.length) add("Open opportunities (only these are open; closed ones are never listed)", "/opportunities", openOpps.map((o) => oppLine(o as unknown as Opp, todayIso)));
+  if (tools.length) add("Tools Library", "/tools", [
+    ...tools.slice(0, 30).map((t) => `- ${t.name} (${t.free_label}): ${clip(t.what as string, 120)} · ${SITE}/tools/${t.slug}`),
+    ...(tools.length > 30 ? [`Also: ${tools.slice(30).map((t) => t.name).join(", ")}.`] : []),
+  ]);
+  if (projects.length) add("Public projects", "/projects", projects.map((p) => `- ${p.title} (${p.status})`));
 
   // 7. Contact and where to find FusionX
   add("Contact", "/contact", [

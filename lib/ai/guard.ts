@@ -25,6 +25,8 @@ const PRIVATE = [
   /\b(applications?|answers?)\s+(of|by|from)\b|\bwho applied\b|\breviewers?\b|\breview notes?\b/i,
   /\b(email|e-mail|address|password|aadhaa?r|roll\s*(no|number))\s+(of|for)\b|\bpersonal\s+(email|details|info)\b|\bpassword\b/i,
   /\b(meeting\s*minutes|minutes of (the )?meeting|audit\s*logs?|admin\s*panel\s*data)\b/i,
+  /\be-?mails?\s*(addresses|ids?|list)\b|\b(list|all)\s+(of\s+)?(members'?|students'?)\s*(e-?mails?|contacts?|details)\b/i,
+  /\b(?!fusionx's|scriet's)[a-z]+'s\s+(my work|tasks?|to-?dos?|dashboard|inbox|notifications?|messages?|private|personal)\b/i,
 ];
 
 const OFF_TOPIC = [
