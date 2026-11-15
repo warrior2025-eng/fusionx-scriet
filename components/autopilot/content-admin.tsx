@@ -5,10 +5,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea } from "@/components/ui/field";
-import { addCollegeOpportunity, contentAction, deleteBatch, pauseFeature, publishIdeaOpen, saveTool } from "@/actions/autopilot-auto";
+import { addCollegeOpportunity, contentAction, deleteBatch, pauseFeature, publishIdeaOpen, runAutomationNow, saveTool } from "@/actions/autopilot-auto";
 import { setMaster } from "@/actions/autopilot";
 import { TOOL_CATEGORIES } from "@/lib/tools/candidates";
 import { cn } from "@/lib/utils";
+import { RefreshCw } from "lucide-react";
 import { useRun } from "./center-parts";
 
 /** Second row under Outcomes: the content Autopilot makes, and what was deleted. Wraps on phones (no sideways scroll). */
@@ -30,21 +31,39 @@ export type Automation = { key: string; label: string; next: string; paused: { n
 /** Today: one On / Paused toggle per automation; "Pause all" is the master switch (super admin). */
 export function AutomationsCard({ items, canPause, superAdmin, masterOn }: { items: Automation[]; canPause: boolean; superAdmin: boolean; masterOn: boolean }) {
   const { pending, run } = useRun();
+  const [running, setRunning] = useState<string | null>(null);
   return (
     <section className="border border-line bg-surface p-4" data-automations>
       <h2 className="font-serif text-lg text-ink">Automations</h2>
       {!masterOn && <p className="mt-1 text-sm font-semibold text-amber-700 dark:text-amber-400">All automations are paused.</p>}
+      {canPause && (
+        <>
+          <Button className="mt-3 min-h-11 w-full font-semibold" disabled={pending || !masterOn}
+            onClick={() => { if (window.confirm("Run all automations now? New ideas, research topics, opportunities and a tool are added, and members get notified.")) { setRunning("all"); run(() => runAutomationNow("all"), () => setRunning(null)); } }}
+            data-run-all>
+            <RefreshCw size={16} className={running === "all" && pending ? "animate-spin" : ""} aria-hidden /> {running === "all" && pending ? "Running… (up to a minute)" : "Run all now"}
+          </Button>
+          <p className="mt-1 text-xs text-ink/60">Adds everything right away instead of waiting for the next run.</p>
+        </>
+      )}
       <ul className="mt-3 divide-y divide-line">
         {items.map((a) => (
           <li key={a.key} className="flex flex-wrap items-center justify-between gap-2 py-2" data-automation={a.key}>
             <span className="min-w-0 text-sm"><span className="font-medium text-ink">{a.label}</span>
               <span className="block text-xs text-ink/65">{a.paused ? `Paused by ${a.paused.name ?? "an admin"} on ${a.paused.at ? new Date(a.paused.at).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }) : ""}` : `Next run: ${a.next}`}</span></span>
             {canPause && (
+              <span className="flex items-center gap-2">
+              <button type="button" disabled={pending || !!a.paused || !masterOn} aria-label={`Run ${a.label} now`}
+                onClick={() => { if (a.key !== "ideas" || window.confirm("Send a new set of ideas to every member now?")) { setRunning(a.key); run(() => runAutomationNow(a.key as Parameters<typeof runAutomationNow>[0]), () => setRunning(null)); } }}
+                className="inline-flex min-h-11 items-center gap-1.5 border border-line px-3 text-sm font-semibold text-ink hover:border-accent disabled:opacity-50" data-run-now={a.key}>
+                <RefreshCw size={14} className={running === a.key && pending ? "animate-spin" : ""} aria-hidden /> {running === a.key && pending ? "Running…" : "Run now"}
+              </button>
               <button type="button" role="switch" aria-checked={!a.paused} aria-label={`${a.label}: ${a.paused ? "paused" : "on"}`} disabled={pending}
                 onClick={() => run(() => pauseFeature(a.key, !a.paused))}
                 className={cn("inline-flex min-h-11 min-w-20 items-center justify-center border px-3 text-sm font-semibold", a.paused ? "border-line text-ink/70" : "border-accent bg-accent text-white")}>
                 {a.paused ? "Paused" : "On"}
               </button>
+              </span>
             )}
           </li>
         ))}
