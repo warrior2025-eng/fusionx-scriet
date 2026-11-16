@@ -283,12 +283,12 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
             <Link href="/my-work?ideas=mine#ideas" className={`inline-flex min-h-11 items-center border px-3 ${ideaFilter === "mine" ? "border-ink text-ink" : "border-line text-ink/70"}`}>Suits my skills</Link>
           </nav>
           {current.length === 0 ? <Empty>No ideas yet. New ones arrive every Sunday morning.</Empty> : (
-            <ul className="grid auto-rows-fr gap-3 md:grid-cols-2" data-ideas-for-you>{current.map((i) => <li key={i.id} className="min-w-0"><IdeaCard idea={i} /></li>)}</ul>
+            <ul className="grid items-start gap-3 md:grid-cols-2" data-ideas-for-you>{current.map((i) => <li key={i.id} className="min-w-0"><IdeaCard idea={i} /></li>)}</ul>
           )}
           {archive.length > 0 && (
             <details className="mt-4" data-idea-archive>
               <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-semibold text-ink">Idea archive ({archive.length})</summary>
-              <ul className="mt-2 grid auto-rows-fr gap-3 md:grid-cols-2">{archive.slice(0, 40).map((i) => <li key={i.id} className="min-w-0"><IdeaCard idea={i} /></li>)}</ul>
+              <ul className="mt-2 grid items-start gap-3 md:grid-cols-2">{archive.slice(0, 40).map((i) => <li key={i.id} className="min-w-0"><IdeaCard idea={i} /></li>)}</ul>
             </details>
           )}
         </Block>

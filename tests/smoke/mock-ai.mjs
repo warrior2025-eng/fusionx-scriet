@@ -4,7 +4,8 @@
 // so the answers show exactly which public data the real model would see. Test use only.
 import http from "node:http";
 
-const day = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+// Dates in IST (the app counts days in IST), so the tests also pass around midnight.
+const day = (n) => new Date(Date.now() + 330 * 60_000 + n * 864e5).toISOString().slice(0, 10);
 export const state = { lastPrompt: "", geminiDown: false, calls: { gemini: 0, groq: 0 } };
 
 const full = (n, level, title) => ({
