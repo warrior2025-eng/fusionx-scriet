@@ -40,11 +40,19 @@ export function IdeaCard({ idea }: { idea: IdeaCardData }) {
         <dl className="mt-1 space-y-1 text-sm">{Object.entries(idea.data).filter(([k, v]) => LABEL[k] && show(v)).map(([k, v]) => <div key={k}><dt className="inline font-semibold text-ink">{LABEL[k]}: </dt><dd className="inline break-words text-ink/80">{show(v)}</dd></div>)}</dl>
       </details>
       {idea.teams.length > 0 && (
-        <div className="mt-2 text-sm text-ink/80" data-idea-teams>
-          {idea.teams.length > 1 ? `${idea.teams.length} teams are building this` : `Started by ${idea.teams[0].started_by || "a member"}`}
-          {idea.teams.filter((t) => t.joinable).slice(0, 2).map((t) => (
-            <button key={t.project_id} type="button" disabled={pending} className="ml-2 inline-flex min-h-11 items-center underline" onClick={() => run(() => joinProject(t.project_id))}>ask to join {t.started_by || "the"}&apos;s team</button>
-          ))}
+        // Someone is already building this: the clearest next step is to ask to join them.
+        <div className="mt-3 border-l-4 border-accent bg-accent/10 p-3 text-sm" data-idea-teams>
+          <p className="font-semibold text-ink">
+            {idea.teams.length > 1 ? `${idea.teams.length} teams are already building this` : `${idea.teams[0].started_by || "A member"}'s team is already building this`}
+          </p>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            {idea.teams.filter((t) => t.joinable).slice(0, 2).map((t) => (
+              <Button key={t.project_id} size="sm" className="min-h-11" disabled={pending} onClick={() => run(() => joinProject(t.project_id))} data-ask-existing>
+                Ask to join {t.started_by || "their"}&apos;s team
+              </Button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-xs text-ink/65">The owner accepts you into the team. Or start your own version below.</p>
         </div>
       )}
       {ask && (
