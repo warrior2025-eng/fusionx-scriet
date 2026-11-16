@@ -1,7 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
 import { deliverPendingEmails } from "@/lib/email/outbox";
 import { sendPendingPushes } from "@/lib/push/server";
-import { dailyOpportunities, dailyTool, monthlyResearch, nightlyCleanup, refreshAi, weeklyIdeas } from "@/lib/autopilot/auto";
+import { after } from "next/server";
+import { dailyOpportunities, dailyTool, fillIdeaBank, monthlyResearch, nightlyCleanup, refreshAi, weeklyIdeas } from "@/lib/autopilot/auto";
 import { createAdminClient } from "@/lib/supabase/server";
 
 // The morning jobs read pages and wait for the model: up to 5 minutes (Vercel Fluid compute, also on Hobby).
@@ -15,6 +16,7 @@ const JOBS: Record<string, (force: boolean) => Promise<Record<string, unknown>>>
   ai: () => refreshAi(),
   ideas: (force: boolean) => weeklyIdeas(force),
   research: (force: boolean) => monthlyResearch(force),
+  bank: () => fillIdeaBank(),
 };
 
 /**
@@ -42,6 +44,8 @@ export async function GET(request: Request) {
     return Response.json({ ok: true, job, ran_at: new Date().toISOString(), result, email: { state: email.state, sent: email.sent }, push });
   }
 
+  // The idea bank fills in the background (one small part at most once an hour, only while it is low).
+  after(() => fillIdeaBank().catch(() => null));
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("autopilot_tick", {});
   if (error) {

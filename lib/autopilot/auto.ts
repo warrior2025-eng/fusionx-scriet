@@ -69,6 +69,109 @@ export function similar(a: string, b: string): boolean {
 
 type Idea = Record<string, unknown> & { title: string; pitch: string; level: number; learn: string };
 
+type Ideas = { want: number; minScore: number; cap: number; week: number; mix: number[]; counts: Map<string, number>; avoid: string[]; opps: string[] };
+
+/** What every idea run needs: the numbers, the week's level mix, members' skills, and what must not repeat. */
+async function ideaContext(admin: Admin, s: Settings, weekAhead = 0): Promise<Ideas> {
+  const want = s.numbers?.ideas_per_week ?? 15;
+  const minScore = s.numbers?.idea_min_quality ?? 7;
+  const cap = s.numbers?.idea_daily_cap ?? 20;
+  // The week number (batches so far + 1), and the level members accepted most in the last 4 weeks.
+  const { data: batches } = await admin.from("idea_drafts").select("batch_date").eq("kind", "project").not("batch_date", "is", null).is("deleted_at", null);
+  const week = new Set((batches ?? []).map((b) => b.batch_date as string)).size + 1 + weekAhead;
+  const since = new Date(Date.now() - 28 * 864e5).toISOString();
+  const { data: accepted } = await admin.from("projects").select("idea:idea_drafts(level)").not("idea_id", "is", null).gte("created_at", since);
+  const byLevel = new Map<number, number>();
+  for (const a of (accepted ?? []) as unknown as { idea: { level: number | null } | null }[]) if (a.idea?.level) byLevel.set(a.idea.level, (byLevel.get(a.idea.level) ?? 0) + 1);
+  const liked = [...byLevel.entries()].sort((a, b) => b[1] - a[1])[0];
+  const mix = levelMix(week, want, liked && liked[1] >= 3 ? liked[0] : null);
+  // Context and what must not repeat (12 weeks of ideas, the bank, and every project).
+  const [{ data: skills }, { data: projects }, { data: recent }, { data: opps }] = await Promise.all([
+    admin.from("profiles").select("skills").eq("is_active", true),
+    admin.from("projects").select("title, description"),
+    admin.from("idea_drafts").select("title, pitch").eq("kind", "project").gte("created_at", new Date(Date.now() - 84 * 864e5).toISOString()),
+    admin.from("opportunities").select("title, deadline").eq("is_published", true).limit(15),
+  ]);
+  const counts = new Map<string, number>();
+  for (const p of skills ?? []) for (const k of (p.skills as string[]) ?? []) counts.set(k.toLowerCase(), (counts.get(k.toLowerCase()) ?? 0) + 1);
+  return { want, minScore, cap, week, mix, counts, avoid: [...(projects ?? []).map((p) => `${p.title}`), ...(recent ?? []).map((r) => `${r.title}`)], opps: (opps ?? []).map((o) => o.title as string) };
+}
+
+const THEMES = ["campus life and student services at SCRIET", "health, safety and the environment in Meerut", "learning, careers, clubs and events", "local shops, farmers, NGOs and the community"];
+const describeLevels = (levels: number[]) => [1, 2, 3, 4, 5].map((l) => [l, levels.filter((x) => x === l).length]).filter(([, n]) => n).map(([l, n]) => `${n} at level ${l}`).join(", ");
+
+/** One part: up to 6 complete ideas at the given levels, on one theme. */
+async function generateIdeas(admin: Admin, c: Ideas, levels: number[], theme: string, until: number): Promise<Idea[]> {
+  const prompt = `You help FusionX@SCRIET, a student innovation club at SCRIET, CCS University, Meerut (Uttar Pradesh, India), with project ideas for ALL its members (any branch, any year).
+Levels: 1 Beginner (1–2 weeks, simple stack), 2 Easy, 3 Intermediate, 4 Advanced, 5 Startup-grade.
+Write exactly ${levels.length} project ideas: ${describeLevels(levels)}. Focus on ${theme}. Real problems on campus or in the Meerut region. Simple English.
+Members' skills (counts): ${[...c.counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 25).map(([k, n]) => `${k} ×${n}`).join(", ") || "unknown"}.
+Do NOT repeat or closely copy: ${c.avoid.slice(0, 120).join("; ") || "none"}.
+Open opportunities: ${c.opps.join("; ") || "none"}.
+Never invent statistics, studies, prices or products. Name a similar product only if sure, else "check similar products".
+Reply with JSON: {"ideas":[{"level":1,"learn":"one line: what you'll learn","hubs":["design|competitions|projects|events"],"title":"","pitch":"one line","problem":"who has it, how often, evidence to collect","users":"","solution":"","different":"","mvp":"","stack":"comma separated","data":"free data or APIs","effort":"S|M|L","variations":{"lite":["milestones"],"standard":["milestones"],"ambitious":["milestones"]},"team":{"Design & Branding":"","Competitions & Opportunities":"","Projects, Research & Startups":"","FusionX Event Crew":""},"validate":"","measures":"","startup_path":"","risks":"","opportunity":""}]}`;
+  const out = (await askJson(admin, "idea_projects", prompt, c.cap, { until, maxTokens: 8192 })) as { ideas?: Record<string, unknown>[] } | null;
+  return (out?.ideas ?? []).map((i): Idea => {
+    const data: Record<string, unknown> = {};
+    for (const f of PROJECT_FIELDS) data[f] = f === "variations" || f === "team" ? i[f] ?? null : str(i[f], 800);
+    return { ...data, hubs: list(i.hubs, 4), title: str(i.title, 160), pitch: str(i.pitch, 400), level: Math.min(5, Math.max(1, Number(i.level) || 1)), learn: str(i.learn, 200) } as Idea;
+  // The core of an idea must be there; the rest may be empty (shown only when present).
+  }).filter((i) => i.title && i.learn && ["pitch", "problem", "solution", "mvp", "stack"].every((f) => i[f]));
+}
+
+/** Second pass: an AI score (1–10) for usefulness, originality, student feasibility, clarity and completeness. */
+async function scoreIdeas(admin: Admin, c: Ideas, ideas: Idea[], until: number): Promise<number[]> {
+  if (!ideas.length) return [];
+  const prompt = `Score each student project idea from 1 to 10 for usefulness, originality, feasibility for students, clarity and completeness. Be strict.
+Reply with JSON: {"scores":[{"i":0,"score":7}]}
+${ideas.map((x, i) => `${i}. [L${x.level}] ${x.title}: ${x.pitch} | MVP: ${x.mvp} | Stack: ${x.stack}`).join("\n")}`;
+  const out = (await askJson(admin, "idea_projects", prompt, c.cap, { until, maxTokens: 2048 })) as { scores?: { i: number; score: number }[] } | null;
+  const map = new Map((out?.scores ?? []).map((x) => [Number(x.i), Number(x.score)]));
+  return ideas.map((_, i) => map.get(i) ?? 0);
+}
+
+/**
+ * The idea bank: scored ideas made ahead of time, a little at a time, whenever the free AI answers. Sunday (and
+ * "Run now") deliver from it at once, so a busy AI at that moment no longer stops the delivery.
+ * Bank rows are idea_drafts with status "draft", no batch date, and data.bank = true.
+ */
+const BANK_SIZE = 30;
+const bankQuery = (admin: Admin) => admin.from("idea_drafts").select("id, title, pitch, level, learn, score, data").eq("kind", "project").eq("status", "draft")
+  .is("published_at", null).is("batch_date", null).is("deleted_at", null).eq("data->>bank", "true");
+
+/** Called every few minutes by the cron route: makes one part (up to 6 ideas) when the bank is low, at most once an hour. */
+export async function fillIdeaBank(): Promise<Record<string, unknown>> {
+  if (!ideaEngineConfigured() || !process.env.SUPABASE_SERVICE_ROLE_KEY) return { state: "not_configured" };
+  const admin = createAdminClient();
+  const g = await gate(admin, "ideas", "ideas_members");
+  if (!g.ok) return { state: "skipped", why: g.why };
+  const { data: bank } = await bankQuery(admin);
+  const rows = (bank ?? []) as { title: string; pitch: string; level: number }[];
+  if (rows.length >= BANK_SIZE) return { state: "full", size: rows.length };
+  const { count: recent } = await admin.from("automation_log").select("id", { count: "exact", head: true })
+    .eq("area", "idea_projects").like("action", "Idea bank%").gte("at", new Date(Date.now() - 55 * 60_000).toISOString());
+  if (recent) return { state: "waiting", size: rows.length };
+  const c = await ideaContext(admin, g.s, 1);
+  c.avoid.push(...rows.map((r) => r.title));
+  // The levels the bank has least of, against next week's mix (×2, so the bank can cover two weeks).
+  const need = c.mix.map((n, i) => Math.max(0, n * 2 - rows.filter((r) => r.level === i + 1).length));
+  const levels = need.flatMap((n, i) => Array<number>(n).fill(i + 1)).sort((a, b) => need[b - 1] - need[a - 1]).slice(0, 6);
+  if (!levels.length) return { state: "full", size: rows.length };
+  const until = Date.now() + 200_000;
+  const ideas = await generateIdeas(admin, c, levels, THEMES[rows.length % THEMES.length], until);
+  const scores = await scoreIdeas(admin, c, ideas, until + 30_000);
+  const keep: (Idea & { score: number })[] = [];
+  ideas.map((x, i) => ({ ...x, score: scores[i] })).filter((x) => x.score >= c.minScore).forEach((x) => {
+    if ([...rows, ...keep].some((k) => similar(`${k.title} ${k.pitch}`, `${x.title} ${x.pitch}`)) || c.avoid.some((a) => similar(a, x.title))) return;
+    keep.push(x);
+  });
+  if (keep.length) {
+    await admin.from("idea_drafts").insert(keep.map(({ title, pitch, level, learn, score: sc, ...rest }) => ({ kind: "project", title, pitch, level, learn, score: sc, data: { ...rest, bank: true }, status: "draft" })));
+  }
+  await log(admin, "idea_projects", `Idea bank: ${keep.length} added`, ideas.length ? `${rows.length + keep.length} in the bank (of ${BANK_SIZE}); ${ideas.length - keep.length} below the bar or repeats` : "The AI did not answer; trying in an hour");
+  return { state: "filled", added: keep.length, size: rows.length + keep.length };
+}
+
 export async function weeklyIdeas(force = false): Promise<Record<string, unknown>> {
   if (!ideaEngineConfigured() || !process.env.SUPABASE_SERVICE_ROLE_KEY) return { state: "not_configured" };
   const admin = createAdminClient();
@@ -77,120 +180,66 @@ export async function weeklyIdeas(force = false): Promise<Record<string, unknown
   const today = todayIST();
   const { count: already } = await admin.from("idea_drafts").select("id", { count: "exact", head: true }).eq("kind", "project").eq("batch_date", today).is("deleted_at", null);
   if ((already ?? 0) > 0 && !force) return { state: "done_today" };
-  const want = g.s.numbers?.ideas_per_week ?? 15;
-  const minScore = g.s.numbers?.idea_min_quality ?? 7;
-  const cap = g.s.numbers?.idea_daily_cap ?? 20;
-
-  // The week number (batches so far + 1), and the level members accepted most in the last 4 weeks.
-  const { data: batches } = await admin.from("idea_drafts").select("batch_date").eq("kind", "project").not("batch_date", "is", null).is("deleted_at", null);
-  const week = new Set((batches ?? []).map((b) => b.batch_date as string)).size + 1;
-  const since = new Date(Date.now() - 28 * 864e5).toISOString();
-  const { data: accepted } = await admin.from("projects").select("idea:idea_drafts(level)").not("idea_id", "is", null).gte("created_at", since);
-  const byLevel = new Map<number, number>();
-  for (const a of (accepted ?? []) as unknown as { idea: { level: number | null } | null }[]) if (a.idea?.level) byLevel.set(a.idea.level, (byLevel.get(a.idea.level) ?? 0) + 1);
-  const liked = [...byLevel.entries()].sort((a, b) => b[1] - a[1])[0];
-  const mix = levelMix(week, want, liked && liked[1] >= 3 ? liked[0] : null);
-
-  // Context and what must not repeat (12 weeks of ideas and every project).
-  const [{ data: skills }, { data: projects }, { data: recent }, { data: opps }] = await Promise.all([
-    admin.from("profiles").select("skills").eq("is_active", true),
-    admin.from("projects").select("title, description"),
-    admin.from("idea_drafts").select("title, pitch").eq("kind", "project").gte("created_at", new Date(Date.now() - 84 * 864e5).toISOString()),
-    admin.from("opportunities").select("title, deadline").eq("is_published", true).limit(15),
-  ]);
-  const counts = new Map<string, number>();
-  for (const p of skills ?? []) for (const s of (p.skills as string[]) ?? []) counts.set(s.toLowerCase(), (counts.get(s.toLowerCase()) ?? 0) + 1);
-  const avoid = [...(projects ?? []).map((p) => `${p.title}`), ...(recent ?? []).map((r) => `${r.title}`)];
+  const c = await ideaContext(admin, g.s);
+  const { want, minScore, mix, avoid } = c;
   // The run must end within the platform's limit (300 s): one deadline for every AI call.
   const until = Date.now() + 240_000;
-  // About 1.5× this week's mix is written, in parallel parts of at most 6 ideas, so each answer stays short
-  // (complete JSON, quick) and each part looks at a different kind of problem (fewer near-duplicates).
-  const THEMES = ["campus life and student services at SCRIET", "health, safety and the environment in Meerut", "learning, careers, clubs and events", "local shops, farmers, NGOs and the community"];
-  const ask = (perLevel: number[]) => perLevel.flatMap((n, i) => Array<number>(Math.max(0, n)).fill(i + 1));
-  const describe = (levels: number[]) => [1, 2, 3, 4, 5].map((l) => [l, levels.filter((x) => x === l).length]).filter(([, n]) => n).map(([l, n]) => `${n} at level ${l}`).join(", ");
-  const generateAll = async (levels: number[]) => {
-    const parts: number[][] = [];
-    for (let i = 0; i < levels.length; i += 6) parts.push(levels.slice(i, i + 6));
-    // One part at a time: the free AI tiers limit how much they answer per minute.
-    const out: Idea[] = [];
-    for (let i = 0; i < parts.length; i++) {
-      if (Date.now() > until - 20_000) break;
-      out.push(...(await generate(parts[i], THEMES[i % THEMES.length])));
-    }
-    return out;
-  };
-  const generate = async (levels: number[], theme: string) => {
-    const prompt = `You help FusionX@SCRIET, a student innovation club at SCRIET, CCS University, Meerut (Uttar Pradesh, India), with project ideas for ALL its members (any branch, any year).
-Levels: 1 Beginner (1–2 weeks, simple stack), 2 Easy, 3 Intermediate, 4 Advanced, 5 Startup-grade.
-Write exactly ${levels.length} project ideas: ${describe(levels)}. Focus on ${theme}. Real problems on campus or in the Meerut region. Simple English.
-Members' skills (counts): ${[...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 25).map(([s, n]) => `${s} ×${n}`).join(", ") || "unknown"}.
-Do NOT repeat or closely copy: ${avoid.slice(0, 120).join("; ") || "none"}.
-Open opportunities: ${(opps ?? []).map((o) => o.title).join("; ") || "none"}.
-Never invent statistics, studies, prices or products. Name a similar product only if sure, else "check similar products".
-Reply with JSON: {"ideas":[{"level":1,"learn":"one line: what you'll learn","hubs":["design|competitions|projects|events"],"title":"","pitch":"one line","problem":"who has it, how often, evidence to collect","users":"","solution":"","different":"","mvp":"","stack":"comma separated","data":"free data or APIs","effort":"S|M|L","variations":{"lite":["milestones"],"standard":["milestones"],"ambitious":["milestones"]},"team":{"Design & Branding":"","Competitions & Opportunities":"","Projects, Research & Startups":"","FusionX Event Crew":""},"validate":"","measures":"","startup_path":"","risks":"","opportunity":""}]}`;
-    const out = (await askJson(admin, "idea_projects", prompt, cap, { until, maxTokens: 8192 })) as { ideas?: Record<string, unknown>[] } | null;
-    return (out?.ideas ?? []).map((i): Idea => {
-      const data: Record<string, unknown> = {};
-      for (const f of PROJECT_FIELDS) data[f] = f === "variations" || f === "team" ? i[f] ?? null : str(i[f], 800);
-      return { ...data, hubs: list(i.hubs, 4), title: str(i.title, 160), pitch: str(i.pitch, 400), level: Math.min(5, Math.max(1, Number(i.level) || 1)), learn: str(i.learn, 200) } as Idea;
-    // The core of an idea must be there; the rest may be empty (shown only when present).
-    }).filter((i) => i.title && i.learn && ["pitch", "problem", "solution", "mvp", "stack"].every((f) => i[f]));
-  };
-  // Second pass: an AI score (1–10) for usefulness, originality, student feasibility, clarity and completeness.
-  const score = async (ideas: Idea[]) => {
-    if (!ideas.length) return [] as number[];
-    const prompt = `Score each student project idea from 1 to 10 for usefulness, originality, feasibility for students, clarity and completeness. Be strict.
-Reply with JSON: {"scores":[{"i":0,"score":7}]}
-${ideas.map((x, i) => `${i}. [L${x.level}] ${x.title}: ${x.pitch} | MVP: ${x.mvp} | Stack: ${x.stack}`).join("\n")}`;
-    const out = (await askJson(admin, "idea_projects", prompt, cap, { until: until + 30_000, maxTokens: 2048 })) as { scores?: { i: number; score: number }[] } | null;
-    const map = new Map((out?.scores ?? []).map((s) => [Number(s.i), Number(s.score)]));
-    return ideas.map((_, i) => map.get(i) ?? 0);
-  };
-  const keep: (Idea & { score: number })[] = [];
-  const take = (pool: Idea[], scores: number[]) => {
-    pool.map((x, i) => ({ ...x, score: scores[i] })).filter((x) => x.score >= minScore).sort((a, b) => b.score - a.score).forEach((x) => {
-      if (keep.length >= want) return;
-      if (keep.some((k) => similar(`${k.title} ${k.pitch}`, `${x.title} ${x.pitch}`))) return;
-      if (avoid.some((a) => similar(a, x.title))) return;
-      // Level mix: no more than this week's share per level (extra slots fill from any level later).
-      if (keep.filter((k) => k.level === x.level).length >= mix[x.level - 1]) return;
-      keep.push(x);
-    });
-  };
-  const first = await generateAll(ask(mix.map((n) => Math.ceil(n * 1.5))));
-  const firstScores = await score(first);
-  take(first, firstScores);
-  if (keep.length < want && Date.now() >= until - 60_000) {
-    // No time for a retry: fill from the best of the rest at any level (the quality bar still applies).
-    first.map((x, i) => ({ ...x, score: firstScores[i] })).filter((x) => x.score >= minScore && !keep.some((k) => k.title === x.title || similar(`${k.title} ${k.pitch}`, `${x.title} ${x.pitch}`)))
-      .sort((a, b) => b.score - a.score).slice(0, want - keep.length).forEach((x) => keep.push(x));
-  } else if (keep.length < want) {
-    // Retry once (only when there is time left): the levels that came short, plus a few spare.
+
+  type Kept = Idea & { score: number; bankId?: string };
+  const keep: Kept[] = [];
+  const fits = (x: Kept, strictMix: boolean) =>
+    x.score >= minScore && !keep.some((k) => k.title === x.title || similar(`${k.title} ${k.pitch}`, `${x.title} ${x.pitch}`))
+    && (x.bankId || !avoid.some((a) => similar(a, x.title)))
+    && (!strictMix || keep.filter((k) => k.level === x.level).length < mix[x.level - 1]);
+  const take = (pool: Kept[], strictMix: boolean) => pool.sort((a, b) => b.score - a.score).forEach((x) => { if (keep.length < want && fits(x, strictMix)) keep.push(x); });
+
+  // 1) From the bank first: no AI needed now.
+  const { data: bank } = await bankQuery(admin).order("score", { ascending: false }).limit(80);
+  const banked = ((bank ?? []) as { id: string; title: string; pitch: string; level: number; learn: string; score: number; data: Record<string, unknown> }[])
+    .map((b) => ({ ...b.data, title: b.title, pitch: b.pitch, level: b.level, learn: b.learn, score: Number(b.score) || 0, bankId: b.id }) as Kept);
+  take(banked, true);
+  // 2) Only what is missing is asked from the AI (one part at a time), then scored.
+  if (keep.length < want) {
     const short = mix.map((n, i) => n - keep.filter((k) => k.level === i + 1).length);
-    const more = await generateAll(ask(short.map((n, i) => (n > 0 ? n + (i < 2 ? 2 : 1) : 0))));
-    const all = [...first.filter((f) => !keep.some((k) => k.title === f.title)), ...more];
-    const sc = await score(all);
-    take(all, sc);
-    if (keep.length < want) {
-      all.map((x, i) => ({ ...x, score: sc[i] })).filter((x) => x.score >= minScore && !keep.some((k) => k.title === x.title || similar(`${k.title} ${k.pitch}`, `${x.title} ${x.pitch}`)))
-        .sort((a, b) => b.score - a.score).slice(0, want - keep.length).forEach((x) => keep.push(x));
+    const levels = short.flatMap((n, i) => Array<number>(Math.max(0, n > 0 ? n + (i < 2 ? 1 : 0) : 0)).fill(i + 1));
+    const fresh: Idea[] = [];
+    for (let i = 0; i < levels.length; i += 6) {
+      if (Date.now() > until - 20_000) break;
+      fresh.push(...(await generateIdeas(admin, c, levels.slice(i, i + 6), THEMES[(i / 6) % THEMES.length], until)));
     }
+    const sc = await scoreIdeas(admin, c, fresh, until + 30_000);
+    const scored = fresh.map((x, i) => ({ ...x, score: sc[i] }) as Kept);
+    take(scored, true);
+    // 3) Still short: the best of the rest at any level (the quality bar still applies).
+    if (keep.length < want) take([...banked, ...scored].filter((x) => !keep.includes(x)), false);
   }
-  if (keep.length === 0) { await log(admin, "idea_projects", "No ideas passed the quality bar", `minimum ${minScore}; trying next run`); return { state: "none" }; }
+  if (keep.length === 0) { await log(admin, "idea_projects", "No ideas passed the quality bar", `minimum ${minScore}; the bank is empty and the AI did not give enough; trying next run`); return { state: "none" }; }
+
   const deliver = g.level === "auto";
-  const rows = keep.map(({ title, pitch, level, learn, score: sc, ...rest }) => ({
-    kind: "project", title, pitch, level, learn, score: sc, data: rest, batch_date: today, status: deliver ? "published" : "draft", published_at: deliver ? new Date().toISOString() : null,
+  const now = new Date().toISOString();
+  const fromBank = keep.filter((k) => k.bankId);
+  for (const k of fromBank) {
+    const rest = { ...k } as Record<string, unknown>;
+    for (const f of ["title", "pitch", "level", "learn", "score", "bankId", "bank"]) delete rest[f];
+    const { error } = await admin.from("idea_drafts").update({ batch_date: today, status: deliver ? "published" : "draft", published_at: deliver ? now : null, data: rest }).eq("id", k.bankId!);
+    if (error) { await log(admin, "idea_projects", "Ideas not saved", error.message); return { state: "failed" }; }
+  }
+  const newRows = keep.filter((k) => !k.bankId).map(({ title, pitch, level, learn, score: sc, ...rest }) => ({
+    kind: "project", title, pitch, level, learn, score: sc, data: rest, batch_date: today, status: deliver ? "published" : "draft", published_at: deliver ? now : null,
   }));
-  const { error } = await admin.from("idea_drafts").insert(rows);
-  if (error) { await log(admin, "idea_projects", "Ideas not saved", error.message); return { state: "failed" }; }
+  if (newRows.length) {
+    const { error } = await admin.from("idea_drafts").insert(newRows);
+    if (error) { await log(admin, "idea_projects", "Ideas not saved", error.message); return { state: "failed" }; }
+  }
+  const total = keep.length;
   if (deliver) {
-    await admin.rpc("ap_notify_everyone", { p_title: `${rows.length} new project ideas are waiting in My work`, p_body: "Pick one to start, save it for later, or hide it.", p_link: "/my-work#ideas" });
-    await log(admin, "idea_projects", `Delivered ${rows.length} project ideas to everyone`, `Week ${week} · levels ${mix.join("/")}`);
+    await admin.rpc("ap_notify_everyone", { p_title: `${total} new project ideas are waiting in My work`, p_body: "Pick one to start, save it for later, or hide it.", p_link: "/my-work#ideas" });
+    await log(admin, "idea_projects", `Delivered ${total} project ideas to everyone`, `Week ${c.week} · levels ${mix.join("/")} · ${fromBank.length} from the idea bank, ${newRows.length} new`);
   } else {
-    await admin.from("autopilot_queue").insert({ area: "ideas_members", kind: "deliver_ideas", title: `Deliver this week's ${rows.length} project ideas`, detail: "Ideas · auto. Approve to send them to everyone's My work.",
+    await admin.from("autopilot_queue").insert({ area: "ideas_members", kind: "deliver_ideas", title: `Deliver this week's ${total} project ideas`, detail: "Ideas · auto. Approve to send them to everyone's My work.",
       payload: { batch_date: today }, dedupe: `ideas:${today}`, safe: false });
   }
-  return { state: deliver ? "delivered" : "suggested", count: rows.length, week, mix };
+  return { state: deliver ? "delivered" : "suggested", count: total, week: c.week, mix, from_bank: fromBank.length };
 }
 
 /** First Sunday of the month: research topics to everyone's My work (members start them themselves; the core team helps). */
