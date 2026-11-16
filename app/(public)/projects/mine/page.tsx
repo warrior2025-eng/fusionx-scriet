@@ -30,6 +30,7 @@ export default async function MyProjectsPage({ searchParams }: { searchParams: P
     .from("projects")
     .select("id, title, status, is_published, updated_at, tracked, mission_id")
     .eq("owner_id", user.id)
+    .is("deleted_at", null)
     .order("updated_at", { ascending: false });
   const ids = (projects ?? []).map((p) => p.id as string);
   // Tracking (migration 0043): progress, the next milestone and the team. Empty before it.
