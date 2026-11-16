@@ -50,6 +50,10 @@ export default async function MyProjectsPage({ searchParams }: { searchParams: P
       ])
     : [{ data: [] }, { data: [] }];
   const startedBy = new Map(((joinedMeta ?? []) as { project_id: string; started_by: string }[]).map((m) => [m.project_id, m.started_by]));
+  // Requests to join that wait for the owner's Accept (migration 0049).
+  const { data: waitRows } = await supabase.from("project_join_requests").select("project_id").eq("user_id", user.id).eq("status", "pending");
+  const waitIds = ((waitRows ?? []) as { project_id: string }[]).map((w) => w.project_id);
+  const { data: waiting } = waitIds.length ? await supabase.from("projects").select("id, title").in("id", waitIds) : { data: [] };
 
   return (
     <Section className="pt-16 pb-24">
@@ -106,6 +110,17 @@ export default async function MyProjectsPage({ searchParams }: { searchParams: P
 
       <div className="mt-12" id="joined" data-joined-teams>
         <SectionHeading eyebrow="Teams you joined" title="Other members' projects you are in." />
+        {(waiting ?? []).length > 0 && (
+          <div className="mb-4 space-y-2" data-waiting-requests>
+            <h3 className="text-sm font-semibold text-ink">Waiting for the owner</h3>
+            {(waiting ?? []).map((w) => (
+              <div key={w.id as string} className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-dashed border-line p-4" data-waiting-request>
+                <span className="min-w-0 text-sm text-ink">{w.title as string}</span>
+                <JoinProject id={w.id as string} signedIn requested />
+              </div>
+            ))}
+          </div>
+        )}
         {(joined ?? []).length > 0 ? (
           <div className="space-y-3">
             {(joined ?? []).map((p) => (

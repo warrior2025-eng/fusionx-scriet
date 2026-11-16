@@ -45,12 +45,32 @@ export async function acceptIdea(id: string, variation: string): Promise<ActionS
 }
 
 export async function joinProject(id: string) {
-  return call("ap_join_project", { p_project: id }, "You joined the team.", ["/projects", "/my-work", "/projects/mine"]);
+  return call("ap_join_project", { p_project: id }, "Request sent. You join when the owner accepts.", ["/projects", "/my-work", "/projects/mine"]);
+}
+
+/** The owner accepts or declines a join request (migration 0049). */
+export async function decideJoin(id: string, user: string, accept: boolean) {
+  return call("ap_project_join_decide", { p_project: id, p_user: user, p_accept: accept }, accept ? "They are in the team now." : "Declined.", ["/projects", `/projects/${id}/work`, "/projects/mine"]);
+}
+
+/** Take back a join request that is still waiting (migration 0049). */
+export async function cancelJoin(id: string) {
+  return call("ap_project_join_cancel", { p_project: id }, "Request cancelled.", ["/projects", "/projects/mine"]);
 }
 
 /** Leave a project team you joined (migration 0048). The owner cannot leave their own project. */
 export async function leaveProject(id: string) {
   return call("ap_leave_project", { p_project: id }, "You left the team.", ["/projects", "/my-work", "/projects/mine"]);
+}
+
+/** The owner stops or allows new joins (migration 0049). */
+export async function setProjectJoins(id: string, closed: boolean) {
+  return call("ap_project_joins", { p_project: id, p_closed: closed }, closed ? "New joins stopped." : "New members can join again.", ["/projects", `/projects/${id}/work`]);
+}
+
+/** The owner removes a member from the team (migration 0049). */
+export async function removeProjectMember(id: string, user: string, reason?: string) {
+  return call("ap_project_remove_member", { p_project: id, p_user: user, p_reason: reason?.slice(0, 300) || null }, "Removed from the team.", ["/projects", `/projects/${id}/work`, "/projects/mine", "/my-work"]);
 }
 
 // ── Admins ──────────────────────────────────────────────────────────────

@@ -31,6 +31,7 @@ const P = { owner: await person("l-owner", "Anuj Owner"), m: await person("l-m",
 const idea = (await one("insert into idea_drafts (kind, title, pitch, data, level, learn, score, batch_date, status, published_at) values ('project', 'Leave Test Idea', 'p', '{}', 1, 'x', 8, current_date - 30, 'published', now()) returning id")).id;
 const pid = (await as(P.owner, "select ap_idea_accept($1, 'lite') id", [idea]))[0].id;
 await as(P.m, "select ap_join_project($1)", [pid]);
+await as(P.owner, "select ap_project_join_decide($1, $2, true)", [pid, P.m]); // the owner accepts (migration 0049)
 const task = (await one("insert into project_tasks (project_id, title, assignee_id) values ($1, 'Make the map', $2) returning id", [pid, P.m])).id;
 const doneTask = (await one("insert into project_tasks (project_id, title, assignee_id, done_at) values ($1, 'Done one', $2, now()) returning id", [pid, P.m])).id;
 
@@ -46,6 +47,7 @@ check("their open task is unassigned; a finished one keeps its name", (await one
 check("the owner is told", (await one("select count(*)::int n from notifications where user_id = $1 and title like 'Mira Member left%'", [P.owner])).n === 1);
 check("the activity log says so", (await one("select count(*)::int n from project_activity where project_id = $1 and text like '%left the team%'", [pid])).n >= 1);
 await as(P.m, "select ap_join_project($1)", [pid]);
+await as(P.owner, "select ap_project_join_decide($1, $2, true)", [pid, P.m]); // the owner accepts (migration 0049)
 check("they can join again later", (await one("select count(*)::int n from project_members where project_id = $1 and user_id = $2", [pid, P.m])).n === 1);
 
 const failed = results.filter((r) => !r.ok).length;

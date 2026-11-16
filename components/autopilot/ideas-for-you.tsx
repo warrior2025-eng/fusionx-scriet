@@ -43,7 +43,7 @@ export function IdeaCard({ idea }: { idea: IdeaCardData }) {
         <div className="mt-2 text-sm text-ink/80" data-idea-teams>
           {idea.teams.length > 1 ? `${idea.teams.length} teams are building this` : `Started by ${idea.teams[0].started_by || "a member"}`}
           {idea.teams.filter((t) => t.joinable).slice(0, 2).map((t) => (
-            <button key={t.project_id} type="button" disabled={pending} className="ml-2 inline-flex min-h-11 items-center underline" onClick={() => run(() => joinProject(t.project_id))}>join {t.started_by || "the"}&apos;s team</button>
+            <button key={t.project_id} type="button" disabled={pending} className="ml-2 inline-flex min-h-11 items-center underline" onClick={() => run(() => joinProject(t.project_id))}>ask to join {t.started_by || "the"}&apos;s team</button>
           ))}
         </div>
       )}
@@ -52,12 +52,12 @@ export function IdeaCard({ idea }: { idea: IdeaCardData }) {
         <div className="mt-3 border border-accent bg-accent/5 p-3 text-sm" role="group" aria-label="Someone is already building this" data-accept-choice>
           <p className="text-ink">
             {joinable.length === 1 ? <><strong>{joinable[0].started_by || "A member"}</strong>&apos;s team is already building this.</> : <><strong>{joinable.length} teams</strong> are already building this.</>}
-            {" "}Join them, or start your own version?
+            {" "}Ask to join them (the owner accepts), or start your own version?
           </p>
           <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             {joinable.slice(0, 3).map((t) => (
               <Button key={t.project_id} size="sm" className="min-h-11" disabled={pending} onClick={() => run(() => joinProject(t.project_id), () => setAsk(false))} data-join-existing>
-                Join {t.started_by || "their"}&apos;s team
+                Ask to join {t.started_by || "their"}&apos;s team
               </Button>
             ))}
             <Button size="sm" variant="secondary" className="min-h-11" disabled={pending} onClick={() => run(() => acceptIdea(idea.id, variation))} data-start-own>Start my own version</Button>
