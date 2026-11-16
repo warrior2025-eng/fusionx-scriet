@@ -101,8 +101,8 @@ export async function weeklyIdeas(force = false): Promise<Record<string, unknown
   const counts = new Map<string, number>();
   for (const p of skills ?? []) for (const s of (p.skills as string[]) ?? []) counts.set(s.toLowerCase(), (counts.get(s.toLowerCase()) ?? 0) + 1);
   const avoid = [...(projects ?? []).map((p) => `${p.title}`), ...(recent ?? []).map((r) => `${r.title}`)];
-  // The run must end within the platform's 60 s: one deadline for every AI call.
-  const until = Date.now() + 50_000;
+  // The run must end within the platform's limit (300 s): one deadline for every AI call.
+  const until = Date.now() + 240_000;
   // About 1.5× this week's mix is written, in parallel parts of at most 6 ideas, so each answer stays short
   // (complete JSON, quick) and each part looks at a different kind of problem (fewer near-duplicates).
   const THEMES = ["campus life and student services at SCRIET", "health, safety and the environment in Meerut", "learning, careers, clubs and events", "local shops, farmers, NGOs and the community"];
@@ -111,11 +111,11 @@ export async function weeklyIdeas(force = false): Promise<Record<string, unknown
   const generateAll = async (levels: number[]) => {
     const parts: number[][] = [];
     for (let i = 0; i < levels.length; i += 6) parts.push(levels.slice(i, i + 6));
-    // Two parts at a time: the free AI tiers limit how much they answer per minute.
+    // One part at a time: the free AI tiers limit how much they answer per minute.
     const out: Idea[] = [];
-    for (let i = 0; i < parts.length; i += 2) {
-      if (Date.now() > until - 12_000) break;
-      out.push(...(await Promise.all(parts.slice(i, i + 2).map((p, j) => generate(p, THEMES[(i + j) % THEMES.length])))).flat());
+    for (let i = 0; i < parts.length; i++) {
+      if (Date.now() > until - 20_000) break;
+      out.push(...(await generate(parts[i], THEMES[i % THEMES.length])));
     }
     return out;
   };
@@ -142,7 +142,7 @@ Reply with JSON: {"ideas":[{"level":1,"learn":"one line: what you'll learn","hub
     const prompt = `Score each student project idea from 1 to 10 for usefulness, originality, feasibility for students, clarity and completeness. Be strict.
 Reply with JSON: {"scores":[{"i":0,"score":7}]}
 ${ideas.map((x, i) => `${i}. [L${x.level}] ${x.title}: ${x.pitch} | MVP: ${x.mvp} | Stack: ${x.stack}`).join("\n")}`;
-    const out = (await askJson(admin, "idea_projects", prompt, cap, { until: until + 8_000, maxTokens: 2048 })) as { scores?: { i: number; score: number }[] } | null;
+    const out = (await askJson(admin, "idea_projects", prompt, cap, { until: until + 30_000, maxTokens: 2048 })) as { scores?: { i: number; score: number }[] } | null;
     const map = new Map((out?.scores ?? []).map((s) => [Number(s.i), Number(s.score)]));
     return ideas.map((_, i) => map.get(i) ?? 0);
   };
@@ -160,7 +160,7 @@ ${ideas.map((x, i) => `${i}. [L${x.level}] ${x.title}: ${x.pitch} | MVP: ${x.mvp
   const first = await generateAll(ask(mix.map((n) => Math.ceil(n * 1.5))));
   const firstScores = await score(first);
   take(first, firstScores);
-  if (keep.length < want && Date.now() >= until - 25_000) {
+  if (keep.length < want && Date.now() >= until - 60_000) {
     // No time for a retry: fill from the best of the rest at any level (the quality bar still applies).
     first.map((x, i) => ({ ...x, score: firstScores[i] })).filter((x) => x.score >= minScore && !keep.some((k) => k.title === x.title || similar(`${k.title} ${k.pitch}`, `${x.title} ${x.pitch}`)))
       .sort((a, b) => b.score - a.score).slice(0, want - keep.length).forEach((x) => keep.push(x));
