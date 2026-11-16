@@ -13,8 +13,25 @@ import { MySquadsBlock, type MySquads } from "@/components/squads/my-squads";
 import { dayLabel, daysFromToday, getAutopilotViewer, peopleById, proofHref, todayIST, type TaskRow } from "@/lib/autopilot/server";
 import { EFFORT_LABEL, PROOF_LABEL, STATUS_LABEL, TASK_STATUS_LABEL, hubLabel } from "@/lib/autopilot/labels";
 import { cn } from "@/lib/utils";
+import { createAdminClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "My work" };
+
+/** "Tue 17 Nov, 3:00 pm" (IST), and whether that time has passed or is within a day. */
+/** Milliseconds until a time (outside the component, so rendering stays pure). */
+const msUntil = (at: number) => at - Date.now();
+
+function By({ iso, label }: { iso: string; label: string }) {
+  const at = Date.parse(iso);
+  const left = msUntil(at);
+  const text = new Date(at).toLocaleString("en-IN", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" });
+  return (
+    <span className={cn("text-xs", left < 0 ? "font-semibold text-red-600 dark:text-red-400" : left < 864e5 ? "font-semibold text-ink" : "text-ink/60")} data-deadline>
+      {left < 0 ? `${label} time passed (${text})` : `${label} ${text}`}
+    </span>
+  );
+}
+const WEEKDAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 function Due({ date }: { date: string }) {
   const d = daysFromToday(date);
@@ -110,10 +127,16 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
   const myProjectTasks = (projectTasks.data ?? []) as unknown as { id: string; title: string; due_on: string | null; project: { id: string; title: string } | null }[];
   const communityOn = settings.data?.community_on !== false;
 
-  type Offer = { id: string; task: { id: string; title: string; due_on: string; effort: string; hub: string; proof: string; mission: { title: string } | null } | null };
+  type Offer = { id: string; offered_at: string; task: { id: string; title: string; due_on: string; effort: string; hub: string; proof: string; mission: { title: string } | null } | null };
   type Mine = TaskRow & { mission: { id: string; title: string; status: string } | null };
   type Review = { id: string; kind: string; due_at: string; task: { id: string; title: string; proof: string; proof_text: string | null; proof_url: string | null; assignee_id: string | null; checklist: string[]; mission: { title: string } | null } | null };
   const offerRows = (offers.data ?? []) as unknown as Offer[];
+  // The answer and check-in times come from Autopilot's settings (read on the server; members cannot read them).
+  const numbers = process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? (((await createAdminClient().from("autopilot_settings").select("numbers").eq("id", 1).maybeSingle()).data?.numbers ?? {}) as Record<string, number>)
+    : {};
+  const offerHours = Number(numbers.offer_timeout_hours ?? 24);
+  const checkinDay = WEEKDAY[Number(numbers.checkin_weekday ?? 5) % 7];
   const mineRows = (mine.data ?? []) as unknown as Mine[];
   const reviewRows = (reviews.data ?? []) as unknown as Review[];
   const contribRows = (contributions.data ?? []) as unknown as { id: string; title: string; skill: string | null; contributed_on: string; mission: { title: string } | null }[];
@@ -169,14 +192,15 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
           )}
         </Block>
 
-        <Block id="offers" title="Offers" hint="A task offered to you. Answer within a day, or it goes to the next person.">
+        <Block id="offers" title="Offers" hint={`A task offered to you. Answer within ${offerHours} hours, or it goes to the next person.`}>
           {offerRows.length === 0 ? <Empty>No offers right now.</Empty> : (
             <ul className="divide-y divide-line">
               {offerRows.map((o) => o.task && (
                 <li key={o.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between" data-offer={o.id}>
                   <div className="min-w-0">
                     <p className="font-medium text-ink">{o.task.title}</p>
-                    <p className="text-xs text-ink/60">{o.task.mission?.title} · {hubLabel(o.task.hub)} · {EFFORT_LABEL[o.task.effort]} · proof: {PROOF_LABEL[o.task.proof]} · <Due date={o.task.due_on} /></p>
+                    <p className="text-xs text-ink/60">{o.task.mission?.title} · {hubLabel(o.task.hub)} · {EFFORT_LABEL[o.task.effort]} · proof: {PROOF_LABEL[o.task.proof]} · task <Due date={o.task.due_on} /></p>
+                    <p className="mt-0.5"><By iso={new Date(Date.parse(o.offered_at) + offerHours * 3_600_000).toISOString()} label="Answer by" /></p>
                   </div>
                   <OfferButtons offerId={o.id} />
                 </li>
@@ -232,6 +256,7 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
                 <li key={r.id} className="border border-line p-3" data-review={r.id}>
                   <p className="font-medium text-ink">{r.task.title}</p>
                   <p className="text-xs text-ink/60">{r.task.mission?.title} · by {names.get(r.task.assignee_id ?? "")?.full_name ?? "a member"} · {r.kind} review</p>
+                  {r.due_at && <p className="mt-0.5"><By iso={r.due_at} label="Review by" /></p>}
                   {r.task.proof_text && <p className="mt-2 whitespace-pre-wrap border-l-2 border-line pl-3 text-sm text-ink/80">{r.task.proof_text}</p>}
                   {proofLinks[i] && <a href={proofLinks[i]!} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm text-accent-text underline">Open the proof</a>}
                   <ReviewForm reviewId={r.id} />
@@ -286,7 +311,7 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
           <BusyDates rows={(busy.data ?? []) as { id: string; starts_on: string; ends_on: string; note: string | null }[]} />
         </Block>
 
-        <Block id="checkin" title="Weekly check-in" hint="One minute: what you did, what is next, and anything blocking you (your lead is told).">
+        <Block id="checkin" title="Weekly check-in" hint={`Due every ${checkinDay}. One minute: what you did, what is next, and anything blocking you (your lead is told).`}>
           <CheckinForm initial={(checkin.data as { done: string | null; next: string | null; blocked: string | null } | null) ?? null} />
         </Block>
 
@@ -342,7 +367,7 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
               {top5.map((o) => (
                 <li key={o.id} className="flex flex-col gap-0.5 py-2 sm:flex-row sm:justify-between">
                   {o.registration_url ? <a href={o.registration_url} target="_blank" rel="noopener noreferrer" className="text-ink underline-offset-2 hover:underline">{o.title}</a> : <span className="text-ink">{o.title}</span>}
-                  <span className="text-xs text-ink/60">{o.organizer} · closes {dayLabel(o.deadline)}{o.distance_km !== null ? ` · ~${o.distance_km} km` : o.mode === "online" ? " · online" : ""}</span>
+                  <span className="text-xs text-ink/60">{o.organizer} · closes {dayLabel(o.deadline)}{o.mode === "online" ? " · online" : o.city ? ` · ${o.city}` : ""}</span>
                 </li>
               ))}
             </ul>

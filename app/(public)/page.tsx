@@ -73,17 +73,27 @@ function Headline({ text, highlight }: { text: string; highlight: string }) {
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
-/** Up to three published projects, featured ones first. */
-async function homeProjects(supabase: Supabase) {
-  const published = () =>
-    supabase.from("projects").select("id, title, description, domain, status, technologies").eq("is_published", true);
-  const featuredFirst = await published()
-    .order("is_featured", { ascending: false })
-    .order("updated_at", { ascending: false })
-    .limit(3);
-  if (!featuredFirst.error) return featuredFirst.data;
-  // Before migration 0008 there is no is_featured column: newest first.
-  return (await published().order("updated_at", { ascending: false }).limit(3)).data;
+type HomeProject = { id: string; title: string; description: string | null; domain: string | null; status: string; technologies: string[] | null; idea_id?: string | null; teams: number };
+
+/**
+ * Up to three published projects, featured ones first. Projects started from the same idea count once,
+ * with how many teams are building it (so the same idea never shows twice).
+ */
+async function homeProjects(supabase: Supabase): Promise<HomeProject[]> {
+  let res = await supabase.from("projects").select("id, title, description, domain, status, technologies, idea_id").eq("is_published", true)
+    .order("is_featured", { ascending: false }).order("updated_at", { ascending: false }).limit(12);
+  // Before migrations 0008 / 0045 there is no is_featured or idea_id column: newest first.
+  if (res.error) res = await supabase.from("projects").select("id, title, description, domain, status, technologies").eq("is_published", true).order("updated_at", { ascending: false }).limit(3) as typeof res;
+  const out: HomeProject[] = [];
+  const byIdea = new Map<string, HomeProject>();
+  for (const p of (res.data ?? []) as Omit<HomeProject, "teams">[]) {
+    const seen = p.idea_id ? byIdea.get(p.idea_id) : undefined;
+    if (seen) { seen.teams++; continue; }
+    const item = { ...p, teams: 1 };
+    if (p.idea_id) byIdea.set(p.idea_id, item);
+    out.push(item);
+  }
+  return out.slice(0, 3);
 }
 
 export default async function HomePage() {
@@ -300,9 +310,10 @@ export default async function HomePage() {
                     </div>
                     <h3 className="mt-4 font-serif text-lg font-medium text-ink">{p.title}</h3>
                     <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-ink/75">{p.description}</p>
-                    {p.technologies?.length > 0 && (
+                    {p.teams > 1 && <p className="mt-3 text-xs font-semibold text-accent-text" data-home-teams>{p.teams} teams are building this</p>}
+                    {(p.technologies?.length ?? 0) > 0 && (
                       <ul className="mt-auto flex flex-wrap gap-1.5 pt-5">
-                        {p.technologies.slice(0, 4).map((t: string) => (
+                        {(p.technologies ?? []).slice(0, 4).map((t: string) => (
                           <li key={t} className="border border-line px-2 py-0.5 text-xs text-ink/75">
                             {t}
                           </li>

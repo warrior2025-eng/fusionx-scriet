@@ -92,7 +92,7 @@ export async function freshSuggestions(): Promise<string[]> {
       db.from("tools").select("id", { count: "exact", head: true }).gte("created_at", since),
     ]);
     return [
-      ...(nearHack ? [`${nearHack} hackathon${nearHack === 1 ? "" : "s"} near Meerut: which ones?`] : []),
+      ...(nearHack ? [`${nearHack} hackathon${nearHack === 1 ? "" : "s"} you can join in person: which ones?`] : []),
       ...(closing ? ["Which opportunities close in 3 days?"] : []),
       ...(newTools ? ["Which tools were added this week?"] : []),
     ];
