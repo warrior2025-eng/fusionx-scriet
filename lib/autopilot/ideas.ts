@@ -79,21 +79,35 @@ export async function askJson(admin: Admin, area: string, prompt: string, cap: n
   // Groq's free tier allows about 6,000 tokens a minute, prompt included: ask for at most 4,500.
   const groq = async (): Promise<unknown | null> => {
     if (!process.env.GROQ_API_KEY) { tried.push("Groq: no key set"); return null; }
-    if (left() < 4_000) return null;
-    const res = await fetch(`${GROQ}/openai/v1/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
-      body: JSON.stringify({ model: await groqModel(GROQ), temperature: 0.6, max_tokens: Math.min(maxTokens, 4500), response_format: { type: "json_object" }, messages: [{ role: "user", content: prompt }] }),
-      signal: timeout(), cache: "no-store",
-    }).catch(() => null);
-    if (res?.ok) {
-      const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-      const out = parse(data.choices?.[0]?.message?.content ?? "");
-      if (out) return out;
-      tried.push("Groq: answer was not complete JSON");
+    // Up to 3 tries: a 400 (the model broke "JSON mode") is asked again without it, and the JSON is read from the
+    // text; a 429 (per-minute limit) waits as long as Groq asks (Retry-After), when the job has the time.
+    let jsonMode = true;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (left() < 4_000) return null;
+      const res = await fetch(`${GROQ}/openai/v1/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+        body: JSON.stringify({
+          model: await groqModel(GROQ), temperature: 0.6, max_tokens: Math.min(maxTokens, 3500),
+          ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
+          messages: [{ role: "user", content: prompt }],
+        }),
+        signal: timeout(), cache: "no-store",
+      }).catch(() => null);
+      if (res?.ok) {
+        const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+        const out = parse(data.choices?.[0]?.message?.content ?? "");
+        if (out) return out;
+        tried.push("Groq: answer was not complete JSON");
+        return null;
+      }
+      const status = res?.status ?? 0;
+      const wait = Math.min(60, Number(res?.headers.get("retry-after")) || 20) * 1000;
+      await why("Groq", res);
+      if (status === 400 && jsonMode) { jsonMode = false; continue; }
+      if (status === 429 && left() > wait + 15_000) { await new Promise((r) => setTimeout(r, wait)); continue; }
       return null;
     }
-    await why("Groq", res);
     return null;
   };
   // Order: the first Gemini model (once more after 2 s if it is busy: 503 or 429), then Groq (fast), then the

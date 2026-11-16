@@ -12,8 +12,8 @@ import { createClient } from "@/lib/supabase/server";
  * assistant; the other names are tried in turn when one is unavailable.
  */
 export const AI_MODEL = process.env.AI_MODEL || "gemini-flash-lite-latest";
-// Fast models first; a retired name answers 404 at once and the next is tried. The slower "flash-latest" is last.
-export const GEMINI_MODELS = [...new Set([AI_MODEL, "gemini-flash-lite-latest", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-flash-latest"])];
+// The fast model first; the slower "flash-latest" is last. (Retired names such as gemini-2.0-flash answer 404.)
+export const GEMINI_MODELS = [...new Set([AI_MODEL, "gemini-flash-lite-latest", "gemini-flash-latest"])];
 /** The Groq fallback (free tier), used when no Gemini model answers and GROQ_API_KEY is set. */
 export const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
