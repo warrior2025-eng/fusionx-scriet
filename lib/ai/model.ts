@@ -1,4 +1,4 @@
-import { GEMINI_MODELS, GROQ_MODEL } from "./settings";
+import { GEMINI_MODELS, groqModel } from "./settings";
 
 /**
  * The model call, with plain fetch (no SDK). SERVER ONLY: the keys go in request headers
@@ -62,7 +62,7 @@ async function groq(system: string, history: Turn[], question: string): Promise<
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY ?? ""}` },
     body: JSON.stringify({
-      model: GROQ_MODEL,
+      model: await groqModel(GROQ),
       stream: true,
       max_tokens: MAX_TOKENS,
       temperature: 0.3,
@@ -90,7 +90,7 @@ export async function* answer(pack: string, history: Turn[], question: string): 
   if (!res?.ok && process.env.GROQ_API_KEY) {
     res = await groq(system, history, question).catch(() => null);
     kind = "groq";
-    if (!res?.ok) console.warn(`FusionX AI: Groq ${GROQ_MODEL} answered ${res ? res.status : "nothing"}`);
+    if (!res?.ok) console.warn(`FusionX AI: Groq ${await groqModel(GROQ)} answered ${res ? res.status : "nothing"}`);
   }
   if (!res || !res.ok || !res.body) throw new AiUnavailable(res ? `status ${res.status}` : "no response");
 
@@ -131,7 +131,7 @@ export async function checkModels(): Promise<string[]> {
   }
   if (process.env.GROQ_API_KEY) {
     const res = await groq("Reply with OK.", ping, "OK?").catch(() => null);
-    lines.push(`Groq ${GROQ_MODEL}: ${res ? (res.ok ? "works" : `error ${res.status}`) : "no response"}`);
+    lines.push(`Groq ${await groqModel(GROQ)}: ${res ? (res.ok ? "works" : `error ${res.status}`) : "no response"}`);
     await res?.body?.cancel().catch(() => null);
   }
   return lines;

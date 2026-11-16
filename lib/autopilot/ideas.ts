@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { GEMINI_MODELS, GROQ_MODEL } from "@/lib/ai/settings";
+import { GEMINI_MODELS, groqModel } from "@/lib/ai/settings";
 
 /**
  * The Idea Engine (migration 0044): project ideas, research topics and an opportunities radar, written
@@ -54,7 +54,7 @@ export async function askJson(admin: Admin, area: string, prompt: string, cap: n
   const why = async (name: string, res: Response | null) => {
     if (!res) { tried.push(`${name}: no response (timeout or network)`); return; }
     const body = (await res.text().catch(() => "")).replace(/\s+/g, " ");
-    const reason = /quota|rate|limit|exhausted/i.test(body) ? "limit reached" : /api.?key|permission|unauth|invalid/i.test(body) ? "key rejected" : /too large|max_tokens|context/i.test(body) ? "request too large" : "";
+    const reason = /quota|rate|limit|exhausted|overload|unavailable/i.test(body) ? (res.status === 503 ? "busy" : "limit reached") : res.status === 401 || res.status === 403 || /api.?key/i.test(body) ? "key rejected" : /too large|max_tokens|context/i.test(body) ? "request too large" : res.status === 404 ? "model not found" : "";
     tried.push(`${name}: ${res.status}${reason ? ` ${reason}` : ""}`);
   };
   if (!process.env.GEMINI_API_KEY) tried.push("Gemini: no key set");
@@ -83,7 +83,7 @@ export async function askJson(admin: Admin, area: string, prompt: string, cap: n
     const res = await fetch(`${GROQ}/openai/v1/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
-      body: JSON.stringify({ model: GROQ_MODEL, temperature: 0.6, max_tokens: Math.min(maxTokens, 4500), response_format: { type: "json_object" }, messages: [{ role: "user", content: prompt }] }),
+      body: JSON.stringify({ model: await groqModel(GROQ), temperature: 0.6, max_tokens: Math.min(maxTokens, 4500), response_format: { type: "json_object" }, messages: [{ role: "user", content: prompt }] }),
       signal: timeout(), cache: "no-store",
     }).catch(() => null);
     if (res?.ok) {
