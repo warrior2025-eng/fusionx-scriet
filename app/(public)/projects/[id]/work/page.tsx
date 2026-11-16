@@ -5,6 +5,7 @@ import { Section } from "@/components/ui/section";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Toaster } from "@/components/admin/toast";
 import { AddMilestone, AddProjectTask, MilestoneControls, ProjectPlanForm, ProjectStatusOverride, ProjectTaskControls, SupportRequest } from "@/components/autopilot/people-parts";
+import { TeamPanel } from "@/components/autopilot/team-panel";
 import { dayLabel, daysFromToday, peopleById } from "@/lib/autopilot/server";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -21,7 +22,7 @@ export default async function ProjectWorkPage({ params }: { params: Promise<{ id
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) redirect(`/login?next=/projects/${id}/work`);
   const [{ data: project }, { data: isTeam }] = await Promise.all([
-    supabase.from("projects").select("id, title, status, owner_id, tracked, plan_variation, target_date, status_locked, mission_id, github_url, demo_url").eq("id", id).maybeSingle(),
+    supabase.from("projects").select("id, title, status, owner_id, tracked, plan_variation, target_date, status_locked, mission_id, github_url, demo_url, joins_closed, open_for_team, idea_id, is_published").eq("id", id).maybeSingle(),
     supabase.rpc("ap_project_member", { p_project: id, p_user: auth.user.id }),
   ]);
   if (!project || !isTeam) notFound();
@@ -39,6 +40,15 @@ export default async function ProjectWorkPage({ params }: { params: Promise<{ id
   const teamIds = [project.owner_id as string, ...((members ?? []) as { user_id: string }[]).map((m) => m.user_id)];
   const names = await peopleById(supabase, [...teamIds, ...ts.map((t) => t.assignee_id), ...((activity ?? []) as { user_id: string | null }[]).map((a) => a.user_id)]);
   const team = [...new Set(teamIds)].map((u) => ({ id: u, name: names.get(u)?.full_name ?? "Member" }));
+  // Join requests waiting for the owner (migration 0049; only the owner and staff can read them).
+  const owns = project.owner_id === auth.user.id;
+  const { data: reqRows } = owns
+    ? await supabase.from("project_join_requests").select("user_id, created_at").eq("project_id", id).eq("status", "pending").order("created_at")
+    : { data: [] };
+  const reqIds = ((reqRows ?? []) as { user_id: string }[]).map((r) => r.user_id);
+  const { data: reqPeople } = reqIds.length ? await supabase.from("profiles").select("id, full_name, department, year, skills").in("id", reqIds) : { data: [] };
+  const requests = ((reqPeople ?? []) as { id: string; full_name: string; department: string | null; year: string | null; skills: string[] | null }[])
+    .map((r) => ({ id: r.id, name: r.full_name, detail: [r.department, r.year, (r.skills ?? []).slice(0, 4).join(", ")].filter(Boolean).join(" · ") }));
   const done = ms.filter((m) => m.done_at).length;
   const next = ms.find((m) => !m.done_at);
   const owner = project.owner_id === auth.user.id;
@@ -67,6 +77,9 @@ export default async function ProjectWorkPage({ params }: { params: Promise<{ id
             <ProjectPlanForm projectId={id} variation={(project.plan_variation as string | null) ?? null} target={(project.target_date as string | null) ?? null} />
           </section>
         )}
+
+        <TeamPanel projectId={id} team={team} ownerId={project.owner_id as string} me={auth.user.id}
+          joinable={!!project.is_published && (!!project.open_for_team || !!project.idea_id)} joinsClosed={!!project.joins_closed} requests={requests} />
 
         <section className="border border-line bg-surface p-4" data-milestones>
           <h2 className="font-serif text-lg text-ink">Milestones</h2>

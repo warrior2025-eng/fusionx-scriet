@@ -58,11 +58,13 @@ check("Projects shows \"Started by <name>\"", meta.started_by === "Asha" && meta
 const pid2 = (await as(P.m2, "select ap_idea_accept($1, 'standard') id", [i1]))[0].id;
 check("a second member can start their own → \"2 teams are building this\"", (await anon("select teams from ap_public_project_meta(array[$1]::uuid[])", [pid2]))[0].teams === 2);
 await as(P.out, "select ap_join_project($1)", [pid]);
+await as(P.m1, "select ap_project_join_decide($1, $2, true)", [pid, P.out]); // the owner accepts (migration 0049)
 check("…or join an existing one", (await one("select count(*)::int n from project_members where project_id = $1 and user_id = $2", [pid, P.out])).n === 1);
 check("members cannot publish ideas to Projects", (await fails(() => as(P.m1, "select ap_idea_publish_open($1, null)", [i2]))) !== null);
 const open = (await as(P.admin, "select ap_idea_publish_open($1, $2) id", [i2, P.admin]))[0].id;
 check("admin \"Publish to Projects\" → \"Open project · looking for a team\"", (await anon("select open_for_team from ap_public_project_meta(array[$1]::uuid[])", [open]))[0].open_for_team === true);
 await as(P.m2, "select ap_join_project($1)", [open]);
+await as(P.admin, "select ap_project_join_decide($1, $2, true)", [open, P.m2]);
 check("members can join the open project", (await one("select count(*)::int n from project_members where project_id = $1", [open])).n === 1);
 
 console.log("\npause, delete, restore");

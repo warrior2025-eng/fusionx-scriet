@@ -84,4 +84,4 @@ Each run needs a fresh database (step 1 again). `FX_PG` must point to a folder w
   - A member joins the pool as a designer; another starts a squad that needs a designer and sees them as a smart pick.
   - The invite is accepted from My work, with no code. The lead marks the squad registered, and the card shows "1 going".
   - `node tests/autopilot/squads.mjs` checks the rules in SQL: privacy, one squad per person, lead-only actions, ranking and counts.
-- **Project teams:** join a member's project from Projects; the card says "You're in" and the project is listed under My projects → Teams you joined; Leave removes it. `node tests/autopilot/leave.mjs` checks the rules in SQL: the owner cannot leave, open tasks are unassigned, the owner is told.
+- **Project teams:** "Ask to join" sends a request; the owner accepts it on the project page; the card says "You're in" and the project is listed under My projects → Teams you joined; Leave removes it; the owner can stop new joins. `node tests/autopilot/leave.mjs` and `owner.mjs` check the rules in SQL (owner-only accept, decline, cancel, remove with a note, stop joins, privacy).

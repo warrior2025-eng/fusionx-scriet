@@ -44,9 +44,15 @@ export default async function ProjectsPage({
   const meta = new Map(((metaRows ?? []) as Meta[]).map((m) => [m.project_id, m]));
   // The teams I am in (so the card says "You're in" with Leave, instead of Join).
   const myTeams = new Set<string>();
+  const myRequests = new Set<string>(); // waiting for the owner's Accept (migration 0049)
   if (auth.user && projects?.length) {
-    const { data: mine } = await supabase.from("project_members").select("project_id").eq("user_id", auth.user.id).in("project_id", projects.map((p) => p.id));
+    const pids = projects.map((p) => p.id);
+    const [{ data: mine }, { data: asked }] = await Promise.all([
+      supabase.from("project_members").select("project_id").eq("user_id", auth.user.id).in("project_id", pids),
+      supabase.from("project_join_requests").select("project_id").eq("user_id", auth.user.id).eq("status", "pending").in("project_id", pids),
+    ]);
     for (const r of mine ?? []) myTeams.add(r.project_id as string);
+    for (const r of asked ?? []) myRequests.add(r.project_id as string);
   }
   const me = auth.user?.id;
   // Projects started from the same idea share one card, with every team listed on it.
@@ -151,7 +157,7 @@ export default async function ProjectsPage({
                                     <span className="font-semibold text-ink">{m?.open_for_team ? "Open team" : `Started by ${who}`}</span>
                                     <span className="text-ink/60"> · {t.status}{m?.joins_closed ? " · full" : ""}</span>
                                   </span>
-                                  {m && (!m.joins_closed || myTeams.has(t.id) || t.owner_id === me) && <JoinProject id={t.id} signedIn={!!auth.user} label="Join" ariaLabel={m.open_for_team ? "Join the open team" : `Join ${who}'s team`} joined={myTeams.has(t.id)} owner={t.owner_id === me} />}
+                                  {m && (!m.joins_closed || myTeams.has(t.id) || t.owner_id === me) && <JoinProject id={t.id} signedIn={!!auth.user} label="Ask to join" ariaLabel={m.open_for_team ? "Ask to join the open team" : `Ask to join ${who}'s team`} joined={myTeams.has(t.id)} owner={t.owner_id === me} requested={myRequests.has(t.id)} />}
                                 </li>
                               );
                             })}
@@ -165,7 +171,7 @@ export default async function ProjectsPage({
                           <div className="mt-3 space-y-2" data-project-meta>
                             <p className="text-xs font-semibold text-accent-text">{m.open_for_team ? "Open project · looking for a team" : `In progress · Started by ${m.started_by || "a member"}`}</p>
                             {m.teams > 1 && <p className="text-xs text-ink/65">{m.teams} teams are building this</p>}
-                            {(!m.joins_closed || myTeams.has(p.id) || p.owner_id === me) && <JoinProject id={p.id} signedIn={!!auth.user} label={m.open_for_team ? "Join this project" : "Join the team"} joined={myTeams.has(p.id)} owner={p.owner_id === me} />}
+                            {(!m.joins_closed || myTeams.has(p.id) || p.owner_id === me) && <JoinProject id={p.id} signedIn={!!auth.user} label="Ask to join" joined={myTeams.has(p.id)} owner={p.owner_id === me} requested={myRequests.has(p.id)} />}
                           </div>
                         );
                       })()}
