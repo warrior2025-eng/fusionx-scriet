@@ -186,7 +186,7 @@ ${ideas.map((x, i) => `${i}. [L${x.level}] ${x.title}: ${x.pitch} | MVP: ${x.mvp
   return { state: deliver ? "delivered" : "suggested", count: rows.length, week, mix };
 }
 
-/** First Sunday of the month: research topics to everyone's My work (adopting still needs a mentor). */
+/** First Sunday of the month: research topics to everyone's My work (members start them themselves; the core team helps). */
 export async function monthlyResearch(force = false): Promise<Record<string, unknown>> {
   if (!ideaEngineConfigured() || !process.env.SUPABASE_SERVICE_ROLE_KEY) return { state: "not_configured" };
   const d = new Date(`${todayIST()}T00:00:00Z`);
@@ -200,7 +200,7 @@ export async function monthlyResearch(force = false): Promise<Record<string, unk
     const today = todayIST();
     await admin.from("idea_drafts").update({ status: "published", published_at: new Date().toISOString(), batch_date: today }).eq("kind", "research").eq("status", "draft").is("published_at", null);
     await admin.from("autopilot_queue").update({ status: "done" }).eq("kind", "idea_draft").eq("area", "idea_research").eq("status", "pending");
-    await admin.rpc("ap_notify_everyone", { p_title: `${n} new research topics in My work`, p_body: "Starting one needs a mentor's approval.", p_link: "/my-work#ideas" });
+    await admin.rpc("ap_notify_everyone", { p_title: `${n} new research topics in My work`, p_body: "Research one by yourself or with your team; the core team can help. Each has dated steps over 12 weeks.", p_link: "/my-work#ideas" });
   }
   await log(admin, "idea_research", n ? `${g.level === "auto" ? "Delivered" : "Drafted"} ${n} research topics` : "No research topics this run",
     n ? (g.level === "auto" ? "Sent to everyone's My work" : "Waiting for approval") : "The AI gave no complete topic; trying next run");

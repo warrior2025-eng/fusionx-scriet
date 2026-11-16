@@ -9,13 +9,15 @@ import { useRun } from "./center-parts";
 export type IdeaCardData = {
   id: string; kind: "project" | "research"; title: string; pitch: string; level: number | null; learn: string | null; data: Record<string, unknown>;
   state: "saved" | "hidden" | null; teams: { project_id: string; started_by: string; joinable: boolean }[]; hubs: string[];
+  /** "Pick by 14 Dec · then it moves to the archive" (worked out on the server). */
+  deadlineNote?: string;
 };
 
 const LEVEL = ["", "Beginner", "Easy", "Intermediate", "Advanced", "Startup-grade"];
 const LABEL: Record<string, string> = {
   problem: "Problem", users: "Users", solution: "Solution", different: "What's different", mvp: "MVP", stack: "Stack", data: "Free data / APIs", effort: "Effort",
   validate: "How to validate", measures: "Measures", startup_path: "Startup path", risks: "Risks", opportunity: "Matching opportunity", question: "Question", method: "Method",
-  data_sources: "Data sources", plan: "Plan", output: "Output", mentor: "Mentor",
+  data_sources: "Data sources", plan: "Plan", output: "Output",
 };
 const show = (v: unknown): string => (Array.isArray(v) ? v.join(" · ") : v && typeof v === "object" ? Object.entries(v as Record<string, unknown>).map(([k, x]) => `${k}: ${show(x)}`).join(" | ") : String(v ?? ""));
 
@@ -29,12 +31,19 @@ export function IdeaCard({ idea }: { idea: IdeaCardData }) {
     <article className="flex h-full min-w-0 flex-col border border-line bg-surface p-4" data-idea-card={idea.level ?? 0}>
       <div className="flex flex-wrap items-center gap-2 text-xs">
         {idea.level && <span className="border border-accent px-2 py-0.5 font-semibold text-accent-text" data-level>Level {idea.level} · {LEVEL[idea.level]}</span>}
-        {idea.kind === "research" && <span className="border border-line px-2 py-0.5 text-ink/75">Research · needs a mentor</span>}
+        {idea.kind === "research" && <span className="border border-line px-2 py-0.5 text-ink/75">Research · 12 weeks</span>}
         {idea.state === "saved" && <span className="text-ink/70">Saved</span>}
       </div>
       <h3 className="mt-2 break-words font-serif text-lg leading-snug text-ink">{idea.title}</h3>
       <p className="mt-1 text-sm text-ink/80">{idea.pitch}</p>
       {idea.learn && <p className="mt-2 text-sm text-ink/70"><strong className="font-semibold text-ink">You&apos;ll learn:</strong> {idea.learn}</p>}
+      {idea.kind === "research" && (
+        <p className="mt-2 border-l-2 border-accent pl-2 text-sm text-ink/80" data-research-note>
+          Do research about it by yourself or with your team. If you need help, discuss it with the core team.
+          Starting it gives you dated steps over 12 weeks.
+        </p>
+      )}
+      {idea.deadlineNote && <p className="mt-2 text-xs font-semibold text-ink/75" data-idea-deadline>{idea.deadlineNote}</p>}
       <details className="mt-2">
         <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm text-accent-text underline">Full detail</summary>
         <dl className="mt-1 space-y-1 text-sm">{Object.entries(idea.data).filter(([k, v]) => LABEL[k] && show(v)).map(([k, v]) => <div key={k}><dt className="inline font-semibold text-ink">{LABEL[k]}: </dt><dd className="inline break-words text-ink/80">{show(v)}</dd></div>)}</dl>

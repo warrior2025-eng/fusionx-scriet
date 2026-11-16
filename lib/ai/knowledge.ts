@@ -184,7 +184,7 @@ export async function buildKnowledge(extraFacts: string): Promise<Knowledge> {
     rows(db.from("projects").select("id, title, status").eq("is_published", true).order("updated_at", { ascending: false }).limit(15)),
   ]);
   add("How FusionX works for members", "/my-work", [
-    "Every Sunday members get 15 new project ideas in My work (from beginner to startup-grade); anyone can Accept and start one (it becomes their project, shown in Projects as \"In progress\"), save it, or hide it. Research topics arrive once a month and need a mentor to start.",
+    "Every Sunday members get 15 new project ideas in My work (from beginner to startup-grade); anyone can Accept and start one (it becomes their project, shown in Projects as \"In progress\"), save it, or hide it. Research topics arrive once a month; a member starts one by themselves or with a team (dated steps over 12 weeks), and the core team helps if needed.",
     `Members join a project from the Projects page (${SITE}/projects): \"Join the team\" on projects started from ideas, or \"Join this project\" on open projects.`,
     `Open seats on FusionX missions are listed for signed-in members at ${SITE}/autopilot/open-seats.`,
     `Opportunities are updated every morning and stay until their deadline: ${SITE}/opportunities. Tools Library: ${SITE}/tools.`,

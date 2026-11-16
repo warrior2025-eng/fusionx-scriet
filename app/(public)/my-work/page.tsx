@@ -10,8 +10,9 @@ import { PitchForm, PitchVote, TakeTask } from "@/components/autopilot/people-pa
 import { ShareCardButton, ShowOnImpact, SuggestOpportunity } from "@/components/autopilot/outcome-parts";
 import { IdeaCard, type IdeaCardData } from "@/components/autopilot/ideas-for-you";
 import { MySquadsBlock, type MySquads } from "@/components/squads/my-squads";
+import { Fold } from "@/components/autopilot/fold";
 import { dayLabel, daysFromToday, getAutopilotViewer, peopleById, proofHref, todayIST, type TaskRow } from "@/lib/autopilot/server";
-import { EFFORT_LABEL, PROOF_LABEL, STATUS_LABEL, TASK_STATUS_LABEL, hubLabel } from "@/lib/autopilot/labels";
+import { EFFORT_LABEL, PROOF_LABEL, STATUS_LABEL, TASK_STATUS_LABEL } from "@/lib/autopilot/labels";
 import { cn } from "@/lib/utils";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -30,6 +31,12 @@ function By({ iso, label }: { iso: string; label: string }) {
       {left < 0 ? `${label} time passed (${text})` : `${label} ${text}`}
     </span>
   );
+}
+/** Ideas stay 4 weeks in "Ideas for you", then move to the archive (they can still be started from there). */
+function ideaDeadline(batch: string, state: string | null, today: string): string {
+  const until = new Date(new Date(`${batch}T00:00:00Z`).getTime() + 28 * 864e5).toISOString().slice(0, 10);
+  if (state === "saved") return "Saved: it stays here until you start or remove it";
+  return until >= today ? `Pick by ${dayLabel(until)} · then it moves to the archive` : "In the archive: you can still start it";
 }
 const WEEKDAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -73,7 +80,7 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
     // Migration 0043 (people); empty before it.
     supabase.from("mission_tasks").select("id, title, due_on, hub, effort, proof, mission:missions(title, status)").eq("community_allowed", true).eq("status", "open").is("assignee_id", null).order("due_on").limit(10),
     supabase.rpc("ap_pitch_board"),
-    supabase.from("project_tasks").select("id, title, due_on, project:projects(id, title)").eq("assignee_id", user.id).is("done_at", null).is("mission_task_id", null).order("due_on", { nullsFirst: false }),
+    supabase.from("project_tasks").select("id, title, due_on, project:projects(id, title, target_date), milestone:project_milestones(title, due_on)").eq("assignee_id", user.id).is("done_at", null).is("mission_task_id", null).order("due_on", { nullsFirst: false }),
     supabase.from("collaborators").select("ends_on").eq("user_id", user.id).eq("status", "active").maybeSingle(),
     supabase.from("community_settings").select("community_on").eq("id", 1).maybeSingle(),
     // Migration 0044 (outcomes); empty before it.
@@ -116,6 +123,7 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
   const ideaCards: (IdeaCardData & { batch: string })[] = rawIdeas.filter((i) => stateBy.get(i.id) !== "hidden").map((i) => ({
     id: i.id, kind: i.kind, title: i.title, pitch: i.pitch, level: i.level, learn: i.learn, data: i.data, state: stateBy.get(i.id) ?? null,
     teams: teamsBy.get(i.id) ?? [], hubs: (i.data.hubs as string[] | undefined) ?? [], batch: i.batch_date ?? i.published_at.slice(0, 10),
+    deadlineNote: ideaDeadline(i.batch_date ?? i.published_at.slice(0, 10), stateBy.get(i.id) ?? null, today),
   }));
   const suits = (i: IdeaCardData) => !mySkills.length || i.hubs.some((h) => hubWords[h]?.test(myText)) || mySkills.some((k) => String(i.data.stack ?? "").toLowerCase().includes(k));
   const current = ideaCards.filter((i) => i.batch >= fourWeeks || i.state === "saved").filter((i) => ideaFilter !== "mine" || suits(i));
@@ -124,7 +132,7 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
   const pitches = (pitchBoard.data ?? []) as Pitch[];
   const communityTasks = ((community.data ?? []) as unknown as { id: string; title: string; due_on: string; hub: string; effort: string; proof: string; mission: { title: string; status: string } | null }[])
     .filter((t) => t.mission && ["planned", "active"].includes(t.mission.status));
-  const myProjectTasks = (projectTasks.data ?? []) as unknown as { id: string; title: string; due_on: string | null; project: { id: string; title: string } | null }[];
+  const myProjectTasks = (projectTasks.data ?? []) as unknown as { id: string; title: string; due_on: string | null; project: { id: string; title: string; target_date: string | null } | null; milestone: { title: string; due_on: string | null } | null }[];
   const communityOn = settings.data?.community_on !== false;
 
   type Offer = { id: string; offered_at: string; task: { id: string; title: string; due_on: string; effort: string; hub: string; proof: string; mission: { title: string } | null } | null };
@@ -145,38 +153,131 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
   const myMissions = new Map<string, { id: string; title: string; status: string }>();
   for (const t of mineRows) if (t.mission) myMissions.set(t.mission.id, t.mission);
   for (const m of owned.data ?? []) myMissions.set(m.id as string, { id: m.id as string, title: `${m.title} (you own it)`, status: m.status as string });
-  const nothing = offerRows.length + mineRows.length + reviewRows.length === 0;
+  // What needs the member now, and the nearest deadline among it (shown at the top).
+  const openTasks = mineRows.filter((t) => t.status !== "submitted");
+  const todo = offerRows.length + openTasks.length + reviewRows.length + myProjectTasks.length + mySquads.invites.length;
+  const nextDeadline = [
+    ...offerRows.map((o) => new Date(Date.parse(o.offered_at) + offerHours * 3_600_000).toISOString().slice(0, 10)),
+    ...openTasks.map((t) => t.due_on),
+    ...reviewRows.map((r) => (r.due_at ?? "").slice(0, 10)),
+    ...myProjectTasks.map((t) => t.due_on ?? t.milestone?.due_on ?? t.project?.target_date ?? ""),
+  ].filter(Boolean).sort()[0];
+  const nothing = todo === 0 && mineRows.length === 0;
+  const busyRows = (busy.data ?? []) as { id: string; starts_on: string; ends_on: string; note: string | null }[];
+  const checkinRow = (checkin.data as { done: string | null; next: string | null; blocked: string | null } | null) ?? null;
+  const votingNow = pitches.filter((p) => p.status === "voting");
+  const badgeRows = (badges.data ?? []) as { label: string; count: number }[];
+  const shareRows = (doneMissions ?? []) as { id: string; title: string }[];
+  const certRows = (certs.data ?? []) as { code: string; period_label: string }[];
 
   return (
     <Section className="touch-44 max-w-3xl pb-24 pt-12">
       <Toaster />
       <Eyebrow>My work</Eyebrow>
-      <h1 className="font-serif text-3xl tracking-tight text-ink md:text-4xl">Your FusionX tasks.</h1>
+      <h1 className="font-serif text-3xl tracking-tight text-ink md:text-4xl">Your FusionX work.</h1>
       {collab.data && <p className="mt-2 inline-block border border-accent px-2 py-0.5 text-xs font-semibold text-accent-text" data-collaborator>Collaborator · until {dayLabel(collab.data.ends_on as string)}</p>}
-      <p className="mt-2 text-sm text-ink/65">
-        Offers to answer, tasks with their dates, reviews to give. Everything you finish and get approved becomes a verified contribution.
-      </p>
-      <nav aria-label="On this page" className="mt-5 flex flex-wrap gap-2 text-sm">
-        {[["#ideas", "Ideas"], ["#offers", `Offers (${offerRows.length})`], ["#tasks", `Tasks (${mineRows.length + myProjectTasks.length})`], ["#reviews", `Reviews (${reviewRows.length})`], ["#community", "Community tasks"], ["#pitches", "Pitches"], ["#checkin", "Check-in"], ["#contributions", "Contributions"], ["#settings", "Settings"]].map(([href, label]) => (
-          <a key={href} href={href} className="border border-line px-2.5 py-1 text-ink/75 hover:border-ink/40 hover:text-ink">{label}</a>
-        ))}
-      </nav>
+      {todo > 0 && (
+        <p className="mt-3 text-sm text-ink/75" data-work-summary>
+          <strong className="text-ink">{todo} thing{todo === 1 ? "" : "s"} to do</strong>{nextDeadline ? <> · next deadline <strong className="text-ink">{dayLabel(nextDeadline)}</strong></> : null}
+        </p>
+      )}
 
-      <div className="mt-8 space-y-5">
+      <div className="mt-6 space-y-4">
+        {/* ── Needs you now: only what has something in it, each with its deadline ── */}
         {nothing && (
           <p className="border border-dashed border-line p-4 text-sm text-ink/70" data-empty-work>
-            Nothing waiting for you right now. When a task fits your hub and skills, it is offered here and you get a notification.
-            Add your skills on <Link href="/profile" className="underline">your profile</Link> so the right tasks find you.
+            You&apos;re all caught up ✓ When a task fits your skills, it is offered here and you get a notification.
+            Add your skills on <Link href="/profile" className="underline">your profile</Link>, or pick an idea below.
           </p>
         )}
 
+        {offerRows.length > 0 && (
+          <Block id="offers" title={`Offers (${offerRows.length})`} hint={`Answer within ${offerHours} hours, or it goes to the next person.`}>
+            <ul className="divide-y divide-line">
+              {offerRows.map((o) => o.task && (
+                <li key={o.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between" data-offer={o.id}>
+                  <div className="min-w-0">
+                    <p className="font-medium text-ink">{o.task.title}</p>
+                    <p className="text-xs text-ink/60">{o.task.mission?.title} · {EFFORT_LABEL[o.task.effort]} · task <Due date={o.task.due_on} /></p>
+                    <p className="mt-0.5"><By iso={new Date(Date.parse(o.offered_at) + offerHours * 3_600_000).toISOString()} label="Answer by" /></p>
+                  </div>
+                  <OfferButtons offerId={o.id} />
+                </li>
+              ))}
+            </ul>
+          </Block>
+        )}
+
+        {mineRows.length > 0 && (
+          <Block id="tasks" title={`My tasks (${mineRows.length})`} hint="Close a task with its proof; a teammate reviews it.">
+            <ul className="space-y-3">
+              {mineRows.map((t) => (
+                <li key={t.id} className="border border-line p-3" data-task={t.id}>
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="font-medium text-ink">{t.title}</p>
+                    <span className="text-xs text-ink/70">{TASK_STATUS_LABEL[t.status]} · <Due date={t.due_on} /></span>
+                  </div>
+                  <p className="text-xs text-ink/60">{t.mission?.title} · proof: {PROOF_LABEL[t.proof]}</p>
+                  {t.checklist.length > 0 && (
+                    <ul className="mt-2 list-inside list-disc text-sm text-ink/75">{t.checklist.map((c) => <li key={c}>{c}</li>)}</ul>
+                  )}
+                  {t.status === "submitted" ? (
+                    <p className="mt-2 text-sm text-ink/70">Submitted. Waiting for the review.</p>
+                  ) : (
+                    <div className="mt-3 space-y-2">
+                      <ProofForm taskId={t.id} proof={t.proof} userId={user.id} changes={t.status === "changes"} />
+                      <RequestChange taskId={t.id} due={t.due_on} />
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Block>
+        )}
+
+        {myProjectTasks.length > 0 && (
+          <Block id="project-tasks" title={`Project tasks (${myProjectTasks.length})`}>
+            <ul className="divide-y divide-line text-sm">
+              {myProjectTasks.map((t) => (
+                <li key={t.id} className="flex justify-between gap-2 py-2">
+                  <Link href={`/projects/${t.project?.id}/work`} className="text-ink hover:underline">{t.title}<span className="block text-xs text-ink/60">{t.project?.title}</span></Link>
+                  {/* Every task shows a deadline: its own date, else its milestone's, else the project's target date. */}
+                  {(() => {
+                    const due = t.due_on ?? t.milestone?.due_on ?? t.project?.target_date ?? null;
+                    if (!due) return <span className="text-xs font-semibold text-amber-700 dark:text-amber-400" data-no-deadline>No deadline yet: ask the owner to set one</span>;
+                    return <span className="shrink-0 text-right"><Due date={due} />{!t.due_on && <span className="block text-[11px] text-ink/55">{t.milestone?.due_on ? "milestone date" : "project target"}</span>}</span>;
+                  })()}
+                </li>
+              ))}
+            </ul>
+          </Block>
+        )}
+
+        {reviewRows.length > 0 && (
+          <Block id="reviews" title={`Reviews to give (${reviewRows.length})`} hint="Check the proof against the checklist. Approve, or say what needs to change.">
+            <ul className="space-y-3">
+              {reviewRows.map((r, i) => r.task && (
+                <li key={r.id} className="border border-line p-3" data-review={r.id}>
+                  <p className="font-medium text-ink">{r.task.title}</p>
+                  <p className="text-xs text-ink/60">{r.task.mission?.title} · by {names.get(r.task.assignee_id ?? "")?.full_name ?? "a member"}</p>
+                  {r.due_at && <p className="mt-0.5"><By iso={r.due_at} label="Review by" /></p>}
+                  {r.task.proof_text && <p className="mt-2 whitespace-pre-wrap border-l-2 border-line pl-3 text-sm text-ink/80">{r.task.proof_text}</p>}
+                  {proofLinks[i] && <a href={proofLinks[i]!} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm text-accent-text underline">Open the proof</a>}
+                  <ReviewForm reviewId={r.id} />
+                </li>
+              ))}
+            </ul>
+          </Block>
+        )}
+
         {(mySquads.invites.length > 0 || mySquads.squads.length > 0) && (
-          <Block id="squads" title="Squads" hint="Teams for hackathons and competitions. Find one from any opportunity card: Find a team.">
+          <Block id="squads" title="Squads" hint="Your hackathon teams. Find one from any opportunity card: Find a team.">
             <MySquadsBlock data={mySquads} me={user.id} />
           </Block>
         )}
 
-        <Block id="ideas" title={`Ideas for you (${current.length})`} hint="New project ideas every Sunday, from beginner to startup-grade. Pick any: hub tags are only hints.">
+        {/* ── Ideas: the main thing to pick from ── */}
+        <Block id="ideas" title={`Ideas for you (${current.length})`} hint="New every Sunday. Each one says until when you can pick it.">
           <nav aria-label="Idea filter" className="mb-3 flex gap-2 text-sm">
             <Link href="/my-work#ideas" className={`inline-flex min-h-11 items-center border px-3 ${ideaFilter !== "mine" ? "border-ink text-ink" : "border-line text-ink/70"}`}>All</Link>
             <Link href="/my-work?ideas=mine#ideas" className={`inline-flex min-h-11 items-center border px-3 ${ideaFilter === "mine" ? "border-ink text-ink" : "border-line text-ink/70"}`}>Suits my skills</Link>
@@ -192,97 +293,42 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
           )}
         </Block>
 
-        <Block id="offers" title="Offers" hint={`A task offered to you. Answer within ${offerHours} hours, or it goes to the next person.`}>
-          {offerRows.length === 0 ? <Empty>No offers right now.</Empty> : (
+        {communityOn && communityTasks.length > 0 && (
+          <Block id="community" title={`Community tasks (${communityTasks.length})`} hint="Anyone can take one at a time. Approved work counts.">
             <ul className="divide-y divide-line">
-              {offerRows.map((o) => o.task && (
-                <li key={o.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between" data-offer={o.id}>
-                  <div className="min-w-0">
-                    <p className="font-medium text-ink">{o.task.title}</p>
-                    <p className="text-xs text-ink/60">{o.task.mission?.title} · {hubLabel(o.task.hub)} · {EFFORT_LABEL[o.task.effort]} · proof: {PROOF_LABEL[o.task.proof]} · task <Due date={o.task.due_on} /></p>
-                    <p className="mt-0.5"><By iso={new Date(Date.parse(o.offered_at) + offerHours * 3_600_000).toISOString()} label="Answer by" /></p>
-                  </div>
-                  <OfferButtons offerId={o.id} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </Block>
-
-        <Block id="tasks" title="My tasks" hint="Due soon first. Close a task with its proof; a teammate reviews it.">
-          {mineRows.length === 0 ? <Empty>No tasks in progress.</Empty> : (
-            <ul className="space-y-3">
-              {mineRows.map((t) => (
-                <li key={t.id} className="border border-line p-3" data-task={t.id}>
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <p className="font-medium text-ink">{t.title}</p>
-                    <span className="text-xs text-ink/70">{TASK_STATUS_LABEL[t.status]} · <Due date={t.due_on} /></span>
-                  </div>
-                  <p className="text-xs text-ink/60">{t.mission?.title} · {hubLabel(t.hub)} · proof: {PROOF_LABEL[t.proof]}</p>
-                  {t.checklist.length > 0 && (
-                    <ul className="mt-2 list-inside list-disc text-sm text-ink/75">{t.checklist.map((c) => <li key={c}>{c}</li>)}</ul>
-                  )}
-                  {t.status === "submitted" ? (
-                    <p className="mt-2 text-sm text-ink/70">Submitted. Waiting for the review.</p>
-                  ) : (
-                    <div className="mt-3 space-y-2">
-                      <ProofForm taskId={t.id} proof={t.proof} userId={user.id} changes={t.status === "changes"} />
-                      <RequestChange taskId={t.id} due={t.due_on} />
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Block>
-
-        {myProjectTasks.length > 0 && (
-          <Block id="project-tasks" title="My project tasks" hint="From your projects' milestones.">
-            <ul className="divide-y divide-line text-sm">
-              {myProjectTasks.map((t) => (
-                <li key={t.id} className="flex justify-between gap-2 py-2">
-                  <Link href={`/projects/${t.project?.id}/work`} className="text-ink hover:underline">{t.title}<span className="block text-xs text-ink/60">{t.project?.title}</span></Link>
-                  {t.due_on && <Due date={t.due_on} />}
+              {communityTasks.map((t) => (
+                <li key={t.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between" data-community-task={t.id}>
+                  <div className="min-w-0"><p className="font-medium text-ink">{t.title}</p><p className="text-xs text-ink/60">{t.mission?.title} · {EFFORT_LABEL[t.effort]} · <Due date={t.due_on} /></p></div>
+                  <TakeTask taskId={t.id} />
                 </li>
               ))}
             </ul>
           </Block>
         )}
 
-        <Block id="reviews" title="Reviews to give" hint="Check the proof against the checklist. Approve, or say what needs to change.">
-          {reviewRows.length === 0 ? <Empty>No reviews waiting.</Empty> : (
-            <ul className="space-y-3">
-              {reviewRows.map((r, i) => r.task && (
-                <li key={r.id} className="border border-line p-3" data-review={r.id}>
-                  <p className="font-medium text-ink">{r.task.title}</p>
-                  <p className="text-xs text-ink/60">{r.task.mission?.title} · by {names.get(r.task.assignee_id ?? "")?.full_name ?? "a member"} · {r.kind} review</p>
-                  {r.due_at && <p className="mt-0.5"><By iso={r.due_at} label="Review by" /></p>}
-                  {r.task.proof_text && <p className="mt-2 whitespace-pre-wrap border-l-2 border-line pl-3 text-sm text-ink/80">{r.task.proof_text}</p>}
-                  {proofLinks[i] && <a href={proofLinks[i]!} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm text-accent-text underline">Open the proof</a>}
-                  <ReviewForm reviewId={r.id} />
+        {/* ── More: closed until opened; each line says what is inside ── */}
+        <h2 className="pt-4 text-xs font-semibold uppercase tracking-wider text-ink/60">More</h2>
+
+        <Fold id="checkin" title="Weekly check-in" summary={`Due every ${checkinDay} · ${checkinRow ? "sent this week ✓" : "not sent yet"}`}>
+          <p className="mb-3 text-sm text-ink/65">One minute: what you did, what is next, and anything blocking you (your lead is told).</p>
+          <CheckinForm initial={checkinRow} />
+        </Fold>
+
+        <Fold id="opportunities" title="Top 5 opportunities for you" summary={top5.length ? `${top5.length} open · next closes ${dayLabel([...top5].sort((a, b) => a.deadline.localeCompare(b.deadline))[0].deadline)}` : "None open right now"}>
+          {top5.length > 0 && (
+            <ul className="divide-y divide-line text-sm" data-top5>
+              {top5.map((o) => (
+                <li key={o.id} className="flex flex-col gap-0.5 py-2 sm:flex-row sm:justify-between">
+                  {o.registration_url ? <a href={o.registration_url} target="_blank" rel="noopener noreferrer" className="text-ink underline-offset-2 hover:underline">{o.title}</a> : <span className="text-ink">{o.title}</span>}
+                  <span className="text-xs text-ink/60">closes {dayLabel(o.deadline)}{o.mode === "online" ? " · online" : o.city ? ` · ${o.city}` : ""}</span>
                 </li>
               ))}
             </ul>
           )}
-        </Block>
+          <div className="mt-3 flex gap-4"><Link href="/opportunities" className="text-sm text-accent-text underline">All opportunities</Link><SuggestOpportunity /></div>
+        </Fold>
 
-        {communityOn && (
-          <Block id="community" title="Community tasks" hint="Open tasks anyone signed in can take, one at a time. Same proof and review; approved work counts.">
-            {communityTasks.length === 0 ? <Empty>None open right now.</Empty> : (
-              <ul className="divide-y divide-line">
-                {communityTasks.map((t) => (
-                  <li key={t.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between" data-community-task={t.id}>
-                    <div className="min-w-0"><p className="font-medium text-ink">{t.title}</p><p className="text-xs text-ink/60">{t.mission?.title} · {hubLabel(t.hub)} · {EFFORT_LABEL[t.effort]} · <Due date={t.due_on} /></p></div>
-                    <TakeTask taskId={t.id} />
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className="mt-3 text-sm"><Link href="/autopilot/open-seats" className="text-accent-text underline">Open seats on missions</Link></p>
-          </Block>
-        )}
-
-        <Block id="pitches" title="Pitches" hint="Pitch an idea; members vote for 5 days; a lead can turn the winner into a mission with your name on it.">
+        <Fold id="pitches" title="Pitches" summary={votingNow.length ? `${votingNow.length} in voting · vote or pitch your own` : "Pitch an idea; members vote for 5 days"}>
           <PitchForm />
           {pitches.length > 0 && (
             <ul className="mt-4 space-y-3">
@@ -295,27 +341,13 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
               ))}
             </ul>
           )}
-        </Block>
+        </Fold>
 
-        <Block id="missions" title="My missions">
-          {myMissions.size === 0 ? <Empty>You are not in a mission yet.</Empty> : (
-            <ul className="space-y-1 text-sm">
-              {[...myMissions.values()].map((m) => (
-                <li key={m.id} className="flex justify-between gap-2"><span className="text-ink">{m.title}</span><span className="text-ink/60">{STATUS_LABEL[m.status]}</span></li>
-              ))}
-            </ul>
-          )}
-        </Block>
+        <Fold id="busy" title="Busy dates" summary={busyRows.length ? `${busyRows.length} set · no new tasks on these days` : "Exams or travel? Add them: no new tasks on those days"}>
+          <BusyDates rows={busyRows} />
+        </Fold>
 
-        <Block id="busy" title="Busy dates" hint="Exams, travel, anything: you get no new tasks on these days.">
-          <BusyDates rows={(busy.data ?? []) as { id: string; starts_on: string; ends_on: string; note: string | null }[]} />
-        </Block>
-
-        <Block id="checkin" title="Weekly check-in" hint={`Due every ${checkinDay}. One minute: what you did, what is next, and anything blocking you (your lead is told).`}>
-          <CheckinForm initial={(checkin.data as { done: string | null; next: string | null; blocked: string | null } | null) ?? null} />
-        </Block>
-
-        <Block id="contributions" title="Contributions" hint="Approved work only. Nobody can add entries for themselves.">
+        <Fold id="contributions" title="Contributions" summary={contribRows.length ? `${contribRows.length} verified · download as PDF` : "Your approved work appears here"}>
           {contribRows.length === 0 ? <Empty>Your approved tasks will appear here.</Empty> : (
             <>
               <ul className="divide-y divide-line text-sm">
@@ -331,55 +363,46 @@ export default async function MyWorkPage({ searchParams }: { searchParams: Promi
               </a>
             </>
           )}
-        </Block>
-
-        {(badges.data ?? []).length > 0 && (
-          <Block id="badges" title="Skill badges" hint="From your verified contributions.">
-            <ul className="flex flex-wrap gap-2" data-badges>
-              {((badges.data ?? []) as { label: string; count: number }[]).map((b) => <li key={b.label} className="border border-accent px-2 py-0.5 text-sm font-medium text-accent-text">{b.label} ×{b.count}</li>)}
+          {badgeRows.length > 0 && (
+            <ul className="mt-4 flex flex-wrap gap-2" data-badges>
+              {badgeRows.map((b) => <li key={b.label} className="border border-accent px-2 py-0.5 text-sm font-medium text-accent-text">{b.label} ×{b.count}</li>)}
             </ul>
-          </Block>
-        )}
-
-        {((doneMissions ?? []) as { id: string; title: string }[]).length > 0 && (
-          <Block id="share" title="Share your work" hint="A LinkedIn card for each finished public mission you worked on. Only your verified tasks; nothing is posted for you.">
-            <ul className="space-y-2">
-              {((doneMissions ?? []) as { id: string; title: string }[]).map((m) => (
-                <li key={m.id} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"><span className="text-sm text-ink">{m.title}</span><ShareCardButton missionId={m.id} code={cardBy.get(m.id) ?? null} /></li>
-              ))}
-            </ul>
-          </Block>
-        )}
-
-        {(certs.data ?? []).length > 0 && (
-          <Block id="certificates" title="Certificates">
-            <ul className="space-y-1 text-sm">
-              {((certs.data ?? []) as { code: string; period_label: string }[]).map((c) => (
-                <li key={c.code} className="flex flex-wrap justify-between gap-2"><span>{c.period_label} · {c.code}</span><span className="flex gap-3"><a href={`/api/autopilot/certificate/${c.code}`} className="underline">Download PDF</a><Link href={`/verify/${c.code}`} className="underline">Verify page</Link></span></li>
-              ))}
-            </ul>
-          </Block>
-        )}
-
-        <Block id="opportunities" title="Top 5 for you" hint="Open opportunities, closest and most urgent first, then the ones that fit your skills.">
-          {top5.length === 0 ? <Empty>None open right now.</Empty> : (
-            <ul className="divide-y divide-line text-sm" data-top5>
-              {top5.map((o) => (
-                <li key={o.id} className="flex flex-col gap-0.5 py-2 sm:flex-row sm:justify-between">
-                  {o.registration_url ? <a href={o.registration_url} target="_blank" rel="noopener noreferrer" className="text-ink underline-offset-2 hover:underline">{o.title}</a> : <span className="text-ink">{o.title}</span>}
-                  <span className="text-xs text-ink/60">{o.organizer} · closes {dayLabel(o.deadline)}{o.mode === "online" ? " · online" : o.city ? ` · ${o.city}` : ""}</span>
-                </li>
+          )}
+          {certRows.length > 0 && (
+            <ul className="mt-4 space-y-1 text-sm">
+              {certRows.map((c) => (
+                <li key={c.code} className="flex flex-wrap justify-between gap-2"><span>Certificate · {c.period_label}</span><span className="flex gap-3"><a href={`/api/autopilot/certificate/${c.code}`} className="underline">Download PDF</a><Link href={`/verify/${c.code}`} className="underline">Verify</Link></span></li>
               ))}
             </ul>
           )}
-          <div className="mt-3 flex gap-4"><Link href="/opportunities" className="text-sm text-accent-text underline">All opportunities</Link><SuggestOpportunity /></div>
-        </Block>
+        </Fold>
 
-        <Block id="settings" title="Notifications">
+        {shareRows.length > 0 && (
+          <Fold id="share" title="Share your work" summary={`${shareRows.length} finished mission${shareRows.length === 1 ? "" : "s"} · a LinkedIn card for each`}>
+            <ul className="space-y-2">
+              {shareRows.map((m) => (
+                <li key={m.id} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"><span className="text-sm text-ink">{m.title}</span><ShareCardButton missionId={m.id} code={cardBy.get(m.id) ?? null} /></li>
+              ))}
+            </ul>
+          </Fold>
+        )}
+
+        {myMissions.size > 0 && (
+          <Fold id="missions" title="My missions" summary={`${myMissions.size} mission${myMissions.size === 1 ? "" : "s"}`}>
+            <ul className="space-y-1 text-sm">
+              {[...myMissions.values()].map((m) => (
+                <li key={m.id} className="flex justify-between gap-2"><span className="text-ink">{m.title}</span><span className="text-ink/60">{STATUS_LABEL[m.status]}</span></li>
+              ))}
+            </ul>
+          </Fold>
+        )}
+
+        <Fold id="settings" title="Settings" summary="Notifications, phone alerts, showing your name on public pages">
           <PreferencesForm delivery={(prefs.data?.delivery as "instant" | "daily" | undefined) ?? "instant"} push={(prefs.data?.push as boolean | undefined) ?? true} />
           <div className="mt-4"><PushToggle subscribed={(subs.data ?? []).map((s) => s.endpoint as string)} /></div>
           {me.data && <div className="mt-4"><ShowOnImpact show={me.data.show_on_impact !== false} /></div>}
-        </Block>
+          {communityOn && <p className="mt-4 text-sm"><Link href="/autopilot/open-seats" className="text-accent-text underline">Open seats on missions</Link></p>}
+        </Fold>
       </div>
     </Section>
   );

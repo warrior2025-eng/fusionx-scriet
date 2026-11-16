@@ -39,7 +39,7 @@ test("a finished public mission: Now building, story page, share card, badges", 
   const img = await page.request.get(`/impact/card/${code}/image`);
   expect(img.status()).toBe(200);
   expect(img.headers()["content-type"]).toContain("image/png");
-  await page.goto("/my-work");
+  await page.goto("/my-work#contributions"); // badges sit in the Contributions section
   await expect(page.locator("[data-badges]")).toBeVisible();
 });
 
