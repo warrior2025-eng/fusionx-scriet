@@ -25,7 +25,7 @@ export default async function ProjectsPage({
 
   let query = supabase
     .from("projects")
-    .select("id, title, slug, description, domain, status, technologies, image_path")
+    .select("id, title, slug, description, domain, status, technologies, image_path, idea_id")
     .eq("is_published", true)
     .order("updated_at", { ascending: false });
 
@@ -42,6 +42,14 @@ export default async function ProjectsPage({
   ]);
   type Meta = { project_id: string; started_by: string; from_idea: boolean; open_for_team: boolean; joins_closed: boolean; teams: number };
   const meta = new Map(((metaRows ?? []) as Meta[]).map((m) => [m.project_id, m]));
+  // Projects started from the same idea share one card, with every team listed on it.
+  const groups: { lead: NonNullable<typeof projects>[number]; teams: NonNullable<typeof projects> }[] = [];
+  const byIdea = new Map<string, number>();
+  for (const p of projects ?? []) {
+    const key = (p as { idea_id?: string | null }).idea_id;
+    if (key && byIdea.has(key)) groups[byIdea.get(key)!].teams.push(p);
+    else { if (key) byIdea.set(key, groups.length); groups.push({ lead: p, teams: [p] }); }
+  }
 
   return (
     <>
@@ -98,9 +106,9 @@ export default async function ProjectsPage({
           </form>
         </ScrollReveal>
 
-        {projects && projects.length > 0 ? (
+        {groups.length > 0 ? (
           <div className="grid md:grid-cols-3 gap-6">
-            {projects.map((p, i) => (
+            {groups.map(({ lead: p, teams }, i) => (
               <ScrollReveal key={p.id} delay={i * 70}>
                 <div className="card-elevated rounded-sm overflow-hidden h-full flex flex-col justify-between group">
                   <div>
@@ -123,7 +131,27 @@ export default async function ProjectsPage({
                         {p.title}
                       </p>
                       <p className="mt-2 text-sm text-ink/55 line-clamp-3 leading-relaxed">{p.description}</p>
-                      {(() => {
+                      {teams.length > 1 && (
+                        <div className="mt-3" data-project-meta data-idea-teams-list>
+                          <p className="text-xs font-semibold text-accent-text">{teams.length} teams are building this</p>
+                          <ul className="mt-2 divide-y divide-line border-y border-line">
+                            {teams.map((t) => {
+                              const m = meta.get(t.id);
+                              const who = m?.started_by || "a member";
+                              return (
+                                <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 py-2" data-idea-team>
+                                  <span className="min-w-0 text-sm text-ink/80">
+                                    <span className="font-semibold text-ink">{m?.open_for_team ? "Open team" : `Started by ${who}`}</span>
+                                    <span className="text-ink/60"> · {t.status}{m?.joins_closed ? " · full" : ""}</span>
+                                  </span>
+                                  {m && !m.joins_closed && <JoinProject id={t.id} signedIn={!!auth.user} label="Join" ariaLabel={m.open_for_team ? "Join the open team" : `Join ${who}'s team`} />}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      )}
+                      {teams.length === 1 && (() => {
                         const m = meta.get(p.id);
                         if (!m || !(m.open_for_team || m.from_idea)) return null;
                         return (
