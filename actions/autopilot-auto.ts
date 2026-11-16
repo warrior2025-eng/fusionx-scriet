@@ -48,6 +48,11 @@ export async function joinProject(id: string) {
   return call("ap_join_project", { p_project: id }, "You joined the team.", ["/projects", "/my-work", "/projects/mine"]);
 }
 
+/** Leave a project team you joined (migration 0048). The owner cannot leave their own project. */
+export async function leaveProject(id: string) {
+  return call("ap_leave_project", { p_project: id }, "You left the team.", ["/projects", "/my-work", "/projects/mine"]);
+}
+
 // ── Admins ──────────────────────────────────────────────────────────────
 export async function publishIdeaOpen(id: string, owner: string) {
   return call("ap_idea_publish_open", { p_idea: id, p_owner: owner || null }, "Published to Projects as an open project.", ["/projects", "/command/ideas"]);

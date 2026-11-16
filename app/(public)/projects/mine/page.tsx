@@ -8,6 +8,8 @@ import { LinkButton } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { dayLabel } from "@/lib/autopilot/server";
 import { cn } from "@/lib/utils";
+import { JoinProject } from "@/components/autopilot/join-project";
+import { Toaster } from "@/components/admin/toast";
 
 export const metadata: Metadata = { title: "My Projects" };
 
@@ -38,9 +40,20 @@ export default async function MyProjectsPage({ searchParams }: { searchParams: P
       ])
     : [{ data: [] }, { data: [] }];
   const list = (projects ?? []).filter((p) => inFilter(p.status as string, filter));
+  // Teams I joined (someone else's project): open its work page, or leave (migration 0048).
+  const { data: memberRows } = await supabase.from("project_members").select("project_id").eq("user_id", user.id);
+  const joinedIds = (memberRows ?? []).map((m) => m.project_id as string).filter((id) => !ids.includes(id));
+  const [{ data: joined }, { data: joinedMeta }] = joinedIds.length
+    ? await Promise.all([
+        supabase.from("projects").select("id, title, status").in("id", joinedIds).is("deleted_at", null).order("updated_at", { ascending: false }),
+        supabase.rpc("ap_public_project_meta", { p_ids: joinedIds }),
+      ])
+    : [{ data: [] }, { data: [] }];
+  const startedBy = new Map(((joinedMeta ?? []) as { project_id: string; started_by: string }[]).map((m) => [m.project_id, m.started_by]));
 
   return (
     <Section className="pt-16 pb-24">
+      <Toaster />
       <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
         <SectionHeading eyebrow="My Projects" title="Projects you own." />
         <LinkButton href="/projects/new" size="sm">
@@ -90,6 +103,25 @@ export default async function MyProjectsPage({ searchParams }: { searchParams: P
           description="Start one to track it from idea through to completion."
         />
       )}
+
+      <div className="mt-12" id="joined" data-joined-teams>
+        <SectionHeading eyebrow="Teams you joined" title="Other members' projects you are in." />
+        {(joined ?? []).length > 0 ? (
+          <div className="space-y-3">
+            {(joined ?? []).map((p) => (
+              <div key={p.id as string} className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-ink/10 bg-surface p-5" data-joined-team>
+                <div className="min-w-0">
+                  <Link href={`/projects/${p.id}/work`} className="font-medium text-ink hover:underline">{p.title as string}</Link>
+                  <p className="mt-1 text-xs text-ink/60">{startedBy.get(p.id as string) ? `Started by ${startedBy.get(p.id as string)} · ` : ""}{p.status as string}</p>
+                </div>
+                <JoinProject id={p.id as string} signedIn joined />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="border border-dashed border-line p-4 text-sm text-ink/70">You have not joined anyone else&apos;s project yet. Find one on <Link href="/projects" className="underline">Projects</Link>.</p>
+        )}
+      </div>
     </Section>
   );
 }
