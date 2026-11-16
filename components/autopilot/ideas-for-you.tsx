@@ -23,6 +23,8 @@ const show = (v: unknown): string => (Array.isArray(v) ? v.join(" · ") : v && t
 export function IdeaCard({ idea }: { idea: IdeaCardData }) {
   const { pending, run } = useRun();
   const [variation, setVariation] = useState(idea.kind === "research" ? "paper" : "lite");
+  const [ask, setAsk] = useState(false);
+  const joinable = idea.teams.filter((t) => t.joinable);
   return (
     <article className="flex h-full min-w-0 flex-col border border-line bg-surface p-4" data-idea-card={idea.level ?? 0}>
       <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -45,11 +47,29 @@ export function IdeaCard({ idea }: { idea: IdeaCardData }) {
           ))}
         </div>
       )}
+      {ask && (
+        // Someone is already building this: join them, or start your own version anyway.
+        <div className="mt-3 border border-accent bg-accent/5 p-3 text-sm" role="group" aria-label="Someone is already building this" data-accept-choice>
+          <p className="text-ink">
+            {joinable.length === 1 ? <><strong>{joinable[0].started_by || "A member"}</strong>&apos;s team is already building this.</> : <><strong>{joinable.length} teams</strong> are already building this.</>}
+            {" "}Join them, or start your own version?
+          </p>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            {joinable.slice(0, 3).map((t) => (
+              <Button key={t.project_id} size="sm" className="min-h-11" disabled={pending} onClick={() => run(() => joinProject(t.project_id), () => setAsk(false))} data-join-existing>
+                Join {t.started_by || "their"}&apos;s team
+              </Button>
+            ))}
+            <Button size="sm" variant="secondary" className="min-h-11" disabled={pending} onClick={() => run(() => acceptIdea(idea.id, variation))} data-start-own>Start my own version</Button>
+            <Button size="sm" variant="ghost" className="min-h-11" onClick={() => setAsk(false)}>Cancel</Button>
+          </div>
+        </div>
+      )}
       <div className="mt-auto flex flex-col gap-2 pt-3 sm:flex-row sm:flex-wrap sm:items-center">
         <Select aria-label="Plan" value={variation} onChange={(e) => setVariation(e.target.value)} className="min-h-11 sm:w-44">
           {idea.kind === "research" ? <><option value="paper">Paper</option><option value="patent">Idea to patent</option></> : <><option value="lite">Lite · 4 weeks</option><option value="standard">Standard · 8 weeks</option><option value="ambitious">Ambitious · 12 weeks</option></>}
         </Select>
-        <Button size="sm" className="min-h-11" disabled={pending} onClick={() => run(() => acceptIdea(idea.id, variation))} data-accept-idea>Accept and start</Button>
+        <Button size="sm" className="min-h-11" disabled={pending} onClick={() => (joinable.length ? setAsk(true) : run(() => acceptIdea(idea.id, variation)))} data-accept-idea>Accept and start</Button>
         {idea.state !== "saved" && <Button size="sm" variant="secondary" className="min-h-11" disabled={pending} onClick={() => run(() => ideaChoice(idea.id, "saved"))}>Save for later</Button>}
         <Button size="sm" variant="ghost" className="min-h-11" disabled={pending} onClick={() => run(() => ideaChoice(idea.id, "hidden"))} data-not-for-me>Not for me</Button>
       </div>
