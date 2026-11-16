@@ -328,11 +328,28 @@ ${texts.join("\n\n").slice(0, 60_000)}`;
     }
   }
   await log(admin, "opportunities_publish", `Morning run: ${published} published, ${skipped} skipped`, [`found ${feeds.items.length} in feeds (${Object.entries(feeds.counts).map(([k, v]) => `${k} ${v}`).join(", ")}) and ${pageItems.length} on other pages`, ...Object.entries(reasons).map(([k, v]) => `${v} ${k}`)].join("; "));
-  // One notification a day, only when something new is near Meerut or closes within 3 days.
+  // At most one notification (and email) a day, about the new opportunities only: how many, and of which kinds.
   if (published) {
-    const soon = new Date(new Date(`${today}T00:00:00Z`).getTime() + 3 * 864e5).toISOString().slice(0, 10);
-    const { count } = await admin.from("opportunities").select("id", { count: "exact", head: true }).eq("run_id", run).or(`region.eq.near,deadline.lte.${soon}`);
-    if (count) await admin.rpc("ap_notify_everyone", { p_title: `${count} new opportunit${count === 1 ? "y" : "ies"} near Meerut or closing soon`, p_body: "See them on the Opportunities page.", p_link: "/opportunities" });
+    const { count: sentToday } = await admin.from("automation_log").select("id", { count: "exact", head: true })
+      .eq("area", "opportunities_publish").eq("action", "Members told about new opportunities").gte("at", `${today}T00:00:00+05:30`);
+    if (!sentToday) {
+      const { data: fresh } = await admin.from("opportunities").select("category").eq("run_id", run);
+      const KIND: Record<string, [string, string]> = {
+        hackathon: ["hackathon", "hackathons"], competition: ["competition", "competitions"], ideathon: ["ideathon", "ideathons"], innovation_challenge: ["ideathon", "ideathons"],
+        internship: ["internship", "internships"], scholarship: ["scholarship", "scholarships"], fellowship: ["fellowship", "fellowships"],
+        workshop: ["workshop or event", "workshops and events"], tech_fest: ["fest or event", "fests and events"], conference: ["conference", "conferences"], research: ["research call", "research calls"],
+      };
+      const byKind = new Map<string, number>();
+      for (const f of fresh ?? []) { const k = KIND[f.category as string] ?? ["opportunity", "opportunities"]; byKind.set(k[1], (byKind.get(k[1]) ?? 0) + 1); }
+      const kinds = [...byKind.entries()].sort((a, b) => b[1] - a[1]).map(([plural, n]) => `${n} ${n === 1 ? (Object.values(KIND).find((k) => k[1] === plural)?.[0] ?? plural) : plural}`);
+      const total = (fresh ?? []).length || published;
+      await admin.rpc("ap_notify_everyone", {
+        p_title: `${total} new opportunit${total === 1 ? "y" : "ies"} on FusionX`,
+        p_body: `${kinds.slice(0, 4).join(", ")}. See them on the Opportunities page.`,
+        p_link: "/opportunities",
+      });
+      await log(admin, "opportunities_publish", "Members told about new opportunities", `${total} new`);
+    }
     await admin.rpc("ap_ai_refresh");
   }
   return { state: "done", run, published, skipped, reasons, found: feeds.counts, from_pages: pageItems.length };
