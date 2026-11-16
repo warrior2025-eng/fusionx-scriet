@@ -63,6 +63,12 @@ export async function leaveProject(id: string) {
   return call("ap_leave_project", { p_project: id }, "You left the team.", ["/projects", "/my-work", "/projects/mine"]);
 }
 
+/** Cancel a project started from an idea, in its first 4 days (migration 0051). Goes back to My work. */
+export async function cancelProject(id: string, reason?: string): Promise<ActionState> {
+  const r = await call("ap_project_cancel", { p_project: id, p_reason: reason?.slice(0, 300) || null }, "Project cancelled.", ["/projects", "/projects/mine", "/my-work"]);
+  return r.status === "success" ? { ...r, redirectTo: "/projects/mine" } : r;
+}
+
 /** The owner stops or allows new joins (migration 0049). */
 export async function setProjectJoins(id: string, closed: boolean) {
   return call("ap_project_joins", { p_project: id, p_closed: closed }, closed ? "New joins stopped." : "New members can join again.", ["/projects", `/projects/${id}/work`]);

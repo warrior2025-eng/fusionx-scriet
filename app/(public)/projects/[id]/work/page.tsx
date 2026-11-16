@@ -6,11 +6,19 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { Toaster } from "@/components/admin/toast";
 import { AddMilestone, AddProjectTask, MilestoneControls, ProjectPlanForm, ProjectStatusOverride, ProjectTaskControls, SupportRequest } from "@/components/autopilot/people-parts";
 import { TeamPanel } from "@/components/autopilot/team-panel";
+import { CancelProject } from "@/components/autopilot/cancel-project";
 import { dayLabel, daysFromToday, peopleById } from "@/lib/autopilot/server";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Project work" };
+
+/** Until when a project started from an idea can be cancelled (4 days), or null when that time has passed. */
+function cancelUntil(createdAt: string): string | null {
+  const end = Date.parse(createdAt) + 4 * 864e5;
+  if (end <= Date.now()) return null;
+  return new Date(end).toLocaleString("en-IN", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" });
+}
 
 /**
  * Tracking for a member's own project (migration 0043), for its owner and team: milestones, tasks,
@@ -22,10 +30,10 @@ export default async function ProjectWorkPage({ params }: { params: Promise<{ id
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) redirect(`/login?next=/projects/${id}/work`);
   const [{ data: project }, { data: isTeam }] = await Promise.all([
-    supabase.from("projects").select("id, title, status, owner_id, tracked, plan_variation, target_date, status_locked, mission_id, github_url, demo_url, joins_closed, open_for_team, idea_id, is_published").eq("id", id).maybeSingle(),
+    supabase.from("projects").select("id, title, status, owner_id, tracked, plan_variation, target_date, status_locked, mission_id, github_url, demo_url, joins_closed, open_for_team, idea_id, is_published, created_at, deleted_at").eq("id", id).maybeSingle(),
     supabase.rpc("ap_project_member", { p_project: id, p_user: auth.user.id }),
   ]);
-  if (!project || !isTeam) notFound();
+  if (!project || !isTeam || project.deleted_at) notFound();
   const [{ data: milestones }, { data: tasks }, { data: activity }, { data: members }, { data: support }] = await Promise.all([
     supabase.from("project_milestones").select("id, title, due_on, done_at, proof_url").eq("project_id", id).order("due_on", { nullsFirst: false }).order("sort"),
     supabase.from("project_tasks").select("id, title, milestone_id, assignee_id, due_on, done_at, mission_task_id").eq("project_id", id).order("due_on", { nullsFirst: false }),
@@ -76,6 +84,10 @@ export default async function ProjectWorkPage({ params }: { params: Promise<{ id
             <p className="mb-3 text-xs text-ink/60">The Flagship sprint&apos;s steps, counted back from your target date. You see what moves before you apply; done milestones stay.</p>
             <ProjectPlanForm projectId={id} variation={(project.plan_variation as string | null) ?? null} target={(project.target_date as string | null) ?? null} />
           </section>
+        )}
+
+        {project.owner_id === auth.user.id && project.idea_id && cancelUntil(project.created_at as string) && (
+          <CancelProject projectId={id} until={cancelUntil(project.created_at as string)!} />
         )}
 
         <TeamPanel projectId={id} team={team} ownerId={project.owner_id as string} me={auth.user.id}
