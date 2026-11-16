@@ -111,7 +111,13 @@ export async function weeklyIdeas(force = false): Promise<Record<string, unknown
   const generateAll = async (levels: number[]) => {
     const parts: number[][] = [];
     for (let i = 0; i < levels.length; i += 6) parts.push(levels.slice(i, i + 6));
-    return (await Promise.all(parts.map((p, i) => generate(p, THEMES[i % THEMES.length])))).flat();
+    // Two parts at a time: the free AI tiers limit how much they answer per minute.
+    const out: Idea[] = [];
+    for (let i = 0; i < parts.length; i += 2) {
+      if (Date.now() > until - 12_000) break;
+      out.push(...(await Promise.all(parts.slice(i, i + 2).map((p, j) => generate(p, THEMES[(i + j) % THEMES.length])))).flat());
+    }
+    return out;
   };
   const generate = async (levels: number[], theme: string) => {
     const prompt = `You help FusionX@SCRIET, a student innovation club at SCRIET, CCS University, Meerut (Uttar Pradesh, India), with project ideas for ALL its members (any branch, any year).
@@ -127,7 +133,8 @@ Reply with JSON: {"ideas":[{"level":1,"learn":"one line: what you'll learn","hub
       const data: Record<string, unknown> = {};
       for (const f of PROJECT_FIELDS) data[f] = f === "variations" || f === "team" ? i[f] ?? null : str(i[f], 800);
       return { ...data, hubs: list(i.hubs, 4), title: str(i.title, 160), pitch: str(i.pitch, 400), level: Math.min(5, Math.max(1, Number(i.level) || 1)), learn: str(i.learn, 200) } as Idea;
-    }).filter((i) => i.title && i.learn && PROJECT_FIELDS.every((f) => f === "opportunity" || i[f]));
+    // The core of an idea must be there; the rest may be empty (shown only when present).
+    }).filter((i) => i.title && i.learn && ["pitch", "problem", "solution", "mvp", "stack"].every((f) => i[f]));
   };
   // Second pass: an AI score (1–10) for usefulness, originality, student feasibility, clarity and completeness.
   const score = async (ideas: Idea[]) => {

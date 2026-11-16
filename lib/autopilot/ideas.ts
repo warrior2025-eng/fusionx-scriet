@@ -49,6 +49,15 @@ export async function askJson(admin: Admin, area: string, prompt: string, cap: n
     const t = text.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
     try { return JSON.parse(t); } catch { const m = /[[{][\s\S]*[\]}]/.exec(t); try { return m ? JSON.parse(m[0]) : null; } catch { return null; } }
   };
+  // Why each model did not answer (HTTP status and a short reason, never a key): shown in the automation log.
+  const tried: string[] = [];
+  const why = async (name: string, res: Response | null) => {
+    if (!res) { tried.push(`${name}: no response (timeout or network)`); return; }
+    const body = (await res.text().catch(() => "")).replace(/\s+/g, " ");
+    const reason = /quota|rate|limit|exhausted/i.test(body) ? "limit reached" : /api.?key|permission|unauth|invalid/i.test(body) ? "key rejected" : /too large|max_tokens|context/i.test(body) ? "request too large" : "";
+    tried.push(`${name}: ${res.status}${reason ? ` ${reason}` : ""}`);
+  };
+  if (!process.env.GEMINI_API_KEY) tried.push("Gemini: no key set");
   if (process.env.GEMINI_API_KEY) {
     for (const model of GEMINI_MODELS) {
       if (left() < 4_000) break;
@@ -62,23 +71,26 @@ export async function askJson(admin: Admin, area: string, prompt: string, cap: n
         const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
         const out = parse(data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "");
         if (out) return out;
-      }
+        tried.push(`${model}: answer was not complete JSON`);
+      } else await why(model, res);
     }
   }
+  // Groq's free tier allows about 6,000 tokens a minute, prompt included: ask for at most 4,500.
   if (process.env.GROQ_API_KEY && left() >= 4_000) {
     const res = await fetch(`${GROQ}/openai/v1/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
-      body: JSON.stringify({ model: GROQ_MODEL, temperature: 0.6, max_tokens: Math.min(maxTokens, 8000), response_format: { type: "json_object" }, messages: [{ role: "user", content: prompt }] }),
+      body: JSON.stringify({ model: GROQ_MODEL, temperature: 0.6, max_tokens: Math.min(maxTokens, 4500), response_format: { type: "json_object" }, messages: [{ role: "user", content: prompt }] }),
       signal: timeout(), cache: "no-store",
     }).catch(() => null);
     if (res?.ok) {
       const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
       const out = parse(data.choices?.[0]?.message?.content ?? "");
       if (out) return out;
-    }
-  }
-  await log(admin, area, "No AI answer", "Gemini and Groq did not answer; trying next run");
+      tried.push("Groq: answer was not complete JSON");
+    } else await why("Groq", res);
+  } else if (!process.env.GROQ_API_KEY) tried.push("Groq: no key set");
+  await log(admin, area, "No AI answer", (tried.join(" · ") || "Gemini and Groq did not answer").slice(0, 480));
   return null;
 }
 
