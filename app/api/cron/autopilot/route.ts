@@ -4,8 +4,8 @@ import { sendPendingPushes } from "@/lib/push/server";
 import { dailyOpportunities, dailyTool, monthlyResearch, nightlyCleanup, refreshAi, weeklyIdeas } from "@/lib/autopilot/auto";
 import { createAdminClient } from "@/lib/supabase/server";
 
-// The morning jobs read pages and wait for the model.
-export const maxDuration = 60;
+// The morning jobs read pages and wait for the model: up to 5 minutes (Vercel Fluid compute, also on Hobby).
+export const maxDuration = 300;
 
 // "force" (with the secret only) runs a job again the same day, or research on a later Sunday: for an admin re-run or a test.
 const JOBS: Record<string, (force: boolean) => Promise<Record<string, unknown>>> = {

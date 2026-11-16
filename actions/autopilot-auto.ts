@@ -100,7 +100,7 @@ export async function runAutomationNow(key: "ideas" | "research" | "opportunitie
   const jobs = key === "all" ? ["tools", "opportunities", "ideas", "research"] : [key === "ai_refresh" ? "ai" : key];
   await createAdminClient().from("audit_logs").insert({ user_id: auth.user.id, action: "autopilot.run_now", resource_type: "automation", metadata: { key } });
   const trigger = (job: string) =>
-    fetch(`${site}/api/cron/autopilot?job=${job}&force=1`, { headers: { Authorization: `Bearer ${secret}` }, cache: "no-store", signal: AbortSignal.timeout(58_000) }).catch(() => null);
+    fetch(`${site}/api/cron/autopilot?job=${job}&force=1`, { headers: { Authorization: `Bearer ${secret}` }, cache: "no-store", signal: AbortSignal.timeout(290_000) }).catch(() => null);
   after(async () => {
     await Promise.allSettled(jobs.map(trigger));
     if (key === "all") await trigger("ai"); // new items reach FusionX AI

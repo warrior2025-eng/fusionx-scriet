@@ -58,25 +58,28 @@ export async function askJson(admin: Admin, area: string, prompt: string, cap: n
     tried.push(`${name}: ${res.status}${reason ? ` ${reason}` : ""}`);
   };
   if (!process.env.GEMINI_API_KEY) tried.push("Gemini: no key set");
-  if (process.env.GEMINI_API_KEY) {
-    for (const model of GEMINI_MODELS) {
-      if (left() < 4_000) break;
-      const res = await fetch(`${GEMINI}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY },
-        body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.6, maxOutputTokens: maxTokens, responseMimeType: "application/json" } }),
-        signal: timeout(), cache: "no-store",
-      }).catch(() => null);
-      if (res?.ok) {
-        const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-        const out = parse(data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "");
-        if (out) return out;
-        tried.push(`${model}: answer was not complete JSON`);
-      } else await why(model, res);
+  const gemini = async (model: string): Promise<{ out: unknown | null; status: number | null }> => {
+    if (!process.env.GEMINI_API_KEY || left() < 4_000) return { out: null, status: null };
+    const res = await fetch(`${GEMINI}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.6, maxOutputTokens: maxTokens, responseMimeType: "application/json" } }),
+      signal: timeout(), cache: "no-store",
+    }).catch(() => null);
+    if (res?.ok) {
+      const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+      const out = parse(data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "");
+      if (out) return { out, status: 200 };
+      tried.push(`${model}: answer was not complete JSON`);
+      return { out: null, status: 200 };
     }
-  }
+    await why(model, res);
+    return { out: null, status: res?.status ?? null };
+  };
   // Groq's free tier allows about 6,000 tokens a minute, prompt included: ask for at most 4,500.
-  if (process.env.GROQ_API_KEY && left() >= 4_000) {
+  const groq = async (): Promise<unknown | null> => {
+    if (!process.env.GROQ_API_KEY) { tried.push("Groq: no key set"); return null; }
+    if (left() < 4_000) return null;
     const res = await fetch(`${GROQ}/openai/v1/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
@@ -88,8 +91,27 @@ export async function askJson(admin: Admin, area: string, prompt: string, cap: n
       const out = parse(data.choices?.[0]?.message?.content ?? "");
       if (out) return out;
       tried.push("Groq: answer was not complete JSON");
-    } else await why("Groq", res);
-  } else if (!process.env.GROQ_API_KEY) tried.push("Groq: no key set");
+      return null;
+    }
+    await why("Groq", res);
+    return null;
+  };
+  // Order: the first Gemini model (once more after 2 s if it is busy: 503 or 429), then Groq (fast), then the
+  // other Gemini models with the time left. A slow model never uses up the time the others need.
+  const [first, ...rest] = GEMINI_MODELS;
+  let g = await gemini(first);
+  if (g.out) return g.out;
+  if (g.status === 503 || g.status === 429) {
+    await new Promise((r) => setTimeout(r, 2_000));
+    g = await gemini(first);
+    if (g.out) return g.out;
+  }
+  const fromGroq = await groq();
+  if (fromGroq) return fromGroq;
+  for (const model of rest) {
+    const other = await gemini(model);
+    if (other.out) return other.out;
+  }
   await log(admin, area, "No AI answer", (tried.join(" · ") || "Gemini and Groq did not answer").slice(0, 480));
   return null;
 }
@@ -147,7 +169,7 @@ export async function draftResearchTopics(admin: Admin, count: number, cap: numb
 Do not repeat: ${(past ?? []).map((p) => p.title).join("; ") || "none"}.
 STRICT: Do NOT cite or name any paper, author or DOI. For data sources name only well-known public datasets you are sure exist, else write "verify". For venues write a venue only if you are sure it fits, else "find with your mentor".
 Reply with JSON: {"topics":[{"title":"","question":"","why":"","scope":"","method":"","data_sources":"","tools":"","plan":["week 1-2: ...", "... 10-12 weeks"],"output":"","venues":"","ethics":"","keywords":["search keywords"],"where_to_search":"Google Scholar, arXiv, IEEE Xplore, Semantic Scholar"}]}`;
-  const out = (await askJson(admin, "idea_research", prompt, cap, { until: Date.now() + 50_000, maxTokens: 8192 })) as { topics?: Record<string, unknown>[] } | null;
+  const out = (await askJson(admin, "idea_research", prompt, cap, { until: Date.now() + 240_000, maxTokens: 8192 })) as { topics?: Record<string, unknown>[] } | null;
   let n = 0;
   for (const t of (out?.topics ?? []).slice(0, count)) {
     const data: Record<string, unknown> = {};

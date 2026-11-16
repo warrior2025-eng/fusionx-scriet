@@ -18,43 +18,43 @@ select cron.unschedule(jobid) from cron.job where jobname in
 select cron.schedule('fx-autopilot-send', '*/5 * * * *', $$
   select net.http_get(url := 'https://fxscriet.com/api/cron/autopilot',
     headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'fx_cron_secret')),
-    timeout_milliseconds := 60000);
+    timeout_milliseconds := 290000);
 $$);
 -- Tools Library, 6:00 IST daily (00:30 UTC).
 select cron.schedule('fx-autopilot-tools', '30 0 * * *', $$
   select net.http_get(url := 'https://fxscriet.com/api/cron/autopilot?job=tools',
     headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'fx_cron_secret')),
-    timeout_milliseconds := 60000);
+    timeout_milliseconds := 290000);
 $$);
 -- Opportunities, 7:00 IST daily (01:30 UTC).
 select cron.schedule('fx-autopilot-opportunities', '30 1 * * *', $$
   select net.http_get(url := 'https://fxscriet.com/api/cron/autopilot?job=opportunities',
     headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'fx_cron_secret')),
-    timeout_milliseconds := 60000);
+    timeout_milliseconds := 290000);
 $$);
 -- Deadline clean-up and 7-day purge, 00:05 IST daily (18:35 UTC the day before).
 select cron.schedule('fx-autopilot-cleanup', '35 18 * * *', $$
   select net.http_get(url := 'https://fxscriet.com/api/cron/autopilot?job=cleanup',
     headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'fx_cron_secret')),
-    timeout_milliseconds := 60000);
+    timeout_milliseconds := 290000);
 $$);
 -- FusionX AI knowledge refresh, 7:30 IST daily (02:00 UTC).
 select cron.schedule('fx-autopilot-ai', '0 2 * * *', $$
   select net.http_get(url := 'https://fxscriet.com/api/cron/autopilot?job=ai',
     headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'fx_cron_secret')),
-    timeout_milliseconds := 60000);
+    timeout_milliseconds := 290000);
 $$);
 -- Project ideas, Sunday 9:00 IST (03:30 UTC Sunday).
 select cron.schedule('fx-autopilot-ideas', '30 3 * * 0', $$
   select net.http_get(url := 'https://fxscriet.com/api/cron/autopilot?job=ideas',
     headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'fx_cron_secret')),
-    timeout_milliseconds := 60000);
+    timeout_milliseconds := 290000);
 $$);
 -- Research topics: every Sunday 9:10 IST; the website runs it only on the first Sunday of the month.
 select cron.schedule('fx-autopilot-research', '40 3 * * 0', $$
   select net.http_get(url := 'https://fxscriet.com/api/cron/autopilot?job=research',
     headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'fx_cron_secret')),
-    timeout_milliseconds := 60000);
+    timeout_milliseconds := 290000);
 $$);
 
 -- ── Check ──────────────────────────────────────────────────────────────
