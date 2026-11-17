@@ -146,7 +146,8 @@ export function MeetingPass({ pass, owner, serverNow, onEnter }: { pass: Pass; o
   // While it is open, the number inside and the phase are read again.
   useEffect(() => {
     if (!open) return;
-    const timer = window.setInterval(() => router.refresh(), 20000);
+    // Once a minute, and only while this tab is in front (each refresh renders the page on the server).
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") router.refresh(); }, 60000);
     return () => window.clearInterval(timer);
   }, [open, router]);
 

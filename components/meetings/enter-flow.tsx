@@ -84,7 +84,8 @@ export function EnterFlow({ pass, owner, serverNow, enter }: { pass: Pass; owner
   // In the lobby: keep asking until a host answers.
   useEffect(() => {
     if (stage !== "lobby") return;
-    const timer = window.setInterval(() => void askToken(), 3000);
+    // Every 5 s while waiting, and only while this tab is in front (each ask is a request to the server).
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void askToken(); }, 5000);
     return () => window.clearInterval(timer);
   }, [stage, askToken]);
 
