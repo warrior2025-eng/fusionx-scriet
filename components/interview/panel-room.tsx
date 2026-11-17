@@ -68,7 +68,8 @@ function useSlotEvents(slotId: string, initial: IntegrityEvent[]) {
     };
     // Back on the tab: catch up at once.
     if (visible) void poll();
-    const timer = visible ? window.setInterval(poll, 5000) : 0;
+    // Realtime brings each event at once; the poll is only the safety net.
+    const timer = visible ? window.setInterval(poll, 12_000) : 0;
     const supabase = createClient();
     const channel = supabase
       .channel(`integrity-${slotId}`)
@@ -290,7 +291,7 @@ export function PanelRoom({
     const timer = window.setInterval(async () => {
       const list = await revealedIds(slotId).catch(() => null);
       if (list) setRevealed(new Set(list));
-    }, 8000);
+    }, 15_000);
     return () => window.clearInterval(timer);
   }, [slotId, visible]);
 

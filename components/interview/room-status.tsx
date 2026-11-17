@@ -30,7 +30,8 @@ export function RoomStatus({ dayId }: { dayId: string }) {
   }, [dayId]);
   useEffect(() => {
     const first = window.setTimeout(load, 0);
-    const timer = window.setInterval(load, 15_000);
+    // A status display: every 30 s, and only while the tab is in front.
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void load(); }, 30_000);
     return () => {
       window.clearTimeout(first);
       window.clearInterval(timer);

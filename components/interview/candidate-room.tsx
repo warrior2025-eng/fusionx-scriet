@@ -376,7 +376,7 @@ function Consent({ access, mobile, onAgreed }: { access: Open; mobile: boolean; 
   );
 }
 
-/** Questions the panel has revealed to this slot: Supabase Realtime, with a 5-second poll behind it. */
+/** Questions the panel has revealed to this slot: Supabase Realtime (instant), with a 15-second poll behind it. */
 function useRevealedQuestions(bookingId: string, slotId: string, active: boolean) {
   const [questions, setQuestions] = useState<RevealedQuestion[]>([]);
   useEffect(() => {
@@ -387,7 +387,8 @@ function useRevealedQuestions(bookingId: string, slotId: string, active: boolean
       if (!stop && list) setQuestions(list);
     };
     void load();
-    const timer = window.setInterval(load, 5000);
+    // Realtime brings a reveal at once; the poll is only the safety net (and skips a tab in the background).
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void load(); }, 15_000);
     const supabase = createClient();
     const channel = supabase
       .channel(`reveals-${slotId}`)
@@ -574,7 +575,7 @@ export function CandidateRoom({ access }: { access: Open & { state?: string } })
       setConn(null);
       setMoved(true);
       exitFullscreen();
-    }, 15_000);
+    }, 30_000);
     return () => window.clearInterval(timer);
   }, [inRoom, moved, access.booking_id]);
 
