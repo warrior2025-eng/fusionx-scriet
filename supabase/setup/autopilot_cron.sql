@@ -14,8 +14,8 @@ select cron.schedule('fx-autopilot', '*/15 * * * *', $$ select public.autopilot_
 select cron.unschedule(jobid) from cron.job where jobname in
   ('fx-autopilot-send', 'fx-autopilot-tools', 'fx-autopilot-opportunities', 'fx-autopilot-cleanup', 'fx-autopilot-ai', 'fx-autopilot-ideas', 'fx-autopilot-research');
 
--- Emails and phone notifications, every 5 minutes.
-select cron.schedule('fx-autopilot-send', '*/5 * * * *', $$
+-- Emails and phone notifications (and the idea bank, at most hourly), every 15 minutes: fewer website calls.
+select cron.schedule('fx-autopilot-send', '*/15 * * * *', $$
   select net.http_get(url := 'https://fxscriet.com/api/cron/autopilot',
     headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'fx_cron_secret')),
     timeout_milliseconds := 290000);

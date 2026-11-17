@@ -37,7 +37,7 @@ export function ResultsCountdown({ until, className }: { until: string; classNam
     if (!due) return;
     // A moment's grace for clocks that run a little fast.
     const first = window.setTimeout(() => router.refresh(), 1500);
-    const again = window.setInterval(() => router.refresh(), 8000);
+    const again = window.setInterval(() => { if (document.visibilityState === "visible") router.refresh(); }, 15000);
     return () => {
       window.clearTimeout(first);
       window.clearInterval(again);
