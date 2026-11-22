@@ -384,7 +384,8 @@ ${texts.join("\n\n").slice(0, 60_000)}`;
     }
   }
   await log(admin, "opportunities_publish", `Morning run: ${published} published, ${skipped} skipped`, [`found ${feeds.items.length} in feeds (${Object.entries(feeds.counts).map(([k, v]) => `${k} ${v}`).join(", ")}) and ${pageItems.length} on other pages`, ...Object.entries(reasons).map(([k, v]) => `${v} ${k}`)].join("; "));
-  // At most one notification (and email) a day, about the new opportunities only: how many, and of which kinds.
+  // At most one notification a day, about the new opportunities only: how many, and of which kinds. Its email waits for
+  // the 3-day announcement email (ap_notify_everyone, migration 0052).
   if (published) {
     const { count: sentToday } = await admin.from("automation_log").select("id", { count: "exact", head: true })
       .eq("area", "opportunities_publish").eq("action", "Members told about new opportunities").gte("at", `${today}T00:00:00+05:30`);
